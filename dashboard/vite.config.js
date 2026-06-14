@@ -12,8 +12,8 @@ export default defineConfig({
         name: 'Acronym Deploy',
         short_name: 'Deploy',
         description: 'Dashboard for the Acronym self-hosted deployment platform',
-        theme_color: '#0d1117',
-        background_color: '#0d1117',
+        theme_color: '#070b11',
+        background_color: '#070b11',
         display: 'standalone',
         orientation: 'portrait',
         start_url: '/',
@@ -37,6 +37,8 @@ export default defineConfig({
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/api\//],
         globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
+        additionalManifestEntries: [],
+        cleanupOutdatedCaches: true,
         runtimeCaching: [
           {
             // Never cache API calls; always go to network.

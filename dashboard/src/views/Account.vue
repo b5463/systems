@@ -24,13 +24,15 @@ async function logout() {
         <div
           class="center"
           style="
-            width: 52px;
-            height: 52px;
+            width: 56px;
+            height: 56px;
             border-radius: 50%;
             background: var(--accent-dim);
             color: var(--accent);
-            font-size: 22px;
+            font-size: 24px;
             font-weight: 700;
+            border: 2px solid var(--border);
+            flex-shrink: 0;
           "
         >
           {{ (auth.user?.username || '?').slice(0, 1).toUpperCase() }}
@@ -39,7 +41,7 @@ async function logout() {
           <div style="font-weight: 700; font-size: 17px">
             {{ auth.user?.username || 'Unknown' }}
           </div>
-          <div class="dim small">User ID: {{ auth.user?.id ?? '–' }}</div>
+          <div class="dim small">Self-hosted deployment platform</div>
         </div>
       </div>
     </div>
@@ -48,6 +50,6 @@ async function logout() {
       <span v-if="loggingOut" class="spinner"></span><span v-else>Log out</span>
     </button>
 
-    <p class="dim small center">Acronym Deploy · self-hosted deployment platform</p>
+    <p class="dim small center">Acronym Deploy · v1.0</p>
   </div>
 </template>

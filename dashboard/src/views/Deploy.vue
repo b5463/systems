@@ -116,11 +116,11 @@ function goToProject() {
       <div class="card stack">
         <div class="field" style="margin: 0">
           <label class="label" for="name">App name</label>
-          <input id="name" v-model="name" placeholder="My API" autocorrect="off" />
+          <input id="name" v-model="name" placeholder="e.g. Notes API" autocorrect="off" />
         </div>
 
         <div class="field" style="margin: 0">
-          <label class="label" for="slug">Slug</label>
+          <label class="label" for="slug">URL slug</label>
           <input
             id="slug"
             :value="slug"
@@ -129,13 +129,13 @@ function goToProject() {
             autocorrect="off"
             @input="onSlugInput"
           />
-          <div class="hint">2-50 characters, lowercase letters, numbers and hyphens.</div>
+          <div class="hint">Letters, numbers, hyphens — becomes the URL path.</div>
         </div>
       </div>
 
       <div
         class="dropzone"
-        :class="{ over: dragOver }"
+        :class="{ over: dragOver, 'has-file': !!file }"
         @click="fileInput && fileInput.click()"
         @dragover.prevent="dragOver = true"
         @dragleave.prevent="dragOver = false"
@@ -146,12 +146,12 @@ function goToProject() {
           <path d="M3 19h18"/>
         </svg>
         <div v-if="file">
-          <strong>{{ file.name }}</strong>
+          <strong style="font-size: 15px">{{ file.name }}</strong>
           <div class="small dim">{{ fmtSize(file.size) }} · tap to change</div>
         </div>
         <div v-else>
-          <strong>Drop your .zip here</strong>
-          <div class="small dim">or tap to browse</div>
+          <strong>Drop a .zip to deploy</strong>
+          <div class="small dim">or tap to choose file</div>
         </div>
         <input
           ref="fileInput"
@@ -170,7 +170,7 @@ function goToProject() {
       </div>
 
       <button class="btn btn-primary btn-block" type="submit" :disabled="uploading">
-        <span v-if="uploading" class="spinner"></span><span v-else>Deploy</span>
+        <span v-if="uploading" class="spinner"></span><span v-else>Deploy app</span>
       </button>
     </form>
 
@@ -186,7 +186,13 @@ function goToProject() {
       </div>
 
       <div class="card">
-        <div class="label">Build log</div>
+        <div class="spread" style="margin-bottom: 10px">
+          <div class="label" style="margin: 0">Build log</div>
+          <span class="badge badge-building">
+            <span class="dot"></span>
+            Building…
+          </span>
+        </div>
         <LogConsole :slug="deployedSlug" mode="build" />
       </div>
 

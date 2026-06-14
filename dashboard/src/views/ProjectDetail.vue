@@ -228,7 +228,27 @@ onBeforeUnmount(() => {
   </TopBar>
 
   <div class="page">
-    <div v-if="loading" class="center" style="padding: 48px"><div class="spinner"></div></div>
+    <!-- Skeleton loading -->
+    <div v-if="loading" class="stack">
+      <div class="skel-card">
+        <div class="spread" style="margin-bottom: 14px">
+          <div style="flex: 1">
+            <div class="skel skel-title" style="width: 55%"></div>
+            <div class="skel skel-line" style="width: 30%; margin-top: 8px"></div>
+          </div>
+          <div class="skel skel-badge"></div>
+        </div>
+        <div class="skel skel-line" style="width: 70%; margin-top: 12px"></div>
+        <div class="skel skel-line" style="width: 60%"></div>
+        <div class="skel skel-line" style="width: 50%"></div>
+        <div class="skel skel-line" style="width: 65%"></div>
+      </div>
+      <div class="btn-row">
+        <div class="skel" style="height: 46px; border-radius: var(--radius-sm)"></div>
+        <div class="skel" style="height: 46px; border-radius: var(--radius-sm)"></div>
+        <div class="skel" style="height: 46px; border-radius: var(--radius-sm)"></div>
+      </div>
+    </div>
 
     <template v-else-if="project">
       <div class="tabs">
@@ -246,18 +266,24 @@ onBeforeUnmount(() => {
 
       <!-- OVERVIEW -->
       <div v-show="tab === 'Overview'" class="stack">
-        <div class="card">
-          <div class="kv"><span class="k">Name</span><span class="v">{{ project.name }}</span></div>
-          <div class="kv"><span class="k">Slug</span><span class="v mono">{{ project.slug }}</span></div>
-          <div class="kv">
-            <span class="k">Public URL</span>
-            <a class="v mono" :href="publicUrl" target="_blank" rel="noopener">{{ publicUrl }}</a>
+        <!-- Status hero -->
+        <div class="card status-hero">
+          <div class="spread">
+            <div style="min-width: 0">
+              <div class="hero-name">{{ project.name }}</div>
+              <div class="mono dim small">/{{ project.slug }}</div>
+            </div>
+            <StatusBadge :status="project.status" />
           </div>
-          <div class="kv"><span class="k">Status</span><span class="v"><StatusBadge :status="project.status" /></span></div>
-          <div class="kv"><span class="k">Port</span><span class="v mono">{{ project.port ?? '–' }}</span></div>
-          <div class="kv"><span class="k">Container</span><span class="v mono small">{{ project.container_id ? String(project.container_id).slice(0, 12) : '–' }}</span></div>
-          <div class="kv"><span class="k">Created</span><span class="v small">{{ fmtDate(project.created_at) }}</span></div>
-          <div class="kv"><span class="k">Updated</span><span class="v small">{{ fmtDate(project.updated_at) }}</span></div>
+          <a class="mono small" :href="publicUrl" target="_blank" rel="noopener">{{ publicUrl }}</a>
+        </div>
+
+        <div v-if="project.status === 'error'" class="notice-error">
+          This app is in an error state — try restarting it.
+        </div>
+        <div v-else-if="project.status === 'building'" class="notice notice-building">
+          <span class="dot"></span>
+          <span>This app is building — hang tight.</span>
         </div>
 
         <div class="btn-row">
@@ -293,6 +319,15 @@ onBeforeUnmount(() => {
           style="display: none"
           @change="onRedeployFile"
         />
+
+        <div class="card">
+          <div class="kv"><span class="k">Name</span><span class="v">{{ project.name }}</span></div>
+          <div class="kv"><span class="k">Status</span><span class="v"><StatusBadge :status="project.status" /></span></div>
+          <div class="kv"><span class="k">Port</span><span class="v mono">{{ project.port ?? '–' }}</span></div>
+          <div class="kv"><span class="k">Container</span><span class="v mono small">{{ project.container_id ? String(project.container_id).slice(0, 12) : '–' }}</span></div>
+          <div class="kv"><span class="k">Created</span><span class="v small">{{ fmtDate(project.created_at) }}</span></div>
+          <div class="kv"><span class="k">Updated</span><span class="v small">{{ fmtDate(project.updated_at) }}</span></div>
+        </div>
 
         <div v-if="showBuildLog" class="card">
           <div class="label">Redeploy build log</div>

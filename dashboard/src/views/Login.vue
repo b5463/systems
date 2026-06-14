@@ -35,8 +35,8 @@ async function submit() {
   <div class="page no-nav center" style="flex-direction: column; min-height: 100vh">
     <div style="width: 100%; max-width: 360px">
       <div style="text-align: center; margin-bottom: 28px">
-        <div style="display: inline-flex; align-items: center; justify-content: center; width: 46px; height: 46px; border-radius: 10px; background: var(--accent-dim); margin-bottom: 14px">
-          <span style="color: var(--accent); font-weight: 800; font-size: 17px; font-family: var(--mono); letter-spacing: -0.04em">AC</span>
+        <div style="display: inline-flex; align-items: center; justify-content: center; width: 52px; height: 52px; border-radius: 12px; background: var(--accent-dim); margin-bottom: 14px">
+          <span style="color: var(--accent); font-weight: 800; font-size: 19px; font-family: var(--mono); letter-spacing: -0.04em">AC</span>
         </div>
         <h1 style="margin: 0 0 4px; font-size: 21px">Acronym Deploy</h1>
         <p class="muted small" style="margin: 0">Sign in to manage your apps</p>

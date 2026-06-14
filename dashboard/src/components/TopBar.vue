@@ -16,7 +16,9 @@ function goBack() {
 
 <template>
   <header class="topbar">
-    <button v-if="back" class="iconbtn" aria-label="Back" @click="goBack">‹</button>
+    <button v-if="back" class="iconbtn" aria-label="Back" @click="goBack">
+      <svg viewBox="0 0 24 24" stroke-width="2"><path d="M15 18l-6-6 6-6" /></svg>
+    </button>
     <h1>{{ title }}</h1>
     <slot name="actions" />
   </header>
