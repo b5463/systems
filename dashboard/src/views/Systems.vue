@@ -154,14 +154,14 @@ onBeforeUnmount(() => clearInterval(timer))
     <!-- Latest deploy + server mini-status, side by side on desktop -->
     <div class="grid grid-2" style="margin-bottom: 22px; align-items:stretch">
       <div v-if="latest" class="card card-tap" @click="open(latest)">
-        <div class="section-label" style="margin-bottom:10px">Latest deploy</div>
+        <div class="section-label">Latest deploy</div>
         <div class="spread">
           <div style="min-width:0"><div class="sc-name">{{ latest.name }}</div><div class="mono small dim">{{ hostFor(latest.slug) }}</div></div>
           <div class="row gap-sm"><span class="small muted">{{ fmtAgo(latest.updated_at || latest.created_at) }}</span><StatusBadge :status="latest.status" /></div>
         </div>
       </div>
       <div class="card">
-        <div class="section-label" style="margin-bottom:10px">Server</div>
+        <div class="section-label">Server</div>
         <div v-if="server" class="server-mini">
           <span><span class="sdot" :class="statusTone(server.docker.status)"></span>Docker {{ statusLabel(server.docker.status) }}</span>
           <span><span class="sdot" :class="statusTone(server.caddy.status)"></span>Caddy {{ statusLabel(server.caddy.status) }}</span>

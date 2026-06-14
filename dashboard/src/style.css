@@ -1693,3 +1693,6 @@ select:focus {
 
 /* Quieter, smaller wordmark in the mobile top bar. */
 .mobile-bar .brand-img { height: 12px; }
+
+/* Section labels inside a .stack rely on the stack gap (no extra margin). */
+.stack > .section-label { margin-bottom: 0; }

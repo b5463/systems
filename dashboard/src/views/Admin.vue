@@ -135,7 +135,7 @@ onMounted(loadUsers)
 
       <!-- Change password -->
       <div class="card stack">
-        <div class="section-label" style="margin:0">Change password</div>
+        <div class="section-label">Change password</div>
         <input v-model="currentPassword" type="password" placeholder="Current password" autocomplete="current-password" />
         <input v-model="newPassword" type="password" placeholder="New password (min 8 chars)" autocomplete="new-password" />
         <input v-model="confirmPassword" type="password" placeholder="Confirm new password" autocomplete="new-password" />
@@ -148,7 +148,7 @@ onMounted(loadUsers)
 
       <!-- Session -->
       <div class="card stack">
-        <div class="section-label" style="margin:0">Session</div>
+        <div class="section-label">Session</div>
         <button class="btn btn-danger btn-block" :disabled="loggingOut" @click="logout">
           <span v-if="loggingOut" class="spinner"></span><span v-else>Sign out</span>
         </button>
@@ -160,7 +160,7 @@ onMounted(loadUsers)
       <!-- Admins -->
       <div class="card stack">
         <div class="spread">
-          <div class="section-label" style="margin:0">Administrators</div>
+          <div class="section-label">Administrators</div>
           <button v-if="!showAddForm && !atCap" class="btn btn-sm btn-ghost" @click="showAddForm = true">Add admin</button>
           <span v-else-if="atCap" class="small dim">2 / 2</span>
         </div>
@@ -210,7 +210,7 @@ onMounted(loadUsers)
 
       <!-- Limits & retention -->
       <div class="card stack">
-        <div class="section-label" style="margin:0">Limits &amp; retention</div>
+        <div class="section-label">Limits &amp; retention</div>
         <div class="kv"><span class="k">Max upload size</span><span class="v mono">{{ UPLOAD_MAX_MB }} MB</span></div>
         <div class="kv"><span class="k">Release retention</span><span class="v mono">{{ RELEASE_RETENTION }} releases</span></div>
         <div class="hint">
@@ -220,7 +220,7 @@ onMounted(loadUsers)
 
       <!-- Security & audit -->
       <div class="card stack">
-        <div class="section-label" style="margin:0">Security &amp; audit</div>
+        <div class="section-label">Security &amp; audit</div>
         <div class="row gap-sm">
           <RouterLink class="btn btn-sm btn-ghost" :to="{ name: 'events' }">Audit log</RouterLink>
           <RouterLink class="btn btn-sm btn-ghost" :to="{ name: 'server' }">SYSTEMS. health</RouterLink>

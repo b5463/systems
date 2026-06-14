@@ -515,7 +515,7 @@ onBeforeUnmount(() => {
       </div>
 
       <div class="card stack">
-        <div class="section-label" style="margin:0">Add / update variables</div>
+        <div class="section-label">Add / update variables</div>
         <div v-for="(row, i) in envVars" :key="i" class="row">
           <input v-model="row.key" placeholder="KEY" autocapitalize="characters" autocorrect="off" />
           <input v-model="row.value" placeholder="value" autocorrect="off" />
@@ -530,7 +530,7 @@ onBeforeUnmount(() => {
 
       <!-- Visibility -->
       <div class="card stack">
-        <div class="section-label" style="margin:0">Visibility</div>
+        <div class="section-label">Visibility</div>
         <div class="segmented">
           <button type="button" :class="{ active: system.visibility === 'public' }" :disabled="visSaving" @click="setVisibility('public')">Public</button>
           <button type="button" :class="{ active: system.visibility === 'private' }" :disabled="visSaving" @click="setVisibility('private')">Private</button>
@@ -543,7 +543,7 @@ onBeforeUnmount(() => {
       </div>
 
       <div class="card stack">
-        <div class="section-label danger-label" style="margin:0">Danger zone</div>
+        <div class="section-label danger-label">Danger zone</div>
         <div class="hint"><strong>Delete</strong> stops the container and removes the public route but keeps history. <strong>Purge</strong> removes everything permanently.</div>
         <div class="btn-row">
           <button class="btn btn-danger" @click="openDelete">Delete</button>

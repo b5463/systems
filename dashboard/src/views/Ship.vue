@@ -125,7 +125,7 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
       </div>
     </div>
     <div class="card">
-      <div class="section-label" style="margin-bottom: 10px">Build log</div>
+      <div class="section-label">Build log</div>
       <LogConsole :slug="deployedSlug" mode="build" @finished="onBuildFinished" />
     </div>
     <div class="btn-row" style="max-width: 360px">
@@ -139,7 +139,7 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
     <!-- LEFT: configuration -->
     <div class="stack">
       <div class="card stack">
-        <div class="section-label" style="margin:0">System</div>
+        <div class="section-label">System</div>
         <div class="field" style="margin:0">
           <label class="label" for="name">Name</label>
           <input id="name" v-model="name" placeholder="Notes API" autocorrect="off" />
@@ -155,7 +155,7 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
       </div>
 
       <div class="card stack">
-        <div class="section-label" style="margin:0">Visibility</div>
+        <div class="section-label">Visibility</div>
         <div class="segmented">
           <button v-for="v in VISIBILITY" :key="v.key" type="button" :class="{ active: visibility === v.key }" :disabled="v.after" :title="v.after ? 'Set after the first deploy' : ''" @click="visibility = v.key">{{ v.label }}</button>
         </div>
@@ -163,7 +163,7 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
       </div>
 
       <div class="card stack">
-        <div class="section-label" style="margin:0">Build</div>
+        <div class="section-label">Build</div>
         <div class="hint">Auto-detected from the archive — Vue/Vite, static, Node, or Dockerfile.</div>
         <div class="field" style="margin:0">
           <label class="label">Build command</label>
@@ -177,7 +177,7 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
       </div>
 
       <div class="card stack">
-        <div class="section-label" style="margin:0">Environment &amp; limits</div>
+        <div class="section-label">Environment &amp; limits</div>
         <div class="hint">Env vars are set after the first deploy, in Settings. Memory/CPU/PIDs use platform defaults — see <RouterLink :to="{ name: 'server' }">Server</RouterLink>.</div>
       </div>
     </div>
@@ -185,7 +185,7 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
     <!-- RIGHT: upload + lifecycle -->
     <div class="stack">
       <div class="card stack">
-        <div class="step-head"><span class="step-num" :class="{ active: !file, done: !!file }">1</span><div class="section-label" style="margin:0">Source archive</div></div>
+        <div class="step-head"><span class="step-num" :class="{ active: !file, done: !!file }">1</span><div class="section-label">Source archive</div></div>
         <div class="dropzone" :class="{ over: dragOver, 'has-file': !!file }" @click="fileInput && fileInput.click()" @dragover.prevent="dragOver = true" @dragleave.prevent="dragOver = false" @drop.prevent="onDrop">
           <svg class="dz-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5" /><path d="M3 19h18" /></svg>
           <div v-if="file"><strong style="font-size: 15px">{{ file.name }}</strong><div class="small dim">{{ fmtSize(file.size) }} · click to change</div></div>
@@ -195,7 +195,7 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
       </div>
 
       <div class="card stack">
-        <div class="step-head"><span class="step-num" :class="{ active: !!file }">2</span><div class="section-label" style="margin:0">Detection &amp; plan</div></div>
+        <div class="step-head"><span class="step-num" :class="{ active: !!file }">2</span><div class="section-label">Detection &amp; plan</div></div>
         <div class="detect-row">
           <span class="kv"><span class="k">Type</span><span class="v dim">{{ file ? 'detected during build' : 'waiting for archive…' }}</span></span>
           <span class="kv"><span class="k">Container</span><span class="v mono small">{{ plan ? plan.containerName : (slug ? 'systems-' + slug : 'systems-{slug}') }}</span></span>
@@ -211,7 +211,7 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
       </div>
 
       <div class="card stack">
-        <div class="step-head"><span class="step-num" :class="{ active: !!file }">3</span><div class="section-label" style="margin:0">Ship</div></div>
+        <div class="step-head"><span class="step-num" :class="{ active: !!file }">3</span><div class="section-label">Ship</div></div>
         <div class="lifecycle">
           <template v-for="(step, i) in LIFECYCLE" :key="step">
             <span class="lc-step"><span class="lc-dot"></span>{{ step }}</span>
