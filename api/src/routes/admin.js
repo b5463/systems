@@ -37,6 +37,12 @@ async function adminRoutes(fastify, options) {
       return reply.code(400).send({ error: 'Password must be at least 8 characters.' });
     }
 
+    // Hard cap: SYSTEMS. is a two-admin platform. No public signup, ever.
+    const adminCount = db.prepare('SELECT COUNT(*) AS c FROM users').get().c;
+    if (adminCount >= 2) {
+      return reply.code(409).send({ error: 'SYSTEMS. allows a maximum of two admins.' });
+    }
+
     const existing = db.prepare('SELECT id FROM users WHERE username = ?').get(username);
     if (existing) {
       return reply.code(409).send({ error: 'A user with this username already exists.' });

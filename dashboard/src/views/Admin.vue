@@ -69,6 +69,7 @@ async function loadUsers() {
 }
 
 const otherAdmins = computed(() => users.value.filter((u) => u.id !== auth.user?.id))
+const atCap = computed(() => users.value.length >= 2) // two admins max — no public signup
 
 const newUsername = ref('')
 const newUserPassword = ref('')
@@ -160,7 +161,8 @@ onMounted(loadUsers)
       <div class="card stack">
         <div class="spread">
           <div class="section-label" style="margin:0">Administrators</div>
-          <button v-if="!showAddForm" class="btn btn-sm btn-ghost" @click="showAddForm = true">Add admin</button>
+          <button v-if="!showAddForm && !atCap" class="btn btn-sm btn-ghost" @click="showAddForm = true">Add admin</button>
+          <span v-else-if="atCap" class="small dim">2 / 2</span>
         </div>
 
         <div v-if="usersLoading" class="muted small">Loading admins…</div>
@@ -219,7 +221,8 @@ onMounted(loadUsers)
       <!-- Security & audit -->
       <div class="card stack">
         <div class="section-label" style="margin:0">Security &amp; audit</div>
-        <div class="kv"><span class="k">Public signup</span><span class="v">Disabled</span></div>
+        <div class="kv"><span class="k">Public signup</span><span class="v">Never</span></div>
+        <div class="kv"><span class="k">Admins</span><span class="v">2 maximum</span></div>
         <div class="kv"><span class="k">Dashboard access</span><span class="v">Admin-only</span></div>
         <div class="kv"><span class="k">Password hashing</span><span class="v mono small">bcrypt</span></div>
         <RouterLink class="btn btn-sm btn-ghost" :to="{ name: 'events' }" style="margin-top:4px">View audit log</RouterLink>
