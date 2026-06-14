@@ -32,17 +32,17 @@ async function submit() {
 </script>
 
 <template>
-  <div class="page no-nav center" style="flex-direction: column; min-height: 100vh">
-    <div style="width: 100%; max-width: 360px">
-      <div style="text-align: center; margin-bottom: 28px">
-        <div style="display: inline-flex; align-items: center; justify-content: center; width: 52px; height: 52px; border-radius: 12px; background: var(--accent-dim); margin-bottom: 14px">
-          <span style="color: var(--accent); font-weight: 800; font-size: 19px; font-family: var(--mono); letter-spacing: -0.04em">AC</span>
+  <div class="login-page" style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 24px;">
+    <div style="width: 100%; max-width: 340px">
+      <div style="text-align: center; margin-bottom: 32px">
+        <div style="display: inline-flex; align-items: center; justify-content: center; width: 52px; height: 52px; border-radius: 13px; background: var(--accent-dim); border: 1px solid rgba(45,212,191,0.18); margin-bottom: 18px">
+          <span style="color: var(--accent); font-weight: 800; font-size: 17px; font-family: var(--mono); letter-spacing: -0.05em">AC</span>
         </div>
-        <h1 style="margin: 0 0 4px; font-size: 21px">Acronym Deploy</h1>
-        <p class="muted small" style="margin: 0">Sign in to manage your apps</p>
+        <div style="font-size: 20px; font-weight: 700; margin-bottom: 5px; letter-spacing: -0.02em">Acronym Deploy</div>
+        <div style="font-size: 13px; color: var(--text-dim)">Self-hosted deployment platform</div>
       </div>
 
-      <form class="card stack" @submit.prevent="submit">
+      <form class="card stack" style="animation: none; border-color: var(--border)" @submit.prevent="submit">
         <div class="field" style="margin: 0">
           <label class="label" for="u">Username</label>
           <input
@@ -65,6 +65,8 @@ async function submit() {
           <span v-else>Sign in</span>
         </button>
       </form>
+
+      <p style="text-align: center; font-size: 11px; color: var(--text-dim); margin-top: 24px; letter-spacing: 0.04em; text-transform: uppercase">Acronym · v1.0</p>
     </div>
   </div>
 </template>

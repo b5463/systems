@@ -4,8 +4,8 @@
   --bg-elevated: #131920;
   --bg-hover: #161d27;
   --bg-input: #0b0f15;
-  --border: #1c2535;
-  --border-soft: #141c28;
+  --border: #1e2d40;
+  --border-soft: #192333;
   --text: #e8edf5;
   --text-muted: #8894a0;
   --text-dim: #4c5766;
@@ -62,7 +62,7 @@ body {
 }
 
 a {
-  color: var(--accent);
+  color: #5ab6ff;
   text-decoration: none;
 }
 
@@ -257,18 +257,19 @@ textarea:focus {
 }
 
 .btn-primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #04201d;
+  background: #0a7a72;
+  border-color: #0c8f86;
+  color: #d4faf7;
 }
 
 .btn-primary:hover {
-  background: var(--accent-hover);
-  border-color: var(--accent-hover);
+  background: #0c8f86;
+  border-color: #10a99f;
+  color: #e8fffe;
 }
 
 .btn-primary:active {
-  background: var(--accent-hover);
+  background: #0a7a72;
 }
 
 .btn-danger {
@@ -297,37 +298,24 @@ textarea:focus {
 .badge {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 3px 10px;
-  border-radius: 999px;
+  gap: 5px;
   font-size: 12px;
-  font-weight: 600;
-  text-transform: capitalize;
-  letter-spacing: 0.02em;
+  font-weight: 500;
   white-space: nowrap;
 }
 
 .badge .dot {
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
+  flex-shrink: 0;
   background: currentColor;
 }
 
-.badge-running {
-  background: rgba(63, 185, 80, 0.15);
-  color: var(--ok);
-}
-.badge-stopped {
-  background: rgba(76, 87, 102, 0.2);
-  color: var(--grey);
-}
-.badge-error {
-  background: rgba(248, 81, 73, 0.16);
-  color: var(--danger);
-}
+.badge-running  { color: var(--ok); }
+.badge-stopped  { color: var(--text-dim); }
+.badge-error    { color: var(--danger); }
 .badge-building {
-  background: rgba(210, 153, 34, 0.16);
   color: var(--warn);
   animation: pulse 1.4s ease-in-out infinite;
 }
@@ -364,9 +352,14 @@ textarea:focus {
 /* Status summary pills */
 .summary-bar {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 8px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding-bottom: 2px;
 }
+.summary-bar::-webkit-scrollbar { display: none; }
 
 .stat-pill {
   display: inline-flex;
@@ -913,3 +906,16 @@ textarea:focus {
 .fade-leave-to {
   opacity: 0;
 }
+
+/* Login atmospheric glow */
+.login-page {
+  background:
+    radial-gradient(ellipse at 50% 28%, rgba(45, 212, 191, 0.07) 0%, transparent 60%),
+    var(--bg);
+}
+
+/* App card error accent */
+.card-error {
+  border-left: 3px solid var(--danger);
+}
+

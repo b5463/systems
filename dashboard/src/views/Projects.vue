@@ -139,6 +139,7 @@ onBeforeUnmount(() => clearInterval(timer))
         v-for="p in projects"
         :key="p.id"
         class="card card-tap"
+        :class="{ 'card-error': p.status === 'error' }"
         @click="open(p)"
       >
         <div class="spread">

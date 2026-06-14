@@ -7,21 +7,22 @@ const props = defineProps({
 
 const cls = computed(() => {
   switch (props.status) {
-    case 'running':
-      return 'badge-running'
-    case 'building':
-      return 'badge-building'
-    case 'error':
-      return 'badge-error'
-    default:
-      return 'badge-stopped'
+    case 'running':  return 'badge-running'
+    case 'building': return 'badge-building'
+    case 'error':    return 'badge-error'
+    default:         return 'badge-stopped'
   }
+})
+
+const label = computed(() => {
+  if (!props.status) return 'Unknown'
+  return props.status.charAt(0).toUpperCase() + props.status.slice(1)
 })
 </script>
 
 <template>
   <span class="badge" :class="cls">
     <span class="dot"></span>
-    {{ status || 'unknown' }}
+    {{ label }}
   </span>
 </template>

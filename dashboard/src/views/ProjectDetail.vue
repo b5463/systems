@@ -321,12 +321,10 @@ onBeforeUnmount(() => {
         />
 
         <div class="card">
-          <div class="kv"><span class="k">Name</span><span class="v">{{ project.name }}</span></div>
-          <div class="kv"><span class="k">Status</span><span class="v"><StatusBadge :status="project.status" /></span></div>
           <div class="kv"><span class="k">Port</span><span class="v mono">{{ project.port ?? '–' }}</span></div>
           <div class="kv"><span class="k">Container</span><span class="v mono small">{{ project.container_id ? String(project.container_id).slice(0, 12) : '–' }}</span></div>
-          <div class="kv"><span class="k">Created</span><span class="v small">{{ fmtDate(project.created_at) }}</span></div>
-          <div class="kv"><span class="k">Updated</span><span class="v small">{{ fmtDate(project.updated_at) }}</span></div>
+          <div class="kv"><span class="k">Deployed</span><span class="v small">{{ fmtDate(project.created_at) }}</span></div>
+          <div class="kv"><span class="k">Last updated</span><span class="v small">{{ fmtDate(project.updated_at) }}</span></div>
         </div>
 
         <div v-if="showBuildLog" class="card">
