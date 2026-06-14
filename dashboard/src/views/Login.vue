@@ -37,13 +37,13 @@ async function submit() {
   <div class="login-page">
     <!-- White ASCII chaos art (decorative, inert) -->
     <div class="login-art">
-      <AsciiChaosField :intensity="1.05" :cell="13" />
+      <AsciiChaosField :intensity="0.8" :cell="14" />
     </div>
 
-    <!-- Brand zone -->
+    <!-- Desktop brand zone -->
     <div class="login-brandzone">
       <SystemsLogo size="lg" />
-      <p class="lz-tag">Private deployment console — ship a zip, get a live system at your own infrastructure.</p>
+      <p class="lz-tag">Private deployment console</p>
       <div class="lz-meta">
         <span>Admin-only</span>
         <span>No public signup</span>
@@ -54,13 +54,13 @@ async function submit() {
     <!-- Form zone -->
     <div class="login-formzone">
       <div class="lf-inner">
-        <!-- Mobile-only compact lockup -->
+        <!-- Mobile-only compact brand (logo sits in its own ASCII halo) -->
         <div class="lf-mobile-brand">
           <SystemsLogo size="lg" />
-          <p class="lz-tag" style="margin-top:14px">Private deployment console</p>
+          <p class="lz-tag">Private deployment console</p>
         </div>
 
-        <form class="card stack" style="animation:none;border-color:var(--border)" @submit.prevent="submit">
+        <form class="card stack login-card" @submit.prevent="submit">
           <div class="field" style="margin:0">
             <label class="label" for="u">Administrator</label>
             <input id="u" v-model="username" autocomplete="username" autocapitalize="none" autocorrect="off" placeholder="username" />
@@ -77,20 +77,19 @@ async function submit() {
             <span v-else>Enter SYSTEMS.</span>
           </button>
         </form>
-
-        <p class="login-foot">Hardened · least-privilege · private infrastructure</p>
       </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-/* The brand zone is the desktop left column; on mobile it is replaced by the
-   compact lockup inside the form zone. */
-.lf-mobile-brand { display: none; text-align: center; margin-bottom: 28px; }
+.lf-mobile-brand { display: none; text-align: center; }
 
 @media (max-width: 860px) {
   .login-brandzone { display: none; }
   .lf-mobile-brand { display: block; }
+  /* smaller, calmer logo on mobile */
+  .lf-mobile-brand :deep(.brand-img.lg) { height: 22px; margin: 0 auto; }
+  .lf-mobile-brand .lz-tag { margin-top: 14px; }
 }
 </style>

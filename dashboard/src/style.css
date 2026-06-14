@@ -1510,13 +1510,13 @@ select:focus {
   background: #08080a;
 }
 .login-art::after {
-  /* pure monochrome vignette + fade toward the form side (no color) */
+  /* pure monochrome vignette + a firm fade so the form side reads clean */
   content: '';
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(130% 100% at 25% 45%, rgba(0,0,0,0) 0%, rgba(8,8,10,0.35) 70%),
-    linear-gradient(100deg, transparent 0%, transparent 42%, rgba(8,8,10,0.6) 66%, var(--bg) 88%);
+    radial-gradient(130% 100% at 24% 46%, rgba(0,0,0,0) 0%, rgba(8,8,10,0.4) 72%),
+    linear-gradient(100deg, transparent 0%, transparent 34%, rgba(8,8,10,0.72) 56%, var(--bg) 78%);
 }
 .login-brandzone {
   position: relative;
@@ -1561,21 +1561,28 @@ select:focus {
 }
 
 @media (max-width: 860px) {
-  .login-page { grid-template-columns: 1fr; }
-  .login-art { height: 42vh; bottom: auto; }
+  .login-page { grid-template-columns: 1fr; display: block; }
+
+  /* ASCII art becomes a small, controlled halo around the logo only —
+     dimmed, masked tight to the top-centre, and never behind the form. */
+  .login-art {
+    height: 34vh;
+    bottom: auto;
+    opacity: 0.5;
+    -webkit-mask-image: radial-gradient(58% 42% at 50% 30%, #000 0%, #000 8%, transparent 56%);
+    mask-image: radial-gradient(58% 42% at 50% 30%, #000 0%, #000 8%, transparent 56%);
+  }
   .login-art::after {
-    background: linear-gradient(180deg, transparent 38%, rgba(8,8,10,0.6) 78%, var(--bg) 100%);
+    background: linear-gradient(180deg, transparent 36%, rgba(8,8,10,0.7) 70%, var(--bg) 100%);
   }
-  .login-brandzone {
-    align-items: center;
-    text-align: center;
-    padding: 40px 24px 8px;
-    min-height: 42vh;
-    justify-content: flex-end;
+
+  /* generous top breathing room; brand and form clearly separated */
+  .login-formzone {
+    padding: 13vh 24px 48px;
+    align-items: flex-start;
+    min-height: 100vh;
   }
-  .login-brandzone .lz-tag { max-width: none; }
-  .login-brandzone .lz-meta { display: none; }
-  .login-formzone { padding: 24px 24px 40px; align-items: flex-start; }
+  .lf-mobile-brand { margin-bottom: 44px; }
 }
 
 /* ---------- Deploy lifecycle rail (Ship) ---------- */
