@@ -26,6 +26,7 @@ async function execRoutes(fastify, options) {
     }
 
     let execStream = null;
+    let execResize = null;
     let closed = false;
 
     const onData = (data) => {
@@ -42,7 +43,9 @@ async function execRoutes(fastify, options) {
     };
 
     try {
-      execStream = await dockerService.execContainer(project.container_id, onData, onEnd);
+      const session = await dockerService.execContainer(project.container_id, onData, onEnd);
+      execStream = session.stream;
+      execResize = session.resize;
     } catch (err) {
       request.log.error({ err }, '[exec] Failed to open exec session');
       if (socket.readyState === socket.OPEN) {
@@ -63,15 +66,26 @@ async function execRoutes(fastify, options) {
     // or { type: 'resize', cols: N, rows: N } for terminal resize
     socket.on('message', (msg) => {
       if (!execStream || closed) return;
+      const raw = msg.toString();
+      let parsed = null;
       try {
-        const parsed = JSON.parse(msg.toString());
-        if (parsed.type === 'input') {
-          execStream.write(parsed.data);
-        }
-        // Resize not supported via Dockerode hijacked stream — frontend should handle gracefully
+        parsed = JSON.parse(raw);
       } catch (e) {
-        // Treat raw non-JSON as direct input
-        try { execStream.write(msg.toString()); } catch (we) { /* stream gone */ }
+        // Treat raw non-JSON as direct input (backward compat).
+        try { execStream.write(raw); } catch (we) { /* stream gone */ }
+        return;
+      }
+
+      if (parsed.type === 'input') {
+        try { execStream.write(parsed.data); } catch (we) { /* stream gone */ }
+      } else if (parsed.type === 'resize') {
+        const cols = Number(parsed.cols);
+        const rows = Number(parsed.rows);
+        if (execResize && Number.isInteger(cols) && Number.isInteger(rows)) {
+          Promise.resolve(execResize({ h: rows, w: cols })).catch((re) => {
+            request.log.warn({ err: re }, '[exec] resize failed');
+          });
+        }
       }
     });
 

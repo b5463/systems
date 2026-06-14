@@ -3,6 +3,7 @@ import { onMounted, onBeforeUnmount, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from './stores/auth'
 import BottomNav from './components/BottomNav.vue'
+import Toast from './components/Toast.vue'
 
 const auth = useAuthStore()
 const route = useRoute()
@@ -32,6 +33,7 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="app-shell">
+    <Toast />
     <router-view v-if="auth.ready" />
     <div v-else class="center" style="min-height: 100vh">
       <div class="spinner"></div>

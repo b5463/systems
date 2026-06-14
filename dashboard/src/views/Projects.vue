@@ -4,12 +4,15 @@ import { useRouter } from 'vue-router'
 import { api } from '../api/client'
 import TopBar from '../components/TopBar.vue'
 import StatusBadge from '../components/StatusBadge.vue'
+import { useToast } from '../composables/useToast'
 
 const router = useRouter()
+const { showToast } = useToast()
 const projects = ref([])
 const loading = ref(true)
 const error = ref('')
 const stats = ref({}) // slug -> stats
+const prevStatuses = ref({}) // slug -> last known status
 
 let timer = null
 
@@ -18,6 +21,15 @@ async function load(silent = false) {
   try {
     const data = await api.get('/projects')
     projects.value = data.projects || []
+
+    // Crash detection: a project that was running and is now error/stopped.
+    for (const p of projects.value) {
+      const prev = prevStatuses.value[p.slug]
+      if (prev === 'running' && (p.status === 'error' || p.status === 'stopped')) {
+        showToast(`${p.name} stopped unexpectedly`, 'error')
+      }
+      prevStatuses.value[p.slug] = p.status
+    }
     // Fetch lightweight stats for running apps.
     const running = projects.value.filter((p) => p.status === 'running')
     await Promise.all(

@@ -30,13 +30,17 @@ const envVars = ref([{ key: '', value: '' }])
 const envSaving = ref(false)
 const envMsg = ref('')
 
-/* ---- Redeploy / delete ---- */
+/* ---- Redeploy / delete / rollback ---- */
 const redeployFile = ref(null)
 const redeploying = ref(false)
 const showBuildLog = ref(false)
 const confirmDelete = ref(false)
 const deleting = ref(false)
 const fileInput = ref(null)
+const rollingBack = ref(false)
+
+/* ---- Analytics history note ---- */
+const historyMinutes = ref(0)
 
 const publicUrl = computed(() => (project.value ? `/${project.value.slug}/` : '#'))
 
@@ -91,10 +95,35 @@ async function pollStats() {
   }
 }
 
-function startStats() {
+async function loadStatsHistory() {
+  try {
+    const data = await api.get(`/projects/${props.slug}/stats/history?hours=1`)
+    const points = data.points || []
+    if (points.length) {
+      const mapped = points.map((p) => ({
+        label: new Date(p.recorded_at).toLocaleTimeString(),
+        cpu: p.cpu_percent ?? 0,
+        mem: p.memory_mb ?? 0
+      }))
+      // Keep the chart window bounded (matches the live-poll 60-point cap).
+      history.value = mapped.slice(-60)
+      const first = new Date(points[0].recorded_at).getTime()
+      const last = new Date(points[points.length - 1].recorded_at).getTime()
+      const mins = Math.round((last - first) / 60000)
+      historyMinutes.value = Number.isFinite(mins) && mins > 0 ? mins : 0
+    }
+  } catch {
+    /* history is best-effort */
+  }
+}
+
+async function startStats() {
   stopStats()
   history.value = []
   latestStats.value = null
+  historyMinutes.value = 0
+  // Pre-populate from persisted history, then start live polling.
+  await loadStatsHistory()
   pollStats()
   statsTimer = setInterval(pollStats, 2000)
 }
@@ -179,6 +208,22 @@ async function doRedeploy() {
   } finally {
     redeploying.value = false
     redeployFile.value = null
+  }
+}
+
+/* ---------- Rollback ---------- */
+async function doRollback() {
+  if (rollingBack.value) return
+  rollingBack.value = true
+  error.value = ''
+  try {
+    const data = await api.post(`/projects/${props.slug}/rollback`)
+    if (data && data.project) project.value = data.project
+    else await loadProject()
+  } catch (e) {
+    error.value = e.message || 'Rollback failed.'
+  } finally {
+    rollingBack.value = false
   }
 }
 
@@ -309,6 +354,14 @@ onBeforeUnmount(() => {
           <button class="btn" :disabled="redeploying" @click="pickRedeploy">
             <span v-if="redeploying" class="spinner"></span><span v-else>Redeploy</span>
           </button>
+          <button
+            v-if="project.previous_image_id"
+            class="btn"
+            :disabled="rollingBack"
+            @click="doRollback"
+          >
+            <span v-if="rollingBack" class="spinner"></span><span v-else>Rollback</span>
+          </button>
           <button class="btn btn-danger" @click="confirmDelete = true">Delete</button>
         </div>
 
@@ -337,6 +390,9 @@ onBeforeUnmount(() => {
       <div v-show="tab === 'Analytics'">
         <div v-if="project.status !== 'running'" class="notice" style="margin-bottom: 14px">
           App is not running — live stats are unavailable.
+        </div>
+        <div v-if="historyMinutes > 0" class="small muted" style="margin-bottom: 10px">
+          Showing last {{ historyMinutes }} minutes of data
         </div>
         <StatsCharts :history="history" :latest="latestStats" />
       </div>

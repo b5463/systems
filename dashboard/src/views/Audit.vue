@@ -1,11 +1,29 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { api } from '../api/client'
 import TopBar from '../components/TopBar.vue'
 
 const entries = ref([])
+const total = ref(0)
 const loading = ref(true)
 const error = ref('')
+
+/* ---- Filters ---- */
+const ACTION_OPTIONS = [
+  'deploy',
+  'restart',
+  'stop',
+  'start',
+  'login',
+  'login_fail',
+  'env_update',
+  'delete',
+  'rollback'
+]
+const filterAction = ref('')
+const filterTarget = ref('')
+const filterUser = ref('')
+let textDebounce = null
 
 function fmtDate(s) {
   if (!s) return ''
@@ -22,7 +40,8 @@ const ACTION_LABELS = {
   login: 'Signed in',
   login_fail: 'Failed login',
   env_update: 'Updated env vars',
-  delete: 'Deleted app'
+  delete: 'Deleted app',
+  rollback: 'Rolled back'
 }
 
 function humanize(action) {
@@ -57,14 +76,27 @@ function dotColor(action) {
 async function load() {
   error.value = ''
   try {
-    const data = await api.get('/audit')
+    const params = new URLSearchParams()
+    if (filterAction.value) params.set('action', filterAction.value)
+    if (filterTarget.value.trim()) params.set('target', filterTarget.value.trim())
+    if (filterUser.value.trim()) params.set('username', filterUser.value.trim())
+    const qs = params.toString()
+    const data = await api.get(`/audit${qs ? `?${qs}` : ''}`)
     entries.value = data.entries || []
+    total.value = data.total ?? entries.value.length
   } catch (e) {
     if (e.status !== 401) error.value = e.message || 'Failed to load activity.'
   } finally {
     loading.value = false
   }
 }
+
+// Dropdown changes refetch immediately; text inputs debounce 300ms.
+watch(filterAction, () => load())
+watch([filterTarget, filterUser], () => {
+  clearTimeout(textDebounce)
+  textDebounce = setTimeout(() => load(), 300)
+})
 
 onMounted(load)
 </script>
@@ -82,6 +114,19 @@ onMounted(load)
   </TopBar>
 
   <div class="page">
+    <!-- Filter bar -->
+    <div class="card stack" style="gap: 10px; margin-bottom: 14px">
+      <select v-model="filterAction">
+        <option value="">All actions</option>
+        <option v-for="a in ACTION_OPTIONS" :key="a" :value="a">{{ a }}</option>
+      </select>
+      <div class="row" style="gap: 10px">
+        <input v-model="filterTarget" placeholder="Filter by app" autocapitalize="none" autocorrect="off" />
+        <input v-model="filterUser" placeholder="Filter by user" autocapitalize="none" autocorrect="off" />
+      </div>
+      <div class="small muted">{{ total }} result{{ total === 1 ? '' : 's' }}</div>
+    </div>
+
     <!-- Skeleton loading -->
     <div v-if="loading" class="timeline">
       <div v-for="i in 4" :key="i" class="tl-item">

@@ -33,6 +33,11 @@ function doFit() {
   }
 }
 
+function sendResize() {
+  if (!term || !ws || ws.readyState !== WebSocket.OPEN) return
+  ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }))
+}
+
 function connect() {
   status.value = 'connecting'
   errMsg.value = ''
@@ -41,6 +46,9 @@ function connect() {
     onOpen() {
       status.value = 'connected'
       term && term.focus()
+      // Fit + send the current terminal size once the session is live.
+      doFit()
+      sendResize()
     },
     onMessage(msg) {
       if (typeof msg === 'string') {
@@ -86,6 +94,9 @@ onMounted(() => {
       ws.send(JSON.stringify({ type: 'input', data }))
     }
   })
+
+  // When xterm reflows to a new size, tell the backend to resize the TTY.
+  term.onResize(() => sendResize())
 
   resizeObserver = new ResizeObserver(() => doFit())
   resizeObserver.observe(wrap.value)

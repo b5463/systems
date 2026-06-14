@@ -4,6 +4,9 @@ import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
 import { openWs } from '../api/ws'
+import { useAuthStore } from '../stores/auth'
+
+const auth = useAuthStore()
 
 const props = defineProps({
   slug: { type: String, required: true },
@@ -85,6 +88,17 @@ function doFit() {
   }
 }
 
+function downloadLogs() {
+  const token = encodeURIComponent(auth.token || '')
+  const url = `/api/projects/${props.slug}/logs/download?token=${token}`
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `${props.slug}-logs.txt`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+}
+
 onMounted(() => {
   term = new Terminal({
     convertEol: true,
@@ -132,7 +146,22 @@ defineExpose({ refit: doFit })
   <div class="stack">
     <div class="spread small muted">
       <span>{{ mode === 'build' ? 'Build log' : 'Live logs' }}</span>
-      <span>{{ status }}</span>
+      <div class="row" style="gap: 10px; align-items: center">
+        <span>{{ status }}</span>
+        <button
+          v-if="mode === 'logs'"
+          class="iconbtn"
+          aria-label="Download logs"
+          title="Download logs"
+          @click="downloadLogs"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 3v12" />
+            <path d="M7 10l5 5 5-5" />
+            <path d="M5 21h14" />
+          </svg>
+        </button>
+      </div>
     </div>
     <div ref="wrap" class="term-wrap"></div>
     <div v-if="errMsg" class="error-box">{{ errMsg }}</div>

@@ -115,6 +115,24 @@ async function runRedeployPipeline(slug, zipPath, extractDir, userId, ip) {
       await generateDockerfile(projectType, extractDir);
     }
 
+    // Snapshot the current deploy so it can be rolled back to. We record this
+    // BEFORE building the new image so the project always points at a known-good
+    // previous image/container.
+    db.prepare(`
+      UPDATE projects
+      SET previous_container_id = ?, previous_image_id = ?
+      WHERE slug = ?
+    `).run(oldContainerId || null, oldImageId || null, slug);
+
+    try {
+      db.prepare(`
+        INSERT INTO deploy_history (project_id, image_id, container_id)
+        VALUES (?, ?, ?)
+      `).run(project.id, oldImageId || null, oldContainerId || null);
+    } catch (e) {
+      console.error('[redeploy] Failed to record deploy history:', e);
+    }
+
     appendBuildLog(slug, `[redeploy] Building new Docker image...\n`);
     const newImageId = await dockerService.buildImage(slug, extractDir, (line) => {
       appendBuildLog(slug, line);
@@ -150,10 +168,8 @@ async function runRedeployPipeline(slug, zipPath, extractDir, userId, ip) {
       WHERE slug = ?
     `).run(newContainerId, newImageId, slug);
 
-    // Remove old image after swap
-    if (oldImageId && oldImageId !== newImageId) {
-      try { await dockerService.removeImage(oldImageId, true); } catch (e) { /* in use elsewhere, ok */ }
-    }
+    // Keep the old image for rollback — do NOT remove it on redeploy.
+    // (Previously: dockerService.removeImage(oldImageId, true).)
 
     appendBuildLog(slug, `[redeploy] Redeploy complete.\n`);
     auditLog({ user_id: userId, action: 'redeploy', target: slug, ip });

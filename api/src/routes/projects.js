@@ -131,6 +131,83 @@ async function projectsRoutes(fastify, options) {
 
     return { message: 'Project deleted', warnings: errors.length > 0 ? errors : undefined };
   });
+
+  // Roll back to the previously deployed image.
+  fastify.post('/api/projects/:slug/rollback', {
+    preHandler: [fastify.authenticate],
+  }, async (request, reply) => {
+    const { slug } = request.params;
+    const project = db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug);
+    if (!project) return reply.code(404).send({ error: 'Project not found' });
+    if (project.status === 'building') return reply.code(409).send({ error: 'Currently building' });
+    if (!project.previous_image_id) {
+      return reply.code(400).send({ error: 'No previous deploy to roll back to.' });
+    }
+
+    const currentContainerId = project.container_id;
+    const currentImageId = project.image_id;
+    const targetImageId = project.previous_image_id;
+
+    // Carry over existing env vars (same as redeploy).
+    let envVars = {};
+    if (project.env_vars) {
+      try {
+        const { decryptEnvVars } = require('./env');
+        envVars = decryptEnvVars(project.env_vars);
+      } catch (e) {
+        // start without env vars rather than fail the rollback
+      }
+    }
+
+    try {
+      // Stop + remove the current container.
+      if (currentContainerId) {
+        try { await dockerService.stopContainer(currentContainerId); } catch (e) { /* already stopped */ }
+        try { await dockerService.removeContainer(currentContainerId, true); } catch (e) { /* gone */ }
+      }
+
+      // Start a new container from the previous image, same port + env vars.
+      const newContainerId = await dockerService.runContainer(slug, targetImageId, project.port, envVars);
+
+      // Swap current <-> previous so a subsequent rollback returns to the
+      // version we just rolled away from.
+      db.prepare(`
+        UPDATE projects
+        SET status = 'running',
+            container_id = ?, image_id = ?,
+            previous_container_id = ?, previous_image_id = ?,
+            updated_at = datetime('now')
+        WHERE slug = ?
+      `).run(newContainerId, targetImageId, currentContainerId || null, currentImageId || null, slug);
+
+      auditLog({ user_id: request.user.id, action: 'rollback', target: slug, ip: request.ip });
+
+      return { project: db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug) };
+    } catch (err) {
+      request.log.error({ err }, '[projects] Rollback failed');
+      db.prepare(`UPDATE projects SET status = 'error', updated_at = datetime('now') WHERE slug = ?`).run(slug);
+      return reply.code(500).send({ error: `Rollback failed: ${err.message}` });
+    }
+  });
+
+  // Last 10 deploy-history rows for a project.
+  fastify.get('/api/projects/:slug/deploy-history', {
+    preHandler: [fastify.authenticate],
+  }, async (request, reply) => {
+    const { slug } = request.params;
+    const project = db.prepare('SELECT id FROM projects WHERE slug = ?').get(slug);
+    if (!project) return reply.code(404).send({ error: 'Project not found' });
+
+    const history = db.prepare(`
+      SELECT id, image_id, container_id, deployed_at
+      FROM deploy_history
+      WHERE project_id = ?
+      ORDER BY deployed_at DESC, id DESC
+      LIMIT 10
+    `).all(project.id);
+
+    return { history };
+  });
 }
 
 module.exports = projectsRoutes;

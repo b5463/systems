@@ -63,6 +63,7 @@ async function main() {
   await fastify.register(require('./routes/env'));
   await fastify.register(require('./routes/exec'));
   await fastify.register(require('./routes/audit'));
+  await fastify.register(require('./routes/admin'));
 
   // Initialize default users from ADMIN_USERS env var
   await initDefaultUsers();

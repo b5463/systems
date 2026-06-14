@@ -72,6 +72,46 @@ async function authRoutes(fastify, options) {
     return { message: 'Logged out successfully' };
   });
 
+  // Change own password
+  fastify.post('/api/auth/change-password', {
+    preHandler: [fastify.authenticate],
+    schema: {
+      body: {
+        type: 'object',
+        required: ['currentPassword', 'newPassword'],
+        properties: {
+          currentPassword: { type: 'string', minLength: 1, maxLength: 200 },
+          newPassword: { type: 'string', minLength: 8, maxLength: 200 },
+        },
+      },
+    },
+  }, async (request, reply) => {
+    const { currentPassword, newPassword } = request.body;
+
+    if (!currentPassword || !newPassword) {
+      return reply.code(400).send({ error: 'Both current and new password are required.' });
+    }
+    if (newPassword.length < 8) {
+      return reply.code(400).send({ error: 'New password must be at least 8 characters.' });
+    }
+
+    const user = db
+      .prepare('SELECT id, username, password_hash FROM users WHERE id = ?')
+      .get(request.user.id);
+    if (!user) return reply.code(401).send({ error: 'Unauthorized' });
+
+    const valid = await bcrypt.compare(currentPassword, user.password_hash);
+    if (!valid) {
+      return reply.code(401).send({ error: 'Current password is incorrect.' });
+    }
+
+    const password_hash = await bcrypt.hash(newPassword, 12);
+    db.prepare(`UPDATE users SET password_hash = ? WHERE id = ?`).run(password_hash, user.id);
+
+    auditLog({ user_id: user.id, action: 'password_change', target: user.username, ip: request.ip });
+    return { message: 'Password updated.' };
+  });
+
   // Refresh token if valid and within 24h of expiry
   fastify.post('/api/auth/refresh', {
     preHandler: [fastify.authenticate],

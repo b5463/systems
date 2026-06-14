@@ -256,7 +256,8 @@ async function streamContainerLogs(containerId, onData, onEnd) {
 
 /**
  * Open an interactive exec session (/bin/sh) inside a container.
- * Returns the raw hijacked stream — write to send input, listen 'data' for output.
+ * Returns { stream, resize } — write to the stream to send input, listen
+ * 'data' for output, and call resize({ h, w }) to resize the TTY.
  */
 async function execContainer(containerId, onData, onEnd) {
   const container = docker.getContainer(containerId);
@@ -288,7 +289,12 @@ async function execContainer(containerId, onData, onEnd) {
     onEnd && onEnd();
   });
 
-  return stream;
+  const resize = async ({ h, w }) => {
+    if (!Number.isInteger(h) || !Number.isInteger(w) || h <= 0 || w <= 0) return;
+    await exec.resize({ h, w });
+  };
+
+  return { stream, resize };
 }
 
 /**

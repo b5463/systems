@@ -53,6 +53,33 @@ db.exec(`
   );
 `);
 
+// ─── Migrations (idempotent) ────────────────────────────────────────────────
+// Deploy history / rollback support: keep a reference to the previous
+// container + image so a redeploy can be rolled back.
+try { db.exec(`ALTER TABLE projects ADD COLUMN previous_image_id TEXT`); } catch {}
+try { db.exec(`ALTER TABLE projects ADD COLUMN previous_container_id TEXT`); } catch {}
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS deploy_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    image_id TEXT,
+    container_id TEXT,
+    deployed_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS stats_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    cpu_percent REAL,
+    memory_mb REAL,
+    memory_limit_mb REAL,
+    rx_bytes INTEGER,
+    tx_bytes INTEGER,
+    recorded_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+  );
+`);
+
 /**
  * Initialize default users from the ADMIN_USERS environment variable.
  * Format: "user1:password1,user2:password2"

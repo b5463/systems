@@ -1,7 +1,7 @@
 'use strict';
 
 const { db } = require('../db');
-const { streamContainerLogs } = require('../services/docker');
+const { streamContainerLogs, getContainerLogs } = require('../services/docker');
 
 /**
  * Logs routes plugin.
@@ -87,6 +87,33 @@ async function logsRoutes(fastify, options) {
         logStream = null;
       }
     });
+  });
+
+  /**
+   * GET /api/projects/:slug/logs/download
+   * Returns the last 1000 lines of container logs as a plain-text attachment.
+   * Docker multiplexed stream headers (8 bytes per frame) are stripped by
+   * getContainerLogs() before the text is returned.
+   */
+  fastify.get('/api/projects/:slug/logs/download', {
+    preHandler: [fastify.authenticate],
+  }, async (request, reply) => {
+    const { slug } = request.params;
+
+    const project = db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug);
+    if (!project) return reply.code(404).send({ error: 'Project not found' });
+    if (!project.container_id) return reply.code(400).send({ error: 'Project has no container' });
+
+    try {
+      const text = await getContainerLogs(project.container_id, 1000);
+      reply
+        .header('Content-Type', 'text/plain; charset=utf-8')
+        .header('Content-Disposition', `attachment; filename="${slug}-logs.txt"`)
+        .send(text);
+    } catch (err) {
+      request.log.error({ err }, '[logs] Failed to fetch logs for download');
+      return reply.code(500).send({ error: `Failed to fetch logs: ${err.message}` });
+    }
   });
 }
 
