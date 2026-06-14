@@ -1,0 +1,48 @@
+version: "3.9"
+
+services:
+  acronym-nginx:
+    image: nginx:alpine
+    container_name: acronym-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d
+      - ./certbot/conf:/etc/letsencrypt:ro
+      - ./certbot/www:/var/www/certbot:ro
+
+  acronym-api:
+    build: ./api
+    container_name: acronym-api
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./data:/app/data
+    environment:
+      - JWT_SECRET=${JWT_SECRET}
+      - ENV_SECRET=${ENV_SECRET}
+      - ADMIN_USERS=${ADMIN_USERS}
+      - CORS_ORIGIN=${CORS_ORIGIN:-https://project.acronym.sk}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - acronym-nginx
+
+  acronym-certbot:
+    image: certbot/certbot
+    container_name: acronym-certbot
+    volumes:
+      - ./certbot/conf:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+    profiles:
+      - certbot
+    entrypoint: >
+      certbot certonly --webroot
+      --webroot-path=/var/www/certbot
+      --email ${CERTBOT_EMAIL:-admin@acronym.sk}
+      --agree-tos
+      --no-eff-email
+      -d project.acronym.sk
