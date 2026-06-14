@@ -28,9 +28,9 @@ async function main() {
     },
   });
 
-  // Register @fastify/cors
+  // Register @fastify/cors — locked to the SYSTEMS. dashboard origin.
   await fastify.register(require('@fastify/cors'), {
-    origin: process.env.CORS_ORIGIN || 'https://project.acronym.sk',
+    origin: process.env.CORS_ORIGIN || 'https://systems.acronym.sk',
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true,
@@ -64,6 +64,7 @@ async function main() {
   await fastify.register(require('./routes/exec'));
   await fastify.register(require('./routes/audit'));
   await fastify.register(require('./routes/admin'));
+  await fastify.register(require('./routes/server'));
 
   // Initialize default users from ADMIN_USERS env var
   await initDefaultUsers();

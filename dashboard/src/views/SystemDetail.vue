@@ -1,0 +1,498 @@
+<script setup>
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { useRouter } from 'vue-router'
+import { api } from '../api/client'
+import StatusBadge from '../components/StatusBadge.vue'
+import StatsCharts from '../components/StatsCharts.vue'
+import LogConsole from '../components/LogConsole.vue'
+import ExecTerminal from '../components/ExecTerminal.vue'
+
+const props = defineProps({ slug: { type: String, required: true } })
+const router = useRouter()
+
+const BASE_DOMAIN = import.meta.env.VITE_BASE_DOMAIN || 'acronym.sk'
+const SCHEME = import.meta.env.VITE_PUBLIC_SCHEME || 'https'
+
+const TABS = ['Overview', 'Deployments', 'Logs', 'Metrics', 'Console', 'Settings']
+const tab = ref('Overview')
+
+const system = ref(null)
+const loading = ref(true)
+const error = ref('')
+const acting = ref('')
+
+/* Metrics */
+const history = ref([])
+const latestStats = ref(null)
+let statsTimer = null
+const historyMinutes = ref(0)
+
+/* Deployments */
+const deployHistory = ref([])
+
+/* Env (Settings) */
+const envKeys = ref([])
+const envVars = ref([{ key: '', value: '' }])
+const envSaving = ref(false)
+const envMsg = ref('')
+
+/* Redeploy / delete / rollback */
+const redeployFile = ref(null)
+const redeploying = ref(false)
+const showBuildLog = ref(false)
+const confirmDelete = ref(false)
+const deleting = ref(false)
+const fileInput = ref(null)
+const rollingBack = ref(false)
+
+const publicHost = computed(() => (system.value ? `${system.value.slug}.${BASE_DOMAIN}` : ''))
+const publicUrl = computed(() => (system.value ? `${SCHEME}://${publicHost.value}` : '#'))
+const isRunning = computed(() => system.value?.status === 'running')
+
+function fmtDate(s) {
+  if (!s) return '–'
+  const d = new Date(s)
+  return Number.isNaN(d.getTime()) ? s : d.toLocaleString()
+}
+
+/* ---- Truth model ---- */
+const truth = computed(() => {
+  const s = system.value
+  if (!s) return []
+  const containerTone =
+    s.status === 'running' ? 'ok' : s.status === 'error' ? 'error' : s.status === 'building' ? 'warn' : 'idle'
+  const containerLabel =
+    s.status === 'running' ? 'Running' : s.status === 'building' ? 'Building' : s.status === 'error' ? 'Crashed' : 'Stopped'
+
+  return [
+    { key: 'Container', tone: containerTone, val: containerLabel },
+    { key: 'Route', tone: isRunning.value ? 'ok' : 'idle', val: isRunning.value ? 'Active' : 'None' },
+    { key: 'HTTPS', tone: isRunning.value ? 'info' : 'idle', val: isRunning.value ? 'At reverse proxy' : '—' },
+    { key: 'Health', tone: 'idle', val: 'Not measured yet' },
+    { key: 'Visibility', tone: 'info', val: 'Public' },
+    { key: 'Runtime', tone: 'idle', val: 'Auto-detected' },
+    { key: 'Last deploy', tone: 'idle', val: fmtDate(s.updated_at || s.created_at) }
+  ]
+})
+
+async function loadSystem() {
+  try {
+    const data = await api.get(`/projects/${props.slug}`)
+    system.value = data.project
+    error.value = ''
+  } catch (e) {
+    if (e.status !== 401) error.value = e.message || 'Failed to load system.'
+  } finally {
+    loading.value = false
+  }
+}
+
+/* ---- Lifecycle ---- */
+async function lifecycle(action) {
+  acting.value = action
+  error.value = ''
+  try {
+    const data = await api.post(`/projects/${props.slug}/${action}`)
+    if (data && data.project) system.value = data.project
+    else await loadSystem()
+  } catch (e) {
+    error.value = e.message || `Failed to ${action}.`
+  } finally {
+    acting.value = ''
+  }
+}
+
+/* ---- Metrics ---- */
+async function pollStats() {
+  if (document.visibilityState !== 'visible') return
+  try {
+    const s = await api.get(`/projects/${props.slug}/stats`)
+    latestStats.value = s
+    history.value.push({ label: new Date().toLocaleTimeString(), cpu: s.cpu_percent ?? 0, mem: s.memory_mb ?? 0 })
+    if (history.value.length > 60) history.value.shift()
+  } catch { /* transient */ }
+}
+async function loadStatsHistory() {
+  try {
+    const data = await api.get(`/projects/${props.slug}/stats/history?hours=1`)
+    const points = data.points || []
+    if (points.length) {
+      history.value = points.map((p) => ({
+        label: new Date(p.recorded_at).toLocaleTimeString(),
+        cpu: p.cpu_percent ?? 0, mem: p.memory_mb ?? 0
+      })).slice(-60)
+      const first = new Date(points[0].recorded_at).getTime()
+      const last = new Date(points[points.length - 1].recorded_at).getTime()
+      const mins = Math.round((last - first) / 60000)
+      historyMinutes.value = Number.isFinite(mins) && mins > 0 ? mins : 0
+    }
+  } catch { /* best-effort */ }
+}
+async function startStats() {
+  stopStats()
+  history.value = []; latestStats.value = null; historyMinutes.value = 0
+  await loadStatsHistory()
+  pollStats()
+  statsTimer = setInterval(pollStats, 2000)
+}
+function stopStats() {
+  if (statsTimer) { clearInterval(statsTimer); statsTimer = null }
+}
+
+/* ---- Deployments ---- */
+async function loadDeployHistory() {
+  try {
+    const data = await api.get(`/projects/${props.slug}/deploy-history`)
+    deployHistory.value = data.history || []
+  } catch { /* best-effort */ }
+}
+
+/* ---- Env ---- */
+async function loadEnv() {
+  try {
+    const data = await api.get(`/projects/${props.slug}/env`)
+    envKeys.value = data.keys || []
+  } catch (e) {
+    if (e.status !== 401) envMsg.value = e.message || 'Failed to load env keys.'
+  }
+}
+function addEnvRow() { envVars.value.push({ key: '', value: '' }) }
+function removeEnvRow(i) {
+  envVars.value.splice(i, 1)
+  if (!envVars.value.length) addEnvRow()
+}
+async function saveEnv() {
+  envMsg.value = ''
+  const vars = {}
+  for (const row of envVars.value) { const k = row.key.trim(); if (k) vars[k] = row.value }
+  if (!Object.keys(vars).length) return (envMsg.value = 'Add at least one KEY=value pair.')
+  envSaving.value = true
+  try {
+    const data = await api.put(`/projects/${props.slug}/env`, { vars })
+    envKeys.value = data.keys || envKeys.value
+    envVars.value = [{ key: '', value: '' }]
+    envMsg.value = 'Saved. The container is restarting.'
+    await loadSystem()
+  } catch (e) {
+    envMsg.value = e.message || 'Failed to save env.'
+  } finally {
+    envSaving.value = false
+  }
+}
+
+/* ---- Redeploy / rollback / delete ---- */
+function pickRedeploy() { fileInput.value && fileInput.value.click() }
+async function onRedeployFile(e) {
+  const f = e.target.files && e.target.files[0]
+  if (!f) return
+  redeployFile.value = f
+  await doRedeploy()
+  e.target.value = ''
+}
+async function doRedeploy() {
+  if (!redeployFile.value) return
+  redeploying.value = true
+  error.value = ''
+  try {
+    await api.upload(`/deploy/${props.slug}/redeploy`, { files: { file: redeployFile.value } })
+    showBuildLog.value = true
+    tab.value = 'Overview'
+    await loadSystem()
+  } catch (e) {
+    error.value = e.message || 'Redeploy failed.'
+  } finally {
+    redeploying.value = false
+    redeployFile.value = null
+  }
+}
+async function doRollback() {
+  if (rollingBack.value) return
+  rollingBack.value = true
+  error.value = ''
+  try {
+    const data = await api.post(`/projects/${props.slug}/rollback`)
+    if (data && data.project) system.value = data.project
+    else await loadSystem()
+    await loadDeployHistory()
+  } catch (e) {
+    error.value = e.message || 'Rollback failed.'
+  } finally {
+    rollingBack.value = false
+  }
+}
+async function doDelete() {
+  deleting.value = true
+  error.value = ''
+  try {
+    await api.del(`/projects/${props.slug}`)
+    router.replace({ name: 'systems' })
+  } catch (e) {
+    error.value = e.message || 'Delete failed.'
+    deleting.value = false
+    confirmDelete.value = false
+  }
+}
+
+function copyUrl() {
+  if (navigator.clipboard) navigator.clipboard.writeText(publicUrl.value).catch(() => {})
+}
+
+/* ---- Tab side effects ---- */
+watch(tab, (t) => {
+  if (t === 'Metrics') startStats(); else stopStats()
+  if (t === 'Settings' && !envKeys.value.length) loadEnv()
+  if (t === 'Deployments') loadDeployHistory()
+})
+
+function onVisibility() {
+  if (document.visibilityState === 'visible' && tab.value === 'Metrics' && !statsTimer) startStats()
+}
+
+onMounted(async () => {
+  await loadSystem()
+  document.addEventListener('visibilitychange', onVisibility)
+})
+onBeforeUnmount(() => {
+  stopStats()
+  document.removeEventListener('visibilitychange', onVisibility)
+})
+</script>
+
+<template>
+  <!-- Skeleton -->
+  <div v-if="loading" class="stack">
+    <div class="skel-card">
+      <div class="spread" style="margin-bottom:14px">
+        <div style="flex:1"><div class="skel skel-title" style="width:45%"></div><div class="skel skel-line" style="width:30%;margin-top:8px"></div></div>
+        <div class="skel skel-badge"></div>
+      </div>
+      <div class="skel skel-line" style="width:70%;margin-top:12px"></div>
+      <div class="skel skel-line" style="width:55%"></div>
+    </div>
+  </div>
+
+  <template v-else-if="system">
+    <!-- Header -->
+    <div class="page-head" style="margin-bottom:18px">
+      <div>
+        <div class="row gap-sm">
+          <RouterLink class="btn btn-sm btn-ghost" :to="{ name: 'systems' }" style="min-height:32px;padding:0 10px">← Systems</RouterLink>
+          <StatusBadge :status="system.status" />
+        </div>
+        <h1 style="margin-top:10px">{{ system.name }}</h1>
+        <a class="mono small" :href="publicUrl" target="_blank" rel="noopener">{{ publicHost }}</a>
+      </div>
+      <div class="head-actions">
+        <button class="btn btn-sm btn-ghost" @click="copyUrl">Copy URL</button>
+        <a class="btn btn-sm" :href="publicUrl" target="_blank" rel="noopener">Open</a>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button v-for="t in TABS" :key="t" :class="{ active: tab === t }" @click="tab = t">{{ t }}</button>
+    </div>
+
+    <div v-if="error" class="error-box" style="margin-bottom:14px">{{ error }}</div>
+
+    <!-- OVERVIEW -->
+    <div v-show="tab === 'Overview'" class="stack">
+      <div v-if="system.status === 'error'" class="callout danger">
+        <div class="co-bar"></div><div>This system crashed or its last deploy failed. Check the logs, then restart or roll back.</div>
+      </div>
+      <div v-else-if="system.status === 'building'" class="callout warn">
+        <div class="co-bar"></div><div>This system is building — the build log is streaming under Deployments.</div>
+      </div>
+
+      <!-- Truth model -->
+      <div>
+        <div class="section-label">Status</div>
+        <div class="truth">
+          <div v-for="cell in truth" :key="cell.key" class="t-cell">
+            <div class="t-key">{{ cell.key }}</div>
+            <div class="t-val"><span class="sdot" :class="cell.tone"></span>{{ cell.val }}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div>
+        <div class="section-label">Actions</div>
+
+        <div class="action-group">
+          <div class="ag-label">Primary</div>
+          <div class="btn-row">
+            <button v-if="!isRunning" class="btn btn-primary" :disabled="!!acting || system.status === 'building'" @click="lifecycle('start')">
+              <span v-if="acting === 'start'" class="spinner"></span><span v-else>Start</span>
+            </button>
+            <button v-else class="btn" :disabled="!!acting" @click="lifecycle('stop')">
+              <span v-if="acting === 'stop'" class="spinner"></span><span v-else>Stop</span>
+            </button>
+            <button class="btn" :disabled="redeploying" @click="pickRedeploy">
+              <span v-if="redeploying" class="spinner"></span><span v-else>Redeploy</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="action-group">
+          <div class="ag-label">Secondary</div>
+          <div class="btn-row">
+            <button class="btn" :disabled="!!acting || system.status === 'building'" @click="lifecycle('restart')">
+              <span v-if="acting === 'restart'" class="spinner"></span><span v-else>Restart</span>
+            </button>
+            <button v-if="system.previous_image_id" class="btn" :disabled="rollingBack" @click="doRollback">
+              <span v-if="rollingBack" class="spinner"></span><span v-else>Roll back</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="action-group danger">
+          <div class="ag-label">Danger</div>
+          <div class="btn-row">
+            <button class="btn btn-danger" @click="confirmDelete = true">Delete system</button>
+          </div>
+        </div>
+      </div>
+
+      <input ref="fileInput" type="file" accept=".zip,application/zip" style="display:none" @change="onRedeployFile" />
+
+      <!-- Metadata -->
+      <div class="card">
+        <div class="kv"><span class="k">Port</span><span class="v mono">{{ system.port ?? '–' }}</span></div>
+        <div class="kv"><span class="k">Container</span><span class="v mono small">{{ system.container_id ? String(system.container_id).slice(0,12) : '–' }}</span></div>
+        <div class="kv"><span class="k">Created</span><span class="v small">{{ fmtDate(system.created_at) }}</span></div>
+        <div class="kv"><span class="k">Last updated</span><span class="v small">{{ fmtDate(system.updated_at) }}</span></div>
+      </div>
+
+      <div v-if="showBuildLog" class="card">
+        <div class="section-label">Redeploy build log</div>
+        <LogConsole :slug="system.slug" mode="build" />
+      </div>
+    </div>
+
+    <!-- DEPLOYMENTS -->
+    <div v-show="tab === 'Deployments'" class="stack">
+      <div class="callout">
+        <div class="co-bar"></div>
+        <div>Each redeploy snapshots the previous release so you can roll back. Streaming build logs appear here during a build.</div>
+      </div>
+
+      <div class="row gap-sm flex-wrap">
+        <button class="btn btn-sm" :disabled="redeploying" @click="pickRedeploy">
+          <span v-if="redeploying" class="spinner"></span><span v-else>Upload new release</span>
+        </button>
+        <button v-if="system.previous_image_id" class="btn btn-sm" :disabled="rollingBack" @click="doRollback">
+          <span v-if="rollingBack" class="spinner"></span><span v-else>Roll back to previous</span>
+        </button>
+      </div>
+
+      <div v-if="!deployHistory.length" class="empty-block">
+        <div class="eb-title">No previous releases yet.</div>
+        <div class="eb-sub">The first redeploy records a rollback point. Until then, this system has a single release.</div>
+      </div>
+      <div v-else class="card" style="padding:0">
+        <div v-for="(h, i) in deployHistory" :key="h.id" class="conn-row">
+          <span class="conn-ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg></span>
+          <div>
+            <div class="c-name">Release {{ deployHistory.length - i }}</div>
+            <div class="c-sub">image {{ h.image_id ? String(h.image_id).replace('sha256:','').slice(0,12) : '–' }}</div>
+          </div>
+          <div class="conn-state">{{ fmtDate(h.deployed_at) }}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- LOGS -->
+    <div v-show="tab === 'Logs'">
+      <div v-if="!system.container_id" class="empty-block">
+        <div class="eb-title">No runtime logs yet.</div>
+        <div class="eb-sub">Logs will appear after the container starts.</div>
+      </div>
+      <LogConsole v-else-if="tab === 'Logs'" :slug="system.slug" mode="logs" />
+    </div>
+
+    <!-- METRICS -->
+    <div v-show="tab === 'Metrics'">
+      <div v-if="!isRunning" class="empty-block">
+        <div class="eb-title">No metrics yet.</div>
+        <div class="eb-sub">SYSTEMS. needs a running container before telemetry appears. Start the system to collect CPU, memory, and network.</div>
+      </div>
+      <template v-else>
+        <div v-if="historyMinutes > 0" class="small muted" style="margin-bottom:10px">Showing last {{ historyMinutes }} minutes</div>
+        <StatsCharts :history="history" :latest="latestStats" />
+      </template>
+    </div>
+
+    <!-- CONSOLE -->
+    <div v-show="tab === 'Console'">
+      <div v-if="!isRunning" class="empty-block">
+        <div class="eb-title">Console unavailable.</div>
+        <div class="eb-sub">The interactive shell only attaches while the container is running.</div>
+      </div>
+      <ExecTerminal v-if="tab === 'Console' && isRunning" :slug="system.slug" />
+    </div>
+
+    <!-- SETTINGS -->
+    <div v-show="tab === 'Settings'" class="stack">
+      <div class="callout warn">
+        <div class="co-bar"></div>
+        <div>Saving environment variables restarts the container. Existing values are encrypted and never shown again.</div>
+      </div>
+
+      <div class="card">
+        <div class="section-label">Current env keys</div>
+        <div v-if="!envKeys.length" class="muted small">No environment variables set.</div>
+        <div v-else class="row flex-wrap" style="gap:8px">
+          <span v-for="k in envKeys" :key="k" class="chip">{{ k }}</span>
+        </div>
+      </div>
+
+      <div class="card stack">
+        <div class="section-label" style="margin:0">Add / update variables</div>
+        <div v-for="(row, i) in envVars" :key="i" class="row">
+          <input v-model="row.key" placeholder="KEY" autocapitalize="characters" autocorrect="off" />
+          <input v-model="row.value" placeholder="value" autocorrect="off" />
+          <button class="iconbtn" aria-label="Remove" @click="removeEnvRow(i)">✕</button>
+        </div>
+        <button class="btn btn-sm" @click="addEnvRow">+ Add row</button>
+        <div v-if="envMsg" class="notice">{{ envMsg }}</div>
+        <button class="btn btn-primary btn-block" :disabled="envSaving" @click="saveEnv">
+          <span v-if="envSaving" class="spinner"></span><span v-else>Save &amp; restart</span>
+        </button>
+      </div>
+
+      <div class="card stack">
+        <div class="section-label danger-label" style="margin:0">Danger zone</div>
+        <div class="hint">Deleting removes the container, image, and route. This cannot be undone.</div>
+        <button class="btn btn-danger" @click="confirmDelete = true">Delete system</button>
+      </div>
+    </div>
+  </template>
+
+  <div v-else class="error-box">{{ error || 'System not found.' }}</div>
+
+  <!-- Delete confirm -->
+  <Teleport to="body">
+    <Transition name="fade">
+      <div v-if="confirmDelete" class="modal-backdrop" @click.self="confirmDelete = false">
+        <div class="modal stack">
+          <h3>Delete this system?</h3>
+          <p class="muted small" style="margin:0">
+            This permanently removes <strong>{{ system?.name }}</strong>, its container, image and
+            public route. This cannot be undone.
+          </p>
+          <div class="btn-row">
+            <button class="btn" :disabled="deleting" @click="confirmDelete = false">Cancel</button>
+            <button class="btn btn-danger" :disabled="deleting" @click="doDelete">
+              <span v-if="deleting" class="spinner"></span><span v-else>Delete</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
+  </Teleport>
+</template>
+
+<style scoped>
+.danger-label { color: var(--danger); }
+</style>

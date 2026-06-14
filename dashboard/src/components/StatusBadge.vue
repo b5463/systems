@@ -14,9 +14,16 @@ const cls = computed(() => {
   }
 })
 
+const LABELS = {
+  running: 'Live',
+  building: 'Building',
+  error: 'Failed',
+  stopped: 'Stopped'
+}
+
 const label = computed(() => {
   if (!props.status) return 'Unknown'
-  return props.status.charAt(0).toUpperCase() + props.status.slice(1)
+  return LABELS[props.status] || (props.status.charAt(0).toUpperCase() + props.status.slice(1))
 })
 </script>
 

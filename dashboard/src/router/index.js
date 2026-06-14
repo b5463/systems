@@ -1,6 +1,9 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 
+// SYSTEMS. V1.1 — five operational surfaces + system detail.
+// Legacy paths (/deploy, /activity, /account, /projects/:slug) redirect to the
+// new structure so existing bookmarks keep working.
 const routes = [
   {
     path: '/login',
@@ -8,16 +11,27 @@ const routes = [
     component: () => import('../views/Login.vue'),
     meta: { public: true }
   },
-  { path: '/', name: 'projects', component: () => import('../views/Projects.vue') },
+  { path: '/', name: 'systems', component: () => import('../views/Systems.vue') },
+  { path: '/ship', name: 'ship', component: () => import('../views/Ship.vue') },
+  { path: '/events', name: 'events', component: () => import('../views/Events.vue') },
+  { path: '/server', name: 'server', component: () => import('../views/Server.vue') },
+  { path: '/admin', name: 'admin', component: () => import('../views/Admin.vue') },
   {
-    path: '/projects/:slug',
-    name: 'project-detail',
-    component: () => import('../views/ProjectDetail.vue'),
+    path: '/systems/:slug',
+    name: 'system-detail',
+    component: () => import('../views/SystemDetail.vue'),
     props: true
   },
-  { path: '/deploy', name: 'deploy', component: () => import('../views/Deploy.vue') },
-  { path: '/activity', name: 'activity', component: () => import('../views/Audit.vue') },
-  { path: '/account', name: 'account', component: () => import('../views/Account.vue') },
+
+  // --- Legacy redirects ---
+  { path: '/deploy', redirect: { name: 'ship' } },
+  { path: '/activity', redirect: { name: 'events' } },
+  { path: '/account', redirect: { name: 'admin' } },
+  {
+    path: '/projects/:slug',
+    redirect: (to) => ({ name: 'system-detail', params: { slug: to.params.slug } })
+  },
+
   { path: '/:pathMatch(.*)*', redirect: '/' }
 ]
 
@@ -35,7 +49,7 @@ router.beforeEach((to) => {
     return { name: 'login', query: to.fullPath !== '/' ? { redirect: to.fullPath } : undefined }
   }
   if (to.name === 'login' && auth.token) {
-    return { name: 'projects' }
+    return { name: 'systems' }
   }
   return true
 })

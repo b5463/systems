@@ -2,13 +2,14 @@
 import { onMounted, onBeforeUnmount, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from './stores/auth'
-import BottomNav from './components/BottomNav.vue'
+import AppShell from './components/AppShell.vue'
 import Toast from './components/Toast.vue'
 
 const auth = useAuthStore()
 const route = useRoute()
 
-const showNav = computed(() => auth.isAuthenticated && route.name !== 'login')
+// The product shell wraps every authenticated surface. Login renders bare.
+const showShell = computed(() => auth.isAuthenticated && route.name !== 'login')
 
 let refreshTimer = null
 
@@ -18,7 +19,6 @@ function onFocus() {
 
 onMounted(async () => {
   await auth.init()
-  // Periodically refresh the token and on window focus.
   refreshTimer = setInterval(() => {
     if (auth.token && document.visibilityState === 'visible') auth.refresh()
   }, 10 * 60 * 1000)
@@ -32,12 +32,16 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="app-shell">
-    <Toast />
-    <router-view v-if="auth.ready" />
-    <div v-else class="center" style="min-height: 100vh">
-      <div class="spinner"></div>
-    </div>
-    <BottomNav v-if="showNav" />
+  <Toast />
+
+  <template v-if="auth.ready">
+    <AppShell v-if="showShell">
+      <RouterView />
+    </AppShell>
+    <RouterView v-else />
+  </template>
+
+  <div v-else class="center" style="min-height: 100vh">
+    <div class="spinner"></div>
   </div>
 </template>
