@@ -141,7 +141,10 @@ function goToProject() {
         @dragleave.prevent="dragOver = false"
         @drop.prevent="onDrop"
       >
-        <div class="dz-ico">📦</div>
+        <svg class="dz-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 16V4M7 9l5-5 5 5"/>
+          <path d="M3 19h18"/>
+        </svg>
         <div v-if="file">
           <strong>{{ file.name }}</strong>
           <div class="small dim">{{ fmtSize(file.size) }} · tap to change</div>
