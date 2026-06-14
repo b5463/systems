@@ -132,8 +132,7 @@ const truth = computed(() => {
     { key: 'HTTPS', tone: hs ? (health.tone === 'error' ? 'error' : 'ok') : 'idle', val: vis === 'private' ? '—' : (hs ? (health.tone === 'error' ? 'Failed' : 'Valid') : 'Not measured yet') },
     { key: 'Health', tone: health.tone, val: health.val },
     { key: 'Visibility', tone: 'idle', val: vis.charAt(0).toUpperCase() + vis.slice(1) },
-    { key: 'Runtime', tone: 'idle', val: s.deploy_type ? (s.deploy_type === 'node' ? 'Node' : s.deploy_type === 'static' ? 'Static' : s.deploy_type) : 'Auto-detected' },
-    { key: 'Last deploy', tone: 'idle', val: fmtDate(s.updated_at || s.created_at) }
+    { key: 'Runtime', tone: 'idle', val: s.deploy_type ? (s.deploy_type === 'node' ? 'Node' : s.deploy_type === 'static' ? 'Static' : s.deploy_type) : 'Auto-detected' }
   ]
 })
 
@@ -435,7 +434,7 @@ onBeforeUnmount(() => {
         <div class="kv"><span class="k">Container</span><span class="v mono small">{{ system.container_id ? String(system.container_id).slice(0,12) : '–' }}</span></div>
         <div class="kv"><span class="k">Image</span><span class="v mono small">{{ system.image_id ? String(system.image_id).replace('sha256:','').slice(0,12) : '–' }}</span></div>
         <div class="kv"><span class="k">Created</span><span class="v small">{{ fmtDate(system.created_at) }}</span></div>
-        <div class="kv"><span class="k">Last updated</span><span class="v small">{{ fmtDate(system.updated_at) }}</span></div>
+        <div class="kv"><span class="k">Last deploy</span><span class="v small">{{ fmtDate(system.updated_at) }}</span></div>
       </div>
 
       <div v-if="showBuildLog" class="card">
