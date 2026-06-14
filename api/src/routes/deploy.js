@@ -218,6 +218,43 @@ async function runRedeployPipeline(slug, zipPath, extractDir, userId, ip) {
 }
 
 async function deployRoutes(fastify, options) {
+  // Dry-run plan: validate the slug and show exactly what WOULD happen —
+  // planned container name, public host, generated Caddy route file and the
+  // lifecycle — without touching Docker or Caddy. Safe to call freely.
+  fastify.post('/api/deploy/plan', {
+    preHandler: [fastify.authenticate],
+    schema: {
+      body: {
+        type: 'object', required: ['slug'],
+        properties: {
+          slug: { type: 'string' },
+          visibility: { type: 'string', enum: ['public', 'private', 'password'] },
+        },
+      },
+    },
+  }, async (request) => {
+    const caddy = require('../services/caddy');
+    const { slug } = request.body;
+    const visibility = request.body.visibility || 'public';
+    const err = slugError(slug);
+    const taken = !err && !!db.prepare('SELECT 1 FROM projects WHERE slug = ? AND status != ?').get(slug, 'deleted');
+
+    const plan = {
+      slug,
+      valid: !err && !taken,
+      error: err || (taken ? 'A system with this slug already exists.' : null),
+      proxy: proxy.kind(),
+      host: `${slug}.${process.env.BASE_DOMAIN || 'acronym.sk'}`,
+      containerName: `systems-${slug}`,
+      visibility,
+      routePublished: visibility !== 'private',
+      route: visibility === 'private' ? null
+        : caddy.renderRoute({ slug, port: 3000, visibility: visibility === 'password' ? 'public' : visibility }),
+      lifecycle: ['archive', 'detect', 'install', 'build', 'container', 'route', 'HTTPS', 'health', 'live'],
+    };
+    return { plan };
+  });
+
   // Initial deploy
   fastify.post('/api/deploy', {
     preHandler: [fastify.authenticate],

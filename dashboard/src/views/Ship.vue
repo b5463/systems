@@ -45,6 +45,20 @@ function onSlugInput(e) { slugEdited.value = true; slug.value = slugify(e.target
 const slugValid = computed(() => /^[a-z0-9-]{2,50}$/.test(slug.value))
 const visDesc = computed(() => VISIBILITY.find((v) => v.key === visibility.value)?.desc || '')
 
+// Dry-run plan: ask the API what WOULD happen (validated slug, container name,
+// generated Caddy route) without touching Docker/Caddy.
+const plan = ref(null)
+let planTimer = null
+function refreshPlan() {
+  clearTimeout(planTimer)
+  if (!slugValid.value) { plan.value = null; return }
+  planTimer = setTimeout(async () => {
+    try { const d = await api.post('/deploy/plan', { slug: slug.value, visibility: visibility.value }); plan.value = d.plan }
+    catch { plan.value = null }
+  }, 350)
+}
+watch([slug, visibility], refreshPlan)
+
 function setFile(f) {
   if (!f) return
   if (!/\.zip$/i.test(f.name)) { error.value = 'Please select a .zip archive.'; return }
@@ -181,12 +195,18 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
       </div>
 
       <div class="card stack">
-        <div class="step-head"><span class="step-num" :class="{ active: !!file }">2</span><div class="section-label" style="margin:0">Detection</div></div>
+        <div class="step-head"><span class="step-num" :class="{ active: !!file }">2</span><div class="section-label" style="margin:0">Detection &amp; plan</div></div>
         <div class="detect-row">
           <span class="kv"><span class="k">Type</span><span class="v dim">detected on upload</span></span>
-          <span class="kv"><span class="k">Builder</span><span class="v dim">detected on upload</span></span>
-          <span class="kv"><span class="k">Output</span><span class="v dim">detected on upload</span></span>
+          <span class="kv"><span class="k">Container</span><span class="v mono small">{{ plan ? plan.containerName : 'systems-{slug}' }}</span></span>
+          <span class="kv"><span class="k">Proxy</span><span class="v dim">{{ plan ? plan.proxy : '—' }}</span></span>
+          <span class="kv"><span class="k">Route</span><span class="v dim">{{ plan ? (plan.routePublished ? 'public route' : 'none (private)') : '—' }}</span></span>
         </div>
+        <div v-if="plan && plan.valid === false" class="error-box" style="margin-top:8px">{{ plan.error }}</div>
+        <details v-if="plan && plan.route" style="margin-top:8px">
+          <summary class="small muted" style="cursor:pointer">Planned Caddy route (dry-run)</summary>
+          <pre class="plan-route">{{ plan.route }}</pre>
+        </details>
       </div>
 
       <div class="card stack">
@@ -216,4 +236,10 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
 .detect-row { display: flex; flex-direction: column; gap: 0; }
 .detect-row .kv { display: flex; justify-content: space-between; padding: 9px 0; border-bottom: 1px solid var(--border-soft); font-size: 13px; }
 .detect-row .kv:last-child { border-bottom: none; }
+.plan-route {
+  margin: 8px 0 0; padding: 10px 12px; background: var(--bg-input);
+  border: 1px solid var(--border-soft); border-radius: var(--radius-sm);
+  font-family: var(--mono); font-size: 12px; color: var(--text-muted);
+  white-space: pre-wrap; overflow-x: auto;
+}
 </style>

@@ -15,7 +15,8 @@
 [CmdletBinding()]
 param(
     [switch]$IncludeLogs,
-    [switch]$IncludeUploads
+    [switch]$IncludeUploads,
+    [switch]$DryRun  # list what would be backed up; write nothing
 )
 
 . "$PSScriptRoot\_systems-common.ps1"
@@ -27,6 +28,19 @@ $dest  = Join-Path $paths.Backups $stamp
 
 $incLogs    = $IncludeLogs    -or ((Get-ConfigValue $cfg 'BACKUP_INCLUDE_LOGS' 'false') -eq 'true')
 $incUploads = $IncludeUploads -or ((Get-ConfigValue $cfg 'BACKUP_INCLUDE_UPLOADS' 'false') -eq 'true')
+
+if ($DryRun) {
+    Write-SystemsStatus 'DRY-RUN — backup contents (nothing will be written):'
+    Write-Host "  target dir : $dest"
+    Write-Host "  database   : Postgres (pg_dump) or SQLite copy from $($paths.Data)"
+    Write-Host "  caddy      : $($paths.CaddyFile) + $($paths.CaddyDir)"
+    Write-Host "  releases   : $($paths.Releases)"
+    Write-Host "  logs       : $(if ($incLogs) { $paths.Logs } else { 'excluded' })"
+    Write-Host "  uploads    : $(if ($incUploads) { $paths.Uploads } else { 'excluded' })"
+    Write-Host "  retention  : $(Get-ConfigValue $cfg 'BACKUP_RETENTION_DAYS' '14') days"
+    Write-SystemsOk 'complete (dry-run)'
+    return
+}
 
 Write-SystemsStatus 'checking environment'
 New-Item -ItemType Directory -Force -Path $dest | Out-Null

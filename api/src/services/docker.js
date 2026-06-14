@@ -8,31 +8,8 @@ const docker = new Docker({ socketPath: '/var/run/docker.sock' });
 
 const ISOLATED_NETWORK = 'acronym-isolated';
 
-/**
- * Resolve per-deployed-container resource limits from env defaults, with
- * optional per-system overrides. Keeps any one project from eating the host.
- * @param {object} [opts] - { memoryMb, cpuLimit, pidsLimit, restartPolicy, logMaxSize, logMaxFile }
- */
-function containerLimits(opts = {}) {
-  const memMb = Number(opts.memoryMb || process.env.DEFAULT_CONTAINER_MEMORY_MB) || 512;
-  const cpu = Number(opts.cpuLimit || process.env.DEFAULT_CONTAINER_CPU_LIMIT) || 0.5;
-  const pids = Number(opts.pidsLimit || process.env.DEFAULT_CONTAINER_PIDS_LIMIT) || 256;
-  const restart = opts.restartPolicy || process.env.DEFAULT_CONTAINER_RESTART_POLICY || 'unless-stopped';
-  const logMaxSize = opts.logMaxSize || process.env.DEFAULT_CONTAINER_LOG_MAX_SIZE || '10m';
-  const logMaxFile = String(opts.logMaxFile || process.env.DEFAULT_CONTAINER_LOG_MAX_FILE || '3');
-  const period = 100000;
-
-  return {
-    Memory: Math.round(memMb) * 1024 * 1024,
-    CpuPeriod: period,
-    CpuQuota: Math.max(1000, Math.round(cpu * period)),
-    PidsLimit: pids,
-    RestartPolicy: restart === 'on-failure'
-      ? { Name: 'on-failure', MaximumRetryCount: 5 }
-      : { Name: restart },
-    LogConfig: { Type: 'json-file', Config: { 'max-size': logMaxSize, 'max-file': logMaxFile } },
-  };
-}
+// Per-deployed-container resource limits (pure; unit-tested in util/limits).
+const { containerLimits } = require('../util/limits');
 
 /**
  * Ensure the isolated Docker network exists.

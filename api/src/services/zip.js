@@ -4,6 +4,7 @@ const fs = require('fs');
 const fsp = require('fs/promises');
 const path = require('path');
 const unzipper = require('unzipper');
+const { safeResolve } = require('../util/pathsafe');
 
 /**
  * Extract a ZIP file to a destination directory.
@@ -37,9 +38,9 @@ async function extractZip(zipPath, destDir) {
         const entryPath = entry.path;
         const type = entry.type;
 
-        // Zip slip prevention
-        const fullOutputPath = path.resolve(destDir, entryPath);
-        if (!fullOutputPath.startsWith(normalizedDest)) {
+        // Zip slip prevention (shared, unit-tested guard)
+        const fullOutputPath = safeResolve(destDir, entryPath);
+        if (!fullOutputPath) {
           entry.autodrain();
           reject(new Error(`Zip slip attempt detected: entry "${entryPath}" resolves outside destination`));
           return;

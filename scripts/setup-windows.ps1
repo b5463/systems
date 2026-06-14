@@ -7,9 +7,12 @@
   open firewall ports for you — it checks and tells you what to do.
 #>
 [CmdletBinding()]
-param()
+param(
+    [switch]$DryRun  # report what would be created/changed; make no changes
+)
 
 . "$PSScriptRoot\_systems-common.ps1"
+if ($DryRun) { Write-SystemsStatus 'DRY-RUN — no directories, networks or rules will be created' }
 
 $cfg   = Import-DotEnv
 $paths = Get-SystemsPaths $cfg
@@ -54,6 +57,8 @@ Write-SystemsStatus 'creating data directories'
 foreach ($p in @($paths.Data, $paths.Releases, $paths.Uploads, $paths.Logs, $paths.Backups, $paths.CaddyDir)) {
     if (Test-Path $p) {
         Write-Host "  exists  $p"
+    } elseif ($DryRun) {
+        Write-Host "  would create $p"
     } else {
         New-Item -ItemType Directory -Force -Path $p | Out-Null
         Write-Host "  created $p"
@@ -65,6 +70,8 @@ if (Get-Command docker -ErrorAction SilentlyContinue) {
     $exists = (& docker network ls --filter "name=^$net$" --format '{{.Name}}' 2>$null)
     if ($exists -eq $net) {
         Write-SystemsOk "network '$net' already exists"
+    } elseif ($DryRun) {
+        Write-Host "  would create docker network '$net'"
     } else {
         & docker network create $net | Out-Null
         if ($LASTEXITCODE -eq 0) { Write-SystemsOk "created network '$net'" }

@@ -1,10 +1,14 @@
 'use strict';
 
-const Docker = require('dockerode');
 const fsp = require('fs/promises');
 const path = require('path');
 
-const docker = new Docker({ socketPath: '/var/run/docker.sock' });
+// Lazy dockerode so this module can be imported (e.g. by the proxy abstraction
+// and unit tests) without the dependency present.
+function getDocker() {
+  const Docker = require('dockerode');
+  return new Docker({ socketPath: '/var/run/docker.sock' });
+}
 
 const CONF_DIR = '/etc/nginx/conf.d';
 
@@ -49,6 +53,7 @@ async function removeProjectRoute(slug) {
  * Reload Nginx by exec-ing `nginx -s reload` inside the acronym-nginx container.
  */
 async function reloadNginx() {
+  const docker = getDocker();
   const containers = await docker.listContainers({
     filters: JSON.stringify({ name: ['acronym-nginx'] }),
   });

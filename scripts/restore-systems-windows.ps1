@@ -11,7 +11,8 @@
 #>
 [CmdletBinding()]
 param(
-    [string]$BackupPath
+    [string]$BackupPath,
+    [switch]$DryRun  # show what would be restored; change nothing
 )
 
 . "$PSScriptRoot\_systems-common.ps1"
@@ -39,6 +40,11 @@ Write-Host "  created_at   : $(if ($manifest) { $manifest.created_at } else { 'u
 Write-Host "  database     : $(if ($manifest) { $manifest.database } else { 'unknown' })"
 Write-Host "  -> database, Caddy routes ($($paths.CaddyDir)) and releases ($($paths.Releases))"
 Write-Host ''
+if ($DryRun) {
+    Write-SystemsStatus 'DRY-RUN — nothing was changed.'
+    Write-SystemsOk 'complete (dry-run)'
+    return
+}
 if (-not (Confirm-Typed 'This cannot be undone.' 'RESTORE')) {
     Write-SystemsWarn 'aborted — no changes made.'
     exit 1
