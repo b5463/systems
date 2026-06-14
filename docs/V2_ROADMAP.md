@@ -28,9 +28,25 @@ backend/server changes are isolated, never bundled.
 - Destructive delete requires typing the system slug; backup-awareness before
   destructive actions.
 
-## V1.2 — Platform alignment (the dangerous, deliberate migrations)
+## V1.2 — Working deployment platform (in progress)
 
-Now built on the Windows choices above:
+**Implemented & verifiable (this pass):** slug rules + reserved-name list;
+reverse-proxy abstraction with a real Caddy route-file generator (public /
+password basic-auth / private) selected by `REVERSE_PROXY`; visibility model
+(schema + endpoint + deploy logic; private = no route); health + HTTPS checker
+(real request, honest states) + endpoint; delete-vs-purge (purge requires
+typing the slug); release-retention pruning; deploy type recorded; UI wiring
+for all of the above (Ship visibility, System detail health/visibility/purge,
+Systems truth + deleted section).
+
+**Remaining (validate on the Windows host — cannot be exercised Docker-less):**
+- Container naming `systems-{slug}` on a shared Caddy network (ICC) so Caddy
+  reaches apps by name; Caddy + Postgres compose/service wiring.
+- SQLite → Postgres internal-store cutover (schema is Postgres-ready; do it as a
+  dedicated, backed-up migration).
+- Live Caddy reload/validate + HTTPS issuance verification end-to-end.
+
+Built on the Windows choices above:
 
 
 - **Postgres** internal DB + SQLite→Postgres migration script.

@@ -6,18 +6,27 @@ const { v4: uuidv4 } = require('uuid');
 const { db, auditLog } = require('../db');
 const dockerService = require('../services/docker');
 const { extractZip, detectProjectType, generateDockerfile } = require('../services/zip');
-const { addProjectRoute, reloadNginx } = require('../services/nginx');
+const proxy = require('../services/proxy');
+const { slugError } = require('../util/slug');
 
 // In-memory build log buffers keyed by slug
 const buildLogs = new Map();
 const buildStatus = new Map();
 const buildListeners = new Map();
 
-// Slug: 3-50 chars, lowercase alphanumeric + hyphens, no leading/trailing hyphen
-const SLUG_RE = /^[a-z0-9][a-z0-9-]{1,48}[a-z0-9]$|^[a-z0-9]{1,2}$/;
+const RELEASE_RETENTION = () => Number(process.env.RELEASE_RETENTION_DEFAULT) || 3;
 
-function isValidSlug(slug) {
-  return SLUG_RE.test(slug);
+// Trim deploy_history rows beyond the retention count (metadata only — the
+// rollback pointer lives on the project row and is never trimmed).
+function pruneReleases(projectId) {
+  try {
+    db.prepare(`
+      DELETE FROM deploy_history
+      WHERE project_id = ? AND id NOT IN (
+        SELECT id FROM deploy_history WHERE project_id = ? ORDER BY deployed_at DESC, id DESC LIMIT ?
+      )
+    `).run(projectId, projectId, RELEASE_RETENTION());
+  } catch (e) { /* best-effort */ }
 }
 
 function appendBuildLog(slug, line) {
@@ -66,18 +75,33 @@ async function runBuildPipeline(slug, zipPath, extractDir, port, userId, ip) {
     const containerId = await dockerService.runContainer(slug, imageId, port);
     appendBuildLog(slug, `[deploy] Container started: ${containerId}\n`);
 
+    const project = db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug);
+    const visibility = project?.visibility || 'public';
+
     db.prepare(`
       UPDATE projects
-      SET status = 'running', container_id = ?, image_id = ?, updated_at = datetime('now')
+      SET status = 'running', container_id = ?, image_id = ?, deploy_type = ?, updated_at = datetime('now')
       WHERE slug = ?
-    `).run(containerId, imageId, slug);
+    `).run(containerId, imageId, projectType, slug);
 
-    appendBuildLog(slug, `[deploy] Configuring Nginx route /${slug}/...\n`);
-    await addProjectRoute(slug, port);
-    await reloadNginx();
+    // Publish the route per visibility (private => no public route).
+    appendBuildLog(slug, `[deploy] Publishing ${visibility} route via ${proxy.kind()}...\n`);
+    let published = false;
+    try {
+      const r = await proxy.publishRoute({ slug, port, visibility, basicUser: project?.basic_user, basicHash: project?.basic_hash });
+      published = r.published;
+      if (r.reload && r.reload.ok === false && !['no_route', 'caddy_not_found'].includes(r.reload.reason)) {
+        appendBuildLog(slug, `[deploy] WARNING: proxy reload reported: ${r.reload.reason}\n`);
+      }
+      appendBuildLog(slug, published ? `[deploy] Route published.\n` : `[deploy] No public route (private).\n`);
+    } catch (e) {
+      appendBuildLog(slug, `[deploy] WARNING: route publish failed: ${e.message}\n`);
+    }
+    db.prepare(`UPDATE projects SET route_published = ? WHERE slug = ?`).run(published ? 1 : 0, slug);
+    if (project?.id) pruneReleases(project.id);
 
-    appendBuildLog(slug, `[deploy] Deployment complete. Available at /${slug}/\n`);
-    auditLog({ user_id: userId, action: 'deploy', target: slug, detail: `port:${port}`, ip });
+    appendBuildLog(slug, `[deploy] Deployment complete.\n`);
+    auditLog({ user_id: userId, action: 'deploy', target: slug, detail: `port:${port} ${visibility}`, ip });
     finishBuild(slug, 'done');
   } catch (err) {
     appendBuildLog(slug, `[deploy] ERROR: ${err.message}\n`);
@@ -208,11 +232,13 @@ async function deployRoutes(fastify, options) {
       const parts = request.parts();
       let name = null;
       let slug = null;
+      let visibility = 'public';
 
       for await (const part of parts) {
         if (part.type === 'field') {
           if (part.fieldname === 'name') name = part.value;
           else if (part.fieldname === 'slug') slug = part.value;
+          else if (part.fieldname === 'visibility' && ['public', 'private'].includes(part.value)) visibility = part.value;
         } else if (part.type === 'file' && part.fieldname === 'file') {
           const uuid = uuidv4();
           zipPath = `/tmp/${uuid}.zip`;
@@ -240,11 +266,10 @@ async function deployRoutes(fastify, options) {
         return reply.code(400).send({ error: 'Missing required fields: name, slug' });
       }
 
-      if (!isValidSlug(slug)) {
+      const slugErr = slugError(slug);
+      if (slugErr) {
         if (zipPath) await fsp.rm(zipPath, { force: true }).catch(() => {});
-        return reply.code(400).send({
-          error: 'Invalid slug: 2-50 lowercase alphanumeric chars and hyphens, no leading/trailing hyphens',
-        });
+        return reply.code(400).send({ error: slugErr });
       }
 
       if (!zipPath) {
@@ -261,7 +286,7 @@ async function deployRoutes(fastify, options) {
       const usedPorts = new Set(dbPorts.map((r) => r.port));
       const port = await dockerService.findFreePort(4000, 5000, usedPorts);
 
-      db.prepare(`INSERT INTO projects (name, slug, port, status) VALUES (?, ?, ?, 'building')`).run(name, slug, port);
+      db.prepare(`INSERT INTO projects (name, slug, port, status, visibility) VALUES (?, ?, ?, 'building', ?)`).run(name, slug, port, visibility);
       const project = db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug);
 
       buildLogs.set(slug, []);

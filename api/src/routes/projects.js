@@ -1,9 +1,13 @@
 'use strict';
 
 const Docker = require('dockerode');
+const bcrypt = require('bcrypt');
+const fsp = require('fs/promises');
+const path = require('path');
 const { db, auditLog } = require('../db');
 const dockerService = require('../services/docker');
-const { removeProjectRoute, reloadNginx } = require('../services/nginx');
+const proxy = require('../services/proxy');
+const health = require('../services/health');
 
 async function projectsRoutes(fastify, options) {
   fastify.get('/api/projects', {
@@ -89,6 +93,9 @@ async function projectsRoutes(fastify, options) {
     }
   });
 
+  // DELETE = soft: stop+remove the container and pull the public route, but
+  // KEEP the system row, releases, history and events. The system becomes
+  // status 'deleted' and can later be purged.
   fastify.delete('/api/projects/:slug', {
     preHandler: [fastify.authenticate],
   }, async (request, reply) => {
@@ -97,39 +104,115 @@ async function projectsRoutes(fastify, options) {
     if (!project) return reply.code(404).send({ error: 'Project not found' });
 
     const errors = [];
-
     if (project.container_id) {
-      try {
-        if (project.status === 'running') await dockerService.stopContainer(project.container_id);
-      } catch (err) {
-        errors.push(`Stop: ${err.message}`);
-      }
-      try {
-        await dockerService.removeContainer(project.container_id, true);
-      } catch (err) {
-        errors.push(`Remove container: ${err.message}`);
-      }
+      try { if (project.status === 'running') await dockerService.stopContainer(project.container_id); } catch (err) { errors.push(`Stop: ${err.message}`); }
+      try { await dockerService.removeContainer(project.container_id, true); } catch (err) { errors.push(`Remove container: ${err.message}`); }
     }
+    try { await proxy.removeRoute(slug); } catch (err) { errors.push(`Remove route: ${err.message}`); }
 
-    if (project.image_id) {
-      try {
-        await dockerService.removeImage(project.image_id, true);
-      } catch (err) {
-        errors.push(`Remove image: ${err.message}`);
-      }
-    }
-
-    try {
-      await removeProjectRoute(slug);
-      await reloadNginx();
-    } catch (err) {
-      errors.push(`Remove nginx config: ${err.message}`);
-    }
-
-    db.prepare('DELETE FROM projects WHERE slug = ?').run(slug);
+    db.prepare(`UPDATE projects SET status = 'deleted', container_id = NULL, route_published = 0, updated_at = datetime('now') WHERE slug = ?`).run(slug);
     auditLog({ user_id: request.user.id, action: 'delete', target: slug, ip: request.ip });
+    return { message: 'System deleted (history kept). Purge to remove permanently.', warnings: errors.length ? errors : undefined };
+  });
 
-    return { message: 'Project deleted', warnings: errors.length > 0 ? errors : undefined };
+  // PURGE = hard: remove container, image, route, release files and the row
+  // itself. Requires typing the slug as confirmation.
+  fastify.post('/api/projects/:slug/purge', {
+    preHandler: [fastify.authenticate],
+    schema: { body: { type: 'object', required: ['confirm'], properties: { confirm: { type: 'string' } } } },
+  }, async (request, reply) => {
+    const { slug } = request.params;
+    if (request.body.confirm !== slug) {
+      return reply.code(400).send({ error: 'Confirmation does not match the system slug.' });
+    }
+    const project = db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug);
+    if (!project) return reply.code(404).send({ error: 'Project not found' });
+
+    const errors = [];
+    if (project.container_id) {
+      try { await dockerService.stopContainer(project.container_id); } catch {}
+      try { await dockerService.removeContainer(project.container_id, true); } catch (err) { errors.push(`Remove container: ${err.message}`); }
+    }
+    for (const img of [project.image_id, project.previous_image_id]) {
+      if (img) { try { await dockerService.removeImage(img, true); } catch (err) { errors.push(`Remove image: ${err.message}`); } }
+    }
+    try { await proxy.removeRoute(slug); } catch (err) { errors.push(`Remove route: ${err.message}`); }
+    // release files (best-effort, scoped to this slug)
+    try {
+      const dir = process.env.DEPLOYMENTS_DIR || path.join(process.env.SYSTEMS_DATA_DIR || '/var/lib/systems', 'releases');
+      await fsp.rm(path.join(dir, slug), { recursive: true, force: true });
+    } catch (err) { errors.push(`Remove releases: ${err.message}`); }
+
+    db.prepare('DELETE FROM projects WHERE slug = ?').run(slug); // cascades deploy_history/stats_history
+    auditLog({ user_id: request.user.id, action: 'purge', target: slug, ip: request.ip });
+    return { message: 'System purged.', warnings: errors.length ? errors : undefined };
+  });
+
+  // Change visibility: republishes (or removes) the public route accordingly.
+  fastify.patch('/api/projects/:slug/visibility', {
+    preHandler: [fastify.authenticate],
+    schema: {
+      body: {
+        type: 'object', required: ['visibility'],
+        properties: {
+          visibility: { type: 'string', enum: ['public', 'password', 'private'] },
+          username: { type: 'string', maxLength: 64 },
+          password: { type: 'string', maxLength: 200 },
+        },
+      },
+    },
+  }, async (request, reply) => {
+    const { slug } = request.params;
+    const { visibility, username, password } = request.body;
+    const project = db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug);
+    if (!project) return reply.code(404).send({ error: 'Project not found' });
+    if (project.status === 'deleted') return reply.code(409).send({ error: 'System is deleted.' });
+
+    let basicUser = project.basic_user;
+    let basicHash = project.basic_hash;
+    if (visibility === 'password') {
+      if (!username || !password) return reply.code(400).send({ error: 'Username and password are required for password protection.' });
+      basicUser = username;
+      basicHash = await bcrypt.hash(password, 12); // Caddy basic_auth accepts bcrypt
+    } else {
+      basicUser = null; basicHash = null;
+    }
+
+    let published = false;
+    const errors = [];
+    try {
+      const r = await proxy.publishRoute({ slug, port: project.port, visibility, basicUser, basicHash });
+      published = r.published;
+      if (r.reload && r.reload.ok === false && r.reload.reason !== 'no_route' && r.reload.reason !== 'caddy_not_found') {
+        errors.push(`Proxy reload: ${r.reload.reason}`);
+      }
+    } catch (err) { errors.push(`Route: ${err.message}`); }
+
+    db.prepare(`UPDATE projects SET visibility = ?, basic_user = ?, basic_hash = ?, route_published = ?, updated_at = datetime('now') WHERE slug = ?`)
+      .run(visibility, basicUser, basicHash, published ? 1 : 0, slug);
+    auditLog({ user_id: request.user.id, action: 'visibility_change', target: slug, detail: visibility, ip: request.ip });
+
+    const updated = db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug);
+    delete updated.basic_hash; // never return the hash
+    return { project: updated, warnings: errors.length ? errors : undefined };
+  });
+
+  // Run a real health + HTTPS check against the public URL and store the result.
+  fastify.post('/api/projects/:slug/health', {
+    preHandler: [fastify.authenticate],
+  }, async (request, reply) => {
+    const { slug } = request.params;
+    const project = db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug);
+    if (!project) return reply.code(404).send({ error: 'Project not found' });
+    if (project.visibility === 'private') {
+      return reply.code(400).send({ error: 'Private systems have no public URL to check.' });
+    }
+    const host = `${slug}.${process.env.BASE_DOMAIN || 'acronym.sk'}`;
+    const result = await health.checkSystem(host, '/');
+    db.prepare(`UPDATE projects SET health_state = ?, health_status = ?, health_response_ms = ?, health_checked_at = ? WHERE slug = ?`)
+      .run(result.state, result.httpStatus, result.responseMs, result.checkedAt, slug);
+    auditLog({ user_id: request.user.id, action: result.state === 'healthy' ? 'health_ok' : 'health_fail', target: slug, detail: `${result.state} ${result.httpStatus ?? ''}`.trim(), ip: request.ip });
+    return { health: result };
   });
 
   // Roll back to the previously deployed image.

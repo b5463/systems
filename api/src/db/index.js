@@ -59,6 +59,18 @@ db.exec(`
 try { db.exec(`ALTER TABLE projects ADD COLUMN previous_image_id TEXT`); } catch {}
 try { db.exec(`ALTER TABLE projects ADD COLUMN previous_container_id TEXT`); } catch {}
 
+// V1.2: visibility, detected deploy type, password basic-auth, health snapshot,
+// and whether a public route is currently published.
+try { db.exec(`ALTER TABLE projects ADD COLUMN visibility TEXT NOT NULL DEFAULT 'public'`); } catch {}
+try { db.exec(`ALTER TABLE projects ADD COLUMN deploy_type TEXT`); } catch {}
+try { db.exec(`ALTER TABLE projects ADD COLUMN basic_user TEXT`); } catch {}
+try { db.exec(`ALTER TABLE projects ADD COLUMN basic_hash TEXT`); } catch {}
+try { db.exec(`ALTER TABLE projects ADD COLUMN health_state TEXT`); } catch {}
+try { db.exec(`ALTER TABLE projects ADD COLUMN health_status INTEGER`); } catch {}
+try { db.exec(`ALTER TABLE projects ADD COLUMN health_response_ms INTEGER`); } catch {}
+try { db.exec(`ALTER TABLE projects ADD COLUMN health_checked_at TEXT`); } catch {}
+try { db.exec(`ALTER TABLE projects ADD COLUMN route_published INTEGER NOT NULL DEFAULT 0`); } catch {}
+
 db.exec(`
   CREATE TABLE IF NOT EXISTS deploy_history (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

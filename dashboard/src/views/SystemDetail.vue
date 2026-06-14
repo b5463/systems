@@ -49,6 +49,50 @@ function openDelete() {
   deleteConfirmText.value = ''
   confirmDelete.value = true
 }
+
+/* Purge (typed-slug confirm) */
+const confirmPurge = ref(false)
+const purgeText = ref('')
+const purging = ref(false)
+function openPurge() { purgeText.value = ''; confirmPurge.value = true }
+async function doPurge() {
+  purging.value = true; error.value = ''
+  try {
+    await api.post(`/projects/${props.slug}/purge`, { confirm: purgeText.value })
+    router.replace({ name: 'systems' })
+  } catch (e) {
+    error.value = e.message || 'Purge failed.'; purging.value = false; confirmPurge.value = false
+  }
+}
+
+/* Health check */
+const checkingHealth = ref(false)
+async function runHealthCheck() {
+  checkingHealth.value = true; error.value = ''
+  try { await api.post(`/projects/${props.slug}/health`); await loadSystem() }
+  catch (e) { error.value = e.message || 'Health check failed.' }
+  finally { checkingHealth.value = false }
+}
+
+/* Visibility */
+const visSaving = ref(false)
+const visUser = ref('')
+const visPass = ref('')
+async function setVisibility(v) {
+  if (v === 'password' && (!visUser.value || !visPass.value)) { error.value = 'Username and password required for password protection.'; return }
+  visSaving.value = true; error.value = ''
+  try {
+    const body = { visibility: v }
+    if (v === 'password') { body.username = visUser.value; body.password = visPass.value }
+    const data = await api.patch(`/projects/${props.slug}/visibility`, body)
+    if (data && data.project) system.value = data.project
+    visPass.value = ''
+  } catch (e) {
+    error.value = e.message || 'Failed to change visibility.'
+  } finally {
+    visSaving.value = false
+  }
+}
 const fileInput = ref(null)
 const rollingBack = ref(false)
 
@@ -71,13 +115,24 @@ const truth = computed(() => {
   const containerLabel =
     s.status === 'running' ? 'Running' : s.status === 'building' ? 'Building' : s.status === 'error' ? 'Crashed' : 'Stopped'
 
+  const routePublished = !!s.route_published
+  const vis = s.visibility || 'public'
+  const hs = s.health_state
+  const healthMap = {
+    healthy: { tone: 'ok', val: `HTTP ${s.health_status || 200}` },
+    unhealthy: { tone: 'warn', val: `HTTP ${s.health_status || '?'}` },
+    timeout: { tone: 'error', val: 'Timeout' },
+    unreachable: { tone: 'error', val: 'Unreachable' }
+  }
+  const health = healthMap[hs] || { tone: 'idle', val: 'Not measured yet' }
+
   return [
     { key: 'Container', tone: containerTone, val: containerLabel },
-    { key: 'Route', tone: isRunning.value ? 'ok' : 'idle', val: isRunning.value ? 'Active' : 'None' },
-    { key: 'HTTPS', tone: 'idle', val: isRunning.value ? 'At reverse proxy' : '—' },
-    { key: 'Health', tone: 'idle', val: 'Not measured yet' },
-    { key: 'Visibility', tone: 'idle', val: 'Public' },
-    { key: 'Runtime', tone: 'idle', val: 'Auto-detected' },
+    { key: 'Route', tone: routePublished ? 'ok' : 'idle', val: routePublished ? 'Active' : (vis === 'private' ? 'None (private)' : 'None') },
+    { key: 'HTTPS', tone: hs ? (health.tone === 'error' ? 'error' : 'ok') : 'idle', val: vis === 'private' ? '—' : (hs ? (health.tone === 'error' ? 'Failed' : 'Valid') : 'Not measured yet') },
+    { key: 'Health', tone: health.tone, val: health.val },
+    { key: 'Visibility', tone: 'idle', val: vis.charAt(0).toUpperCase() + vis.slice(1) },
+    { key: 'Runtime', tone: 'idle', val: s.deploy_type ? (s.deploy_type === 'node' ? 'Node' : s.deploy_type === 'static' ? 'Static' : s.deploy_type) : 'Auto-detected' },
     { key: 'Last deploy', tone: 'idle', val: fmtDate(s.updated_at || s.created_at) }
   ]
 })
@@ -357,6 +412,9 @@ onBeforeUnmount(() => {
             <button v-if="system.previous_image_id" class="btn" :disabled="rollingBack" @click="doRollback">
               <span v-if="rollingBack" class="spinner"></span><span v-else>Roll back</span>
             </button>
+            <button v-if="system.visibility !== 'private'" class="btn" :disabled="checkingHealth" @click="runHealthCheck">
+              <span v-if="checkingHealth" class="spinner"></span><span v-else>Check health</span>
+            </button>
           </div>
         </div>
 
@@ -471,10 +529,27 @@ onBeforeUnmount(() => {
         </button>
       </div>
 
+      <!-- Visibility -->
+      <div class="card stack">
+        <div class="section-label" style="margin:0">Visibility</div>
+        <div class="segmented">
+          <button type="button" :class="{ active: system.visibility === 'public' }" :disabled="visSaving" @click="setVisibility('public')">Public</button>
+          <button type="button" :class="{ active: system.visibility === 'private' }" :disabled="visSaving" @click="setVisibility('private')">Private</button>
+          <button type="button" :class="{ active: system.visibility === 'password' }" :disabled="visSaving" @click="setVisibility('password')">Password</button>
+        </div>
+        <div v-if="system.visibility === 'password'" class="small muted">Protected. Update the credentials below to rotate.</div>
+        <input v-model="visUser" placeholder="basic-auth username" autocapitalize="none" autocorrect="off" />
+        <input v-model="visPass" type="password" placeholder="basic-auth password" autocomplete="new-password" />
+        <div class="hint">Public: open route. Private: no public route. Password: Caddy basic auth (hashed).</div>
+      </div>
+
       <div class="card stack">
         <div class="section-label danger-label" style="margin:0">Danger zone</div>
-        <div class="hint">Deleting removes the container, image, and route. This cannot be undone.</div>
-        <button class="btn btn-danger" @click="openDelete">Delete system</button>
+        <div class="hint"><strong>Delete</strong> stops the container and removes the public route but keeps history. <strong>Purge</strong> removes everything permanently.</div>
+        <div class="btn-row">
+          <button class="btn btn-danger" @click="openDelete">Delete</button>
+          <button class="btn btn-danger" @click="openPurge">Purge…</button>
+        </div>
       </div>
     </div>
   </template>
@@ -501,6 +576,31 @@ onBeforeUnmount(() => {
             <button class="btn" :disabled="deleting" @click="confirmDelete = false">Cancel</button>
             <button class="btn btn-danger" :disabled="deleting || deleteConfirmText !== system?.slug" @click="doDelete">
               <span v-if="deleting" class="spinner"></span><span v-else>Delete system</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
+
+    <!-- Purge confirm -->
+    <Transition name="fade">
+      <div v-if="confirmPurge" class="modal-backdrop" @click.self="confirmPurge = false">
+        <div class="modal stack">
+          <h3>Purge this system?</h3>
+          <p class="muted small" style="margin:0">
+            This permanently removes <strong>{{ system?.name }}</strong> — container, images, route,
+            release files and all records. This cannot be undone.
+          </p>
+          <div class="callout danger" style="margin:0">
+            <div class="co-bar"></div>
+            <div>No backup is taken automatically. Back up first (see docs/DISASTER_RECOVERY.md).</div>
+          </div>
+          <label class="label" style="margin:0">Type <span class="mono" style="color:var(--text)">{{ system?.slug }}</span> to confirm</label>
+          <input v-model="purgeText" :placeholder="system?.slug" autocapitalize="none" autocorrect="off" />
+          <div class="btn-row">
+            <button class="btn" :disabled="purging" @click="confirmPurge = false">Cancel</button>
+            <button class="btn btn-danger" :disabled="purging || purgeText !== system?.slug" @click="doPurge">
+              <span v-if="purging" class="spinner"></span><span v-else>Purge everything</span>
             </button>
           </div>
         </div>

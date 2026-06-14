@@ -146,3 +146,42 @@ Confirm exposure (run from another network or use the script):
 
 See also: [`SECURITY.md`](SECURITY.md), [`OPERATIONS.md`](OPERATIONS.md),
 [`UPDATE_STRATEGY.md`](UPDATE_STRATEGY.md), [`DISASTER_RECOVERY.md`](DISASTER_RECOVERY.md).
+
+---
+
+## V1.2 deploy flow (what the platform does)
+
+`upload → validate zip (zip-slip guarded, ≤ UPLOAD_MAX_MB) → detect type →
+build (Vue/Vite or static) → run hardened container → publish route per
+visibility → reload Caddy → (optional) health/HTTPS check → mark live`.
+
+- **Slugs** are validated and **reserved names rejected** (`www, api, admin,
+  dashboard, server, system(s), auth, login, proxy, docker, caddy, …`).
+- **Visibility:** `public` (route published), `private` (no public route —
+  runs and is monitored only), `password` (Caddy `basic_auth`, bcrypt-hashed;
+  set from the system's **Settings**).
+- **Routes** are written to `CADDY_SYSTEMS_DIR\{slug}.caddy` and Caddy is
+  reloaded. Reload/validate are guarded — a missing Caddy logs a warning
+  instead of crashing the API, and the system is **not** marked live falsely.
+- **Delete vs Purge:** delete stops the container + removes the route but keeps
+  history; **purge** removes container, images, route, release files and all
+  records and **requires typing the slug**.
+- **Health check** runs a real HTTP(S) request and stores status/response time;
+  results are honest (`healthy / unhealthy / timeout / unreachable`).
+- **Release retention** trims deploy history beyond `RELEASE_RETENTION_DEFAULT`.
+
+### Caddy container networking (required, validate on the host)
+For Caddy to reach app containers by name, deployed containers must be named
+`systems-{slug}` and share a Docker network with Caddy that permits
+inter-container traffic. The generated route uses
+`reverse_proxy systems-{slug}:3000`. Set `REVERSE_PROXY=caddy` and run Caddy
+(container or service) with `CADDY_SYSTEMS_DIR` mounted/readable. This is the
+one part that must be validated on the Windows host (it cannot be exercised in
+a Docker-less CI/dev box).
+
+### Postgres (V1.2)
+The internal DB target is Postgres. The current build runs on SQLite; the
+`POSTGRES_*` settings + a `pg_dump`-based backup are in place, and the Server
+screen reports Postgres **Connected** only when `POSTGRES_HOST` is actually
+reachable. Cutting the internal store over to Postgres is a dedicated, tested
+migration step on the host — do it with a backup taken first.

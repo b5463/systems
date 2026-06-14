@@ -16,8 +16,8 @@ const SCHEME = import.meta.env.VITE_PUBLIC_SCHEME || 'https'
 
 const VISIBILITY = [
   { key: 'public', label: 'Public', desc: 'Public route. Anyone with the URL can reach it.' },
-  { key: 'password', label: 'Password', desc: 'Public route behind Caddy basic auth.', v12: true },
-  { key: 'private', label: 'Private', desc: 'No public route — reachable internally only.', v12: true }
+  { key: 'private', label: 'Private', desc: 'No public route — runs and is monitored internally only.' },
+  { key: 'password', label: 'Password', desc: 'Set after deploy in Settings (Caddy basic auth).', after: true }
 ]
 
 const name = ref('')
@@ -66,7 +66,7 @@ async function submit() {
   uploading.value = true; progress.value = 0
   try {
     const data = await api.upload('/deploy', {
-      fields: { name: name.value.trim(), slug: slug.value },
+      fields: { name: name.value.trim(), slug: slug.value, visibility: visibility.value },
       files: { file: file.value },
       onProgress: (p) => (progress.value = p)
     })
@@ -143,9 +143,9 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
       <div class="card stack">
         <div class="section-label" style="margin:0">Visibility</div>
         <div class="segmented">
-          <button v-for="v in VISIBILITY" :key="v.key" type="button" :class="{ active: visibility === v.key }" :disabled="v.v12" :title="v.v12 ? 'Arrives in V1.2' : ''" @click="visibility = v.key">{{ v.label }}</button>
+          <button v-for="v in VISIBILITY" :key="v.key" type="button" :class="{ active: visibility === v.key }" :disabled="v.after" :title="v.after ? 'Set after the first deploy' : ''" @click="visibility = v.key">{{ v.label }}</button>
         </div>
-        <div class="hint">{{ visDesc }}<template v-if="VISIBILITY.find(v => v.key === visibility)?.v12"> (V1.2)</template></div>
+        <div class="hint">{{ visDesc }}</div>
       </div>
 
       <div class="card stack">

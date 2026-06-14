@@ -51,9 +51,12 @@ function open(s) { router.push({ name: 'system-detail', params: { slug: s.slug }
 function hostFor(slug) { return `${slug}.${BASE_DOMAIN}` }
 function urlFor(slug) { return `${SCHEME}://${hostFor(slug)}` }
 
+const active = computed(() => systems.value.filter((s) => s.status !== 'deleted'))
+const deleted = computed(() => systems.value.filter((s) => s.status === 'deleted'))
+
 const counts = computed(() => {
   const c = { live: 0, building: 0, stopped: 0, failed: 0 }
-  for (const s of systems.value) {
+  for (const s of active.value) {
     if (s.status === 'running') c.live++
     else if (s.status === 'building') c.building++
     else if (s.status === 'error') c.failed++
@@ -62,11 +65,11 @@ const counts = computed(() => {
   return c
 })
 
-const needsAttention = computed(() => systems.value.filter((s) => s.status === 'error' || s.status === 'stopped'))
+const needsAttention = computed(() => active.value.filter((s) => s.status === 'error' || s.status === 'stopped'))
 
 const latest = computed(() => {
-  if (!systems.value.length) return null
-  return [...systems.value].sort((a, b) => new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at))[0]
+  if (!active.value.length) return null
+  return [...active.value].sort((a, b) => new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at))[0]
 })
 
 // Honest server mini-status line.
@@ -103,8 +106,8 @@ onBeforeUnmount(() => clearInterval(timer))
   <div class="page-head">
     <div>
       <h1>Systems</h1>
-      <div v-if="!loading && systems.length" class="watching">
-        Watching {{ systems.length }} system{{ systems.length === 1 ? '' : 's' }} —
+      <div v-if="!loading && active.length" class="watching">
+        Watching {{ active.length }} system{{ active.length === 1 ? '' : 's' }} —
         <span class="ok">{{ counts.live }} live</span> ·
         <span :class="{ warn: counts.building }">{{ counts.building }} building</span> ·
         <span>{{ counts.stopped }} stopped</span> ·
@@ -128,7 +131,7 @@ onBeforeUnmount(() => clearInterval(timer))
   <div v-else-if="error" class="error-box">{{ error }}</div>
 
   <!-- Empty -->
-  <div v-else-if="!systems.length" class="empty-block">
+  <div v-else-if="!active.length && !deleted.length" class="empty-block">
     <div class="eb-title">No systems yet.</div>
     <div class="eb-sub">Ship a <span class="mono">.zip</span> to deploy one at <span class="mono">slug.{{ BASE_DOMAIN }}</span>.</div>
     <div class="eb-actions"><RouterLink class="btn btn-primary" :to="{ name: 'ship' }">Ship a system</RouterLink></div>
@@ -169,9 +172,9 @@ onBeforeUnmount(() => clearInterval(timer))
     </div>
 
     <!-- All systems -->
-    <div class="section-label">All systems · {{ systems.length }}</div>
+    <div class="section-label">All systems · {{ active.length }}</div>
     <div class="grid grid-auto">
-      <div v-for="s in systems" :key="s.id" class="card card-tap sys-card" @click="open(s)">
+      <div v-for="s in active" :key="s.id" class="card card-tap sys-card" @click="open(s)">
         <div class="sc-top">
           <div style="min-width:0">
             <div class="sc-name">{{ s.name }}</div>
@@ -181,9 +184,9 @@ onBeforeUnmount(() => clearInterval(timer))
         </div>
 
         <div class="sc-facts">
-          <span><i>Route</i>{{ s.status === 'running' ? 'Active' : 'None' }}</span>
-          <span><i>HTTPS</i>{{ s.status === 'running' ? 'At proxy' : '—' }}</span>
-          <span><i>Visibility</i>Public</span>
+          <span><i>Route</i>{{ s.route_published ? 'Active' : (s.visibility === 'private' ? 'Private' : 'None') }}</span>
+          <span><i>Health</i>{{ s.health_state ? (s.health_state === 'healthy' ? 'Healthy' : s.health_state) : 'Not measured' }}</span>
+          <span><i>Visibility</i>{{ (s.visibility || 'public').charAt(0).toUpperCase() + (s.visibility || 'public').slice(1) }}</span>
           <span><i>Last deploy</i>{{ fmtAgo(s.updated_at || s.created_at) }}</span>
         </div>
 
@@ -196,6 +199,17 @@ onBeforeUnmount(() => clearInterval(timer))
         </div>
       </div>
     </div>
+
+    <!-- Deleted (history kept; purge from detail) -->
+    <template v-if="deleted.length">
+      <div class="section-label" style="margin-top:22px">Deleted · {{ deleted.length }}</div>
+      <div class="card" style="padding:0">
+        <div v-for="s in deleted" :key="s.id" class="conn-row" style="cursor:pointer" @click="open(s)">
+          <div style="flex:1; min-width:0"><div class="c-name">{{ s.name }}</div><div class="c-sub mono">{{ hostFor(s.slug) }}</div></div>
+          <span class="small dim">deleted · purge to remove</span>
+        </div>
+      </div>
+    </template>
   </template>
 </template>
 
