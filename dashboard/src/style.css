@@ -1686,3 +1686,10 @@ select:focus {
   /* system-detail action groups closer together */
   .action-group + .action-group { margin-top: 12px; }
 }
+
+/* ---------- Review polish ---------- */
+/* System-detail action rows shouldn't sprawl the full content width on desktop. */
+.action-group .btn-row { max-width: 560px; }
+
+/* Quieter, smaller wordmark in the mobile top bar. */
+.mobile-bar .brand-img { height: 12px; }

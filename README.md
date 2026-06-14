@@ -5,8 +5,9 @@
 # SYSTEMS.
 ### by Acronym
 
-SYSTEMS. is a self-hosted tool for deploying your own apps. You drop in a zip,
-it builds the app, runs it in a Docker container, and serves it at a subdomain.
+SYSTEMS. is a self-hosted tool for deploying your own apps (it calls them
+"systems"). You drop in a zip, it builds the app, runs it in a Docker container,
+and serves it at a subdomain.
 
 It runs on your own server and it's just for you — only admins can log in, and
 there's no public sign-up. It's not a service you'd hand to other people.
