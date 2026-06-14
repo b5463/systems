@@ -1,3 +1,5 @@
+<p align="center"><img src="assets/header.svg" alt="SYSTEMS. by Acronym" width="100%" /></p>
+
 # SYSTEMS. — Architecture
 
 > Status: **V1.1 foundation.** This documents what exists today and the locked

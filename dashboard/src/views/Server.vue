@@ -36,13 +36,16 @@ onMounted(load)
 </script>
 
 <template>
-  <div class="page-head">
-    <div>
-      <h1>Server</h1>
-      <div class="sub">Infrastructure SYSTEMS. depends on. Status is observed, never assumed.</div>
-    </div>
-    <div class="head-actions">
-      <button class="btn btn-sm btn-ghost" @click="load">Refresh</button>
+  <div class="server-head">
+    <div class="art-layer art-topology ambient" aria-hidden="true"></div>
+    <div class="page-head" style="margin-bottom:0">
+      <div>
+        <h1>Server</h1>
+        <div class="sub">Infrastructure SYSTEMS. depends on. Status is observed, never assumed.</div>
+      </div>
+      <div class="head-actions">
+        <button class="btn btn-sm btn-ghost" @click="load">Refresh</button>
+      </div>
     </div>
   </div>
 
@@ -148,3 +151,18 @@ onMounted(load)
     </div>
   </template>
 </template>
+
+<style scoped>
+.server-head {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
+  background: #08080a;
+  padding: 22px 22px;
+  margin-bottom: 22px;
+}
+.server-head > .page-head { position: relative; z-index: 1; }
+.server-head .art-layer { z-index: 0; opacity: 0.4; }
+</style>

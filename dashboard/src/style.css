@@ -1109,6 +1109,8 @@ select:focus {
 }
 
 .content-inner {
+  position: relative;
+  z-index: 1;
   flex: 1;
   width: 100%;
   max-width: var(--content-max);
@@ -1444,3 +1446,221 @@ select:focus {
 .mt-sm { margin-top: 8px; }
 .mt { margin-top: 16px; }
 .tnum { font-variant-numeric: tabular-nums; }
+
+/* ============================================================
+   SYSTEMS. — Chaos Signal Field art layer (Art Direction pass)
+   Decorative only. Always behind content, low-opacity, monochrome,
+   pointer-events:none, and gated by prefers-reduced-motion where animated.
+   Functional UI (cards/forms/tables/logs/nav) carries NO art.
+   ============================================================ */
+
+/* Static SVG art layer, faded at the edges so it never competes with text. */
+.art-layer {
+  position: absolute;
+  inset: 0;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: cover;
+  pointer-events: none;
+  z-index: 0;
+}
+.art-layer.ambient { opacity: 0.5; }
+.art-layer.faint { opacity: 0.32; }
+.art-field {
+  background-image: url('/art/signal-field.svg');
+  -webkit-mask-image: radial-gradient(ellipse at center, #000 35%, transparent 78%);
+  mask-image: radial-gradient(ellipse at center, #000 35%, transparent 78%);
+}
+.art-topology {
+  background-image: url('/art/topology.svg');
+  background-size: cover;
+  -webkit-mask-image: linear-gradient(180deg, #000 0%, transparent 92%);
+  mask-image: linear-gradient(180deg, #000 0%, transparent 92%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* keep static SVG textures; they don't move, so nothing to disable here */
+}
+
+/* Very faint fixed backdrop behind the whole content column. */
+.shell-backdrop {
+  position: fixed;
+  inset: 0;
+  background-image: url('/art/signal-field.svg');
+  background-size: 120% auto;
+  background-position: top right;
+  background-repeat: no-repeat;
+  opacity: 0.05;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ---------- Empty states carry a faint field ---------- */
+.empty-block {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.empty-block > * { position: relative; z-index: 1; }
+.empty-block::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-image: url('/art/signal-field.svg');
+  background-size: cover;
+  background-position: center;
+  opacity: 0.26;
+  pointer-events: none;
+  -webkit-mask-image: radial-gradient(ellipse at center, #000 18%, transparent 72%);
+  mask-image: radial-gradient(ellipse at center, #000 18%, transparent 72%);
+}
+
+/* ---------- Login composition ---------- */
+.login-page {
+  position: relative;
+  overflow: hidden;
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 1.05fr minmax(360px, 0.95fr);
+}
+.login-art {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: #08080a;
+}
+.login-art::after {
+  /* hard monochrome contrast: vignette + fade toward the form side */
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(120% 90% at 22% 42%, rgba(95,176,212,0.05), transparent 55%),
+    linear-gradient(100deg, transparent 0%, transparent 40%, rgba(8,8,10,0.55) 64%, var(--bg) 86%);
+}
+.login-brandzone {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 48px 56px;
+  min-width: 0;
+}
+.login-brandzone .lz-tag {
+  margin-top: 22px;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  max-width: 360px;
+}
+.login-brandzone .lz-meta {
+  margin-top: 28px;
+  display: flex;
+  gap: 18px;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.login-formzone {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 40px;
+}
+.login-formzone .lf-inner { width: 100%; max-width: 340px; }
+.login-foot {
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 24px;
+  letter-spacing: 0.03em;
+}
+
+@media (max-width: 860px) {
+  .login-page { grid-template-columns: 1fr; }
+  .login-art { height: 42vh; bottom: auto; }
+  .login-art::after {
+    background:
+      radial-gradient(90% 70% at 50% 30%, rgba(95,176,212,0.06), transparent 60%),
+      linear-gradient(180deg, transparent 40%, rgba(8,8,10,0.6) 78%, var(--bg) 100%);
+  }
+  .login-brandzone {
+    align-items: center;
+    text-align: center;
+    padding: 40px 24px 8px;
+    min-height: 42vh;
+    justify-content: flex-end;
+  }
+  .login-brandzone .lz-tag { max-width: none; }
+  .login-brandzone .lz-meta { display: none; }
+  .login-formzone { padding: 24px 24px 40px; align-items: flex-start; }
+}
+
+/* ---------- Deploy lifecycle rail (Ship) ---------- */
+.lifecycle {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex-wrap: wrap;
+  row-gap: 12px;
+}
+.lc-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+.lc-step .lc-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--border); flex-shrink: 0;
+}
+.lc-step.active { color: var(--text); }
+.lc-step.active .lc-dot { background: var(--ok); }
+.lc-step.current .lc-dot { background: var(--warn); animation: pulse 1.4s ease-in-out infinite; }
+.lc-link { width: 22px; height: 1px; background: var(--border-soft); margin: 0 8px; flex-shrink: 0; }
+@media (prefers-reduced-motion: reduce) { .lc-step.current .lc-dot { animation: none; } }
+
+/* ---------- Brand panel (deploy success / splash moment) ---------- */
+.brand-panel {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: #08080a;
+  padding: 30px;
+  isolation: isolate;
+}
+.brand-panel > * { position: relative; z-index: 1; }
+.brand-panel .art-layer { z-index: 0; }
+.brand-panel.live { border-color: rgba(69,194,103,0.4); }
+
+/* live pulse for the success moment */
+.live-pulse {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--ok);
+}
+.live-pulse .lp-dot {
+  width: 9px; height: 9px; border-radius: 50%; background: var(--ok);
+  box-shadow: 0 0 0 0 rgba(69,194,103,0.5);
+  animation: livePulse 1.8s ease-out infinite;
+}
+@keyframes livePulse {
+  0% { box-shadow: 0 0 0 0 rgba(69,194,103,0.5); }
+  70% { box-shadow: 0 0 0 9px rgba(69,194,103,0); }
+  100% { box-shadow: 0 0 0 0 rgba(69,194,103,0); }
+}
+@media (prefers-reduced-motion: reduce) { .live-pulse .lp-dot { animation: none; } }
+
+/* dropzone gets a faint field behind it (kept subtle, text stays crisp) */
+.dropzone { position: relative; overflow: hidden; isolation: isolate; }
+.dropzone > * { position: relative; z-index: 1; }
+.dropzone .art-layer { z-index: 0; opacity: 0.18; }

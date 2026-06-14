@@ -71,6 +71,9 @@ function go(name) {
 
     <!-- Content column -->
     <div class="content">
+      <!-- Faint ambient signal-field backdrop (decorative, inert) -->
+      <div class="shell-backdrop" aria-hidden="true"></div>
+
       <header class="mobile-bar">
         <button class="iconbtn" aria-label="Open navigation" @click="drawerOpen = true">
           <svg viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="1.9" stroke-linecap="round">

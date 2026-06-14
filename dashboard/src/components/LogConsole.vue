@@ -14,6 +14,9 @@ const props = defineProps({
   mode: { type: String, default: 'logs' }
 })
 
+// Emitted once when a build log reports a terminal state ('done' | 'error').
+const emit = defineEmits(['finished'])
+
 const wrap = ref(null)
 const status = ref('connecting') // connecting | streaming | ended | error
 const errMsg = ref('')
@@ -26,8 +29,8 @@ let resizeObserver = null
 const theme = {
   background: '#000000',
   foreground: '#e6edf3',
-  cursor: '#2dd4bf',
-  selectionBackground: 'rgba(45,212,191,0.3)'
+  cursor: '#5fb0d4',
+  selectionBackground: 'rgba(95,176,212,0.3)'
 }
 
 function writeLine(data) {
@@ -60,6 +63,7 @@ function connect() {
         writeLine(`\n[build ${msg.status}]\n`)
         if (msg.status === 'done' || msg.status === 'error') {
           status.value = msg.status === 'done' ? 'ended' : 'error'
+          emit('finished', msg.status)
         }
       } else if (msg.type === 'end') {
         status.value = 'ended'

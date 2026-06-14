@@ -5,6 +5,10 @@ import { api } from '../api/client'
 import LogConsole from '../components/LogConsole.vue'
 
 const router = useRouter()
+
+// The defined deploy pipeline — shown as a reference rail (atmosphere, not a
+// fake live readout; SYSTEMS. does not assert which substep is running).
+const LIFECYCLE = ['archive', 'detect', 'install', 'build', 'container', 'route', 'HTTPS', 'health', 'live']
 const BASE_DOMAIN = import.meta.env.VITE_BASE_DOMAIN || 'acronym.sk'
 const SCHEME = import.meta.env.VITE_PUBLIC_SCHEME || 'https'
 
@@ -21,6 +25,11 @@ const progress = ref(0)
 const error = ref('')
 const deployedSlug = ref('')
 const phase = ref('form') // form | building
+const buildResult = ref('') // '' | 'done' | 'error' (from the real build stream)
+
+function onBuildFinished(status) {
+  buildResult.value = status
+}
 
 function slugify(s) {
   return s.toLowerCase().trim()
@@ -82,6 +91,7 @@ function reset() {
   name.value = ''; slug.value = ''; slugEdited.value = false
   file.value = null; progress.value = 0; deployedSlug.value = ''
   phase.value = 'form'; error.value = ''; visibility.value = 'public'
+  buildResult.value = ''
 }
 
 function openSystem() {
@@ -99,19 +109,32 @@ function openSystem() {
 
   <!-- BUILDING -->
   <div v-if="phase === 'building'" class="stack" style="max-width: 820px">
-    <div class="card">
+    <div class="brand-panel" :class="{ live: buildResult === 'done' }">
+      <div class="art-layer art-field ambient" aria-hidden="true"></div>
       <div class="spread">
         <div>
-          <div class="sc-name">{{ name || deployedSlug }}</div>
-          <div class="mono small dim">{{ deployedSlug }}.{{ BASE_DOMAIN }}</div>
+          <div class="sc-name" style="font-size:17px">{{ name || deployedSlug }}</div>
+          <a class="mono small" :href="`${SCHEME}://${deployedSlug}.${BASE_DOMAIN}`" target="_blank" rel="noopener">
+            {{ deployedSlug }}.{{ BASE_DOMAIN }}
+          </a>
         </div>
-        <span class="badge badge-building"><span class="dot"></span>Building</span>
+        <span v-if="buildResult === 'done'" class="live-pulse"><span class="lp-dot"></span>Live</span>
+        <span v-else-if="buildResult === 'error'" class="badge badge-error"><span class="dot"></span>Failed</span>
+        <span v-else class="badge badge-building"><span class="dot"></span>Building</span>
+      </div>
+
+      <!-- Lifecycle rail -->
+      <div class="lifecycle" style="margin-top: 22px">
+        <template v-for="(step, i) in LIFECYCLE" :key="step">
+          <span class="lc-step" :class="{ active: buildResult === 'done' }"><span class="lc-dot"></span>{{ step }}</span>
+          <span v-if="i < LIFECYCLE.length - 1" class="lc-link"></span>
+        </template>
       </div>
     </div>
 
     <div class="card">
       <div class="section-label" style="margin-bottom: 10px">Build log</div>
-      <LogConsole :slug="deployedSlug" mode="build" />
+      <LogConsole :slug="deployedSlug" mode="build" @finished="onBuildFinished" />
     </div>
 
     <div class="btn-row" style="max-width: 360px">
@@ -197,6 +220,7 @@ function openSystem() {
           @dragleave.prevent="dragOver = false"
           @drop.prevent="onDrop"
         >
+          <div class="art-layer art-field" aria-hidden="true"></div>
           <svg class="dz-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 16V4M7 9l5-5 5 5" /><path d="M3 19h18" />
           </svg>
@@ -230,10 +254,13 @@ function openSystem() {
           <span v-else>Build &amp; deploy</span>
         </button>
 
-        <div class="hint">
-          Lifecycle: <span class="mono">upload → detect → build → containerize → route → live</span>.
-          Progress streams into the build log once the upload completes.
+        <div class="lifecycle">
+          <template v-for="(step, i) in LIFECYCLE" :key="step">
+            <span class="lc-step"><span class="lc-dot"></span>{{ step }}</span>
+            <span v-if="i < LIFECYCLE.length - 1" class="lc-link"></span>
+          </template>
         </div>
+        <div class="hint">Progress streams into the build log once the upload completes.</div>
       </div>
     </div>
   </form>

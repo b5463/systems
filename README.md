@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/assets/header.svg" alt="SYSTEMS. — by Acronym — Private deployment infrastructure" width="100%" />
+</p>
+
 # SYSTEMS.
 ### by Acronym
 
