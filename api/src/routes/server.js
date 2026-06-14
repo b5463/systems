@@ -7,6 +7,7 @@ const fsp = require('fs/promises');
 const path = require('path');
 const { db } = require('../db');
 const dockerService = require('../services/docker');
+const { features } = require('../util/flags');
 
 const PLATFORM_VERSION = '1.1.0';
 
@@ -76,6 +77,7 @@ async function serverRoutes(fastify, options) {
       disk: { status: 'not_measured', usedPct: null, freeGb: null, totalGb: null },
       backup: { status: 'not_measured', last: null, ageHours: null, count: 0 },
       defaults: dockerService.containerLimits(),
+      features: features(), // V2 feature flags (risky ones off by default)
     };
 
     // Docker — the one component we can truly probe today.

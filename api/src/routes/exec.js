@@ -2,14 +2,23 @@
 
 const { db, auditLog } = require('../db');
 const dockerService = require('../services/docker');
+const { features } = require('../util/flags');
 
 async function execRoutes(fastify, options) {
-  // WebSocket interactive terminal — /bin/sh inside the running container
+  // WebSocket interactive terminal — /bin/sh inside the running container.
+  // Admin-only AND gated by ENABLE_SHELL_CONSOLE (OFF by default — a shell into
+  // a container is high-risk, so it must be explicitly enabled).
   fastify.get('/api/projects/:slug/exec', {
     websocket: true,
     preHandler: [fastify.authenticate],
   }, async (socket, request) => {
     const { slug } = request.params;
+
+    if (!features().shellConsole) {
+      socket.send(JSON.stringify({ type: 'error', message: 'Shell console is disabled (ENABLE_SHELL_CONSOLE=false).' }));
+      socket.close();
+      return;
+    }
 
     const project = db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug);
 

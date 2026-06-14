@@ -179,6 +179,19 @@ onMounted(load)
       <div class="kv"><span class="k">Log rotation</span><span class="v mono">{{ defaults.logSize }} × {{ defaults.logFile }}</span></div>
     </div>
 
+    <!-- V2 feature flags -->
+    <div v-if="info.features" class="section-label">V2 features</div>
+    <div v-if="info.features" class="card" style="margin-bottom: 22px">
+      <div class="kv"><span class="k">Dockerfile mode</span><span class="v">{{ info.features.dockerfileMode ? 'Enabled' : 'Disabled' }}</span></div>
+      <div class="kv"><span class="k">Shell console</span><span class="v">{{ info.features.shellConsole ? 'Enabled' : 'Disabled' }}</span></div>
+      <div class="kv"><span class="k">DB provisioning</span><span class="v">{{ info.features.dbProvisioning ? 'Enabled' : 'Planned' }}</span></div>
+      <div class="kv"><span class="k">DB mode</span><span class="v mono">{{ info.features.dbMode }}</span></div>
+      <div class="kv"><span class="k">GitHub deploys</span><span class="v">{{ info.features.githubDeploys ? 'Enabled' : 'Planned' }}</span></div>
+      <div class="kv"><span class="k">Notifications</span><span class="v">{{ info.features.notifications ? 'Enabled' : 'Planned' }}</span></div>
+      <div class="kv"><span class="k">Upload limit</span><span class="v mono">{{ info.features.uploadMaxMb }} MB (V2 target {{ info.features.v2UploadMaxMb }} MB)</span></div>
+      <div class="hint">Risky features are off by default and enabled via <span class="mono">.env</span>. Large uploads, DB provisioning, GitHub deploys and notifications require Windows host validation.</div>
+    </div>
+
     <div class="callout warn">
       <div class="co-bar"></div>
       <div>Caddy and Postgres are configured during V1.2 Windows setup. DNS is set manually in Websupport and can't be checked from here.</div>

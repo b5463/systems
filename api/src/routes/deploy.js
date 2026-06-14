@@ -8,6 +8,7 @@ const dockerService = require('../services/docker');
 const { extractZip, detectProjectType, generateDockerfile } = require('../services/zip');
 const proxy = require('../services/proxy');
 const { slugError } = require('../util/slug');
+const { features } = require('../util/flags');
 
 // In-memory build log buffers keyed by slug
 const buildLogs = new Map();
@@ -59,6 +60,12 @@ async function runBuildPipeline(slug, zipPath, extractDir, port, userId, ip) {
 
     const projectType = await detectProjectType(extractDir);
     appendBuildLog(slug, `[deploy] Detected project type: ${projectType}\n`);
+
+    // Dockerfile builds run project-defined instructions — advanced/admin-only
+    // and OFF unless ENABLE_DOCKERFILE_MODE=true. Never run it silently.
+    if (projectType === 'dockerfile' && !features().dockerfileMode) {
+      throw new Error('This archive contains a Dockerfile. Dockerfile mode is disabled (set ENABLE_DOCKERFILE_MODE=true to allow it).');
+    }
 
     if (projectType !== 'dockerfile') {
       appendBuildLog(slug, `[deploy] Generating Dockerfile for ${projectType} project...\n`);

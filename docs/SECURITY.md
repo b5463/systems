@@ -101,3 +101,23 @@ Checklist:
   guarded by typing the database name.
 - Pre-destructive-action backup awareness: the UI shows whether a recent backup
   exists and warns when none does.
+
+---
+
+## V2 security review (per feature)
+
+Risky features are **off by default** and only enable via explicit `.env` flags.
+
+| Feature | Key risks | Mitigations | Status | Safe to enable by default? |
+| --- | --- | --- | --- | --- |
+| 2 GB uploads | OOM, disk exhaustion, zip-slip, abandoned temp files | stream to disk (no buffering), server-side cap, disk-fit check, traversal-safe temp path, admin-only, rate-limit, cleanup on cancel | validation **logic implemented + tested**; endpoint host-validated | No — keep V1 100 MB until validated |
+| DB provisioning | credential leak, privilege escalation, SQL injection | per-system DB + **least-privilege** role, random secret, **masked** + never returned, **parameterized** SQL (no concatenation), typed-confirm destructive | helpers **implemented + tested**; execution host-validated | No (`ENABLE_DB_PROVISIONING=false`) |
+| Dockerfile builds | arbitrary build instructions | **disabled by default**, explicit opt-in, admin-only, build timeout, resource/PIDs limits, no secrets in logs, audited, rejected silently-never | gate **implemented + tested**; build host-validated | No (`ENABLE_DOCKERFILE_MODE=false`) |
+| Node API execution | runs uploaded code | hardened container (CapDrop ALL, no-new-privileges), limits, sanitized names/slugs, no shell concatenation, private mode = no route | classification/plan **implemented + tested**; runtime host-validated | Yes (same trust model as static/Vue) |
+| Workers/Bots | long-running uploaded code | no public route by default, limits, logs, restart policy | no-route plan **implemented + tested**; runtime host-validated | Yes |
+| Shell console | container code-exec | **disabled by default**, admin-only, audited; honest disabled state (no fake terminal) | gate **implemented + tested**; live use host-validated | No (`ENABLE_SHELL_CONSOLE=false`) |
+| GitHub webhooks | forged payloads, token leak | **HMAC-SHA256 constant-time verify**, branch filter, admin-only, secret stored masked, rate-limit | verify **implemented + tested**; deploy wiring planned | No (`ENABLE_GITHUB_DEPLOYS=false`) |
+| Notifications | secret leak, spam | admin-only, masked secrets, rate-limit, test action | **planned** | No (`ENABLE_NOTIFICATIONS=false`) |
+
+**Default posture:** every high-risk V2 feature is disabled until hardened and
+host-validated. None are claimed working live.

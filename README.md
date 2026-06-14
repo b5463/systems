@@ -138,7 +138,16 @@ It is hardened and least-privilege by design — it is **not** "unhackable." See
 - [`docs/OPERATIONS.md`](docs/OPERATIONS.md) — day-2 operations, backups, limits, disk
 - [`docs/UPDATE_STRATEGY.md`](docs/UPDATE_STRATEGY.md) — updating SYSTEMS. safely
 - [`docs/DISASTER_RECOVERY.md`](docs/DISASTER_RECOVERY.md) — recovery runbook
+- [`docs/WINDOWS_VALIDATION_CHECKLIST.md`](docs/WINDOWS_VALIDATION_CHECKLIST.md) — host-only validation steps
 - [`docs/V2_ROADMAP.md`](docs/V2_ROADMAP.md) — what's coming
+- **V2 (in progress, mostly off-by-default):**
+  [`DATABASES`](docs/DATABASES.md) ·
+  [`LARGE_UPLOADS`](docs/LARGE_UPLOADS.md) ·
+  [`DOCKERFILE_MODE`](docs/DOCKERFILE_MODE.md) ·
+  [`WORKERS`](docs/WORKERS.md) ·
+  [`GITHUB_DEPLOYS`](docs/GITHUB_DEPLOYS.md) ·
+  [`NOTIFICATIONS`](docs/NOTIFICATIONS.md) ·
+  [`SHELL_CONSOLE`](docs/SHELL_CONSOLE.md)
 
 ---
 

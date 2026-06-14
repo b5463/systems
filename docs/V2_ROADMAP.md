@@ -79,3 +79,19 @@ Built on the Windows choices above:
 
 *Art direction and the Windows-target lock are handled in their own dedicated
 prompts before the V1.2 engine work.*
+
+## V2 — repo-only implementation status (this pass)
+
+**Implemented & unit-tested (pure logic):** project classification
+(static/vue/node-api/worker/dockerfile), DB provisioning helpers
+(names/credentials/URL/masking), chunked-upload validation, GitHub webhook
+HMAC verification, feature flags. **Gated in the deploy/exec paths:** Dockerfile
+mode (off by default, never silent), shell console (off by default). **Surfaced
+honestly:** V2 feature flags on the Server screen; `/api/deploy/plan` dry-run.
+
+**Requires Windows host validation:** live chunked 2 GB upload endpoint, DB
+provisioning execution, Node-API/worker container runtime + Caddy reachability,
+Dockerfile builds, GitHub deploy-on-push.
+
+**Planned only:** notifications, multi-server (per-node Docker/Caddy,
+scheduling, node health, route distribution — docs/architecture notes only).
