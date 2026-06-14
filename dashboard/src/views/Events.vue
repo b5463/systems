@@ -41,7 +41,7 @@ function humanize(action) {
 
 function dotClass(action) {
   switch (action) {
-    case 'deploy': case 'redeploy': return 'info'
+    case 'deploy': case 'redeploy': return 'ok'
     case 'start': case 'restart': return 'ok'
     case 'stop': return 'idle'
     case 'login_fail': case 'delete': case 'user_delete': case 'error': return 'error'

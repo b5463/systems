@@ -67,9 +67,9 @@ const truth = computed(() => {
   return [
     { key: 'Container', tone: containerTone, val: containerLabel },
     { key: 'Route', tone: isRunning.value ? 'ok' : 'idle', val: isRunning.value ? 'Active' : 'None' },
-    { key: 'HTTPS', tone: isRunning.value ? 'info' : 'idle', val: isRunning.value ? 'At reverse proxy' : '—' },
+    { key: 'HTTPS', tone: 'idle', val: isRunning.value ? 'At reverse proxy' : '—' },
     { key: 'Health', tone: 'idle', val: 'Not measured yet' },
-    { key: 'Visibility', tone: 'info', val: 'Public' },
+    { key: 'Visibility', tone: 'idle', val: 'Public' },
     { key: 'Runtime', tone: 'idle', val: 'Auto-detected' },
     { key: 'Last deploy', tone: 'idle', val: fmtDate(s.updated_at || s.created_at) }
   ]

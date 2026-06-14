@@ -1,4 +1,8 @@
 <p align="center">
+  <img src="docs/assets/systems-wordmark-white.png#gh-dark-mode-only" alt="SYSTEMS." width="420" />
+  <img src="docs/assets/systems-wordmark.png#gh-light-mode-only" alt="SYSTEMS." width="420" />
+</p>
+<p align="center">
   <img src="docs/assets/header.svg" alt="SYSTEMS. — by Acronym — Private deployment infrastructure" width="100%" />
 </p>
 

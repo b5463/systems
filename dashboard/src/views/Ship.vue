@@ -3,6 +3,7 @@ import { ref, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '../api/client'
 import LogConsole from '../components/LogConsole.vue'
+import AsciiChaosField from '../components/AsciiChaosField.vue'
 
 const router = useRouter()
 
@@ -110,7 +111,8 @@ function openSystem() {
   <!-- BUILDING -->
   <div v-if="phase === 'building'" class="stack" style="max-width: 820px">
     <div class="brand-panel" :class="{ live: buildResult === 'done' }">
-      <div class="art-layer art-field ambient" aria-hidden="true"></div>
+      <AsciiChaosField :intensity="0.7" :cell="12" />
+      <div class="brand-panel-fade" aria-hidden="true"></div>
       <div class="spread">
         <div>
           <div class="sc-name" style="font-size:17px">{{ name || deployedSlug }}</div>
@@ -220,7 +222,6 @@ function openSystem() {
           @dragleave.prevent="dragOver = false"
           @drop.prevent="onDrop"
         >
-          <div class="art-layer art-field" aria-hidden="true"></div>
           <svg class="dz-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 16V4M7 9l5-5 5 5" /><path d="M3 19h18" />
           </svg>
