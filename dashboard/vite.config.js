@@ -11,7 +11,7 @@ export default defineConfig({
       manifest: {
         name: 'SYSTEMS.',
         short_name: 'SYSTEMS.',
-        description: 'Private deployment console by Acronym.',
+        description: 'SYSTEMS. deployment engine.',
         theme_color: '#0a0a0c',
         background_color: '#0a0a0c',
         display: 'standalone',

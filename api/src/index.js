@@ -78,7 +78,7 @@ async function main() {
     host: '0.0.0.0',
   });
 
-  fastify.log.info('Acronym deployment platform API running on 0.0.0.0:3000');
+  fastify.log.info('SYSTEMS. deployment engine API running on 0.0.0.0:3000');
 }
 
 main().catch((err) => {

@@ -117,8 +117,7 @@ ${texts}
     <stop offset="1" stop-color="#0a0a0c" stop-opacity="0.75"/>
   </linearGradient>
 </defs>
-<text x="40" y="250" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14" letter-spacing="6" fill="#585c66">BY ACRONYM</text>
-<text x="40" y="284" font-family="-apple-system, system-ui, sans-serif" font-size="18" fill="#9296a0">Private deployment infrastructure</text>
+<text x="40" y="272" font-family="-apple-system, system-ui, sans-serif" font-size="18" fill="#9296a0">Deployment engine</text>
 </svg>
 `
   writeFileSync(resolve(DOCS, 'header.svg'), svg)

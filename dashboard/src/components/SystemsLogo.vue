@@ -7,7 +7,7 @@ import { ref } from 'vue'
 
 defineProps({
   size: { type: String, default: 'sm' }, // 'sm' | 'lg'
-  byline: { type: Boolean, default: true }
+  byline: { type: Boolean, default: false } // "by Acronym" hidden for now
 })
 
 const failed = ref(false)

@@ -1,9 +1,8 @@
 <p align="center">
-  <img src="docs/assets/header.svg" alt="SYSTEMS. by Acronym" width="100%" />
+  <img src="docs/assets/header.svg" alt="SYSTEMS. — deployment engine" width="100%" />
 </p>
 
 # SYSTEMS.
-### by Acronym
 
 SYSTEMS. is a self-hosted tool for deploying your own apps (it calls them
 "systems"). You drop in a zip, it builds the app, runs it in a Docker container,
