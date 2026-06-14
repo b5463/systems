@@ -221,12 +221,7 @@ onMounted(loadUsers)
       <!-- Security & audit -->
       <div class="card stack">
         <div class="section-label" style="margin:0">Security &amp; audit</div>
-        <div class="kv"><span class="k">Public signup</span><span class="v">Never</span></div>
-        <div class="kv"><span class="k">Admins</span><span class="v">2 maximum</span></div>
-        <div class="kv"><span class="k">Dashboard access</span><span class="v">Admin-only</span></div>
-        <div class="kv"><span class="k">Password hashing</span><span class="v mono small">bcrypt</span></div>
-        <div class="kv"><span class="k">Backups</span><span class="v dim">Planned for V1.2</span></div>
-        <div class="row gap-sm" style="margin-top:4px">
+        <div class="row gap-sm">
           <RouterLink class="btn btn-sm btn-ghost" :to="{ name: 'events' }">Audit log</RouterLink>
           <RouterLink class="btn btn-sm btn-ghost" :to="{ name: 'server' }">SYSTEMS. health</RouterLink>
         </div>
