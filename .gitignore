@@ -5,3 +5,6 @@ certbot/www/
 .env
 *.zip
 nginx/conf.d/*.conf
+
+# Generated UI screenshots (visual artifacts, not source)
+shots/
