@@ -32,10 +32,10 @@ const failed = ref(false)
 <style scoped>
 .brand-img {
   display: block;
-  height: 15px;
+  height: 14px;
   width: auto;
 }
 .brand-img.lg {
-  height: 30px;
+  height: 20px;
 }
 </style>

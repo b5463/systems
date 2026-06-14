@@ -43,12 +43,6 @@ async function submit() {
     <!-- Desktop brand zone -->
     <div class="login-brandzone">
       <SystemsLogo size="lg" />
-      <p class="lz-tag">Private deployment console</p>
-      <div class="lz-meta">
-        <span>Admin-only</span>
-        <span>No public signup</span>
-        <span>v1.1</span>
-      </div>
     </div>
 
     <!-- Form zone -->
@@ -57,7 +51,6 @@ async function submit() {
         <!-- Mobile-only compact brand (logo sits in its own ASCII halo) -->
         <div class="lf-mobile-brand">
           <SystemsLogo size="lg" />
-          <p class="lz-tag">Private deployment console</p>
         </div>
 
         <form class="card stack login-card" @submit.prevent="submit">
@@ -89,7 +82,6 @@ async function submit() {
   .login-brandzone { display: none; }
   .lf-mobile-brand { display: block; }
   /* smaller, calmer logo on mobile */
-  .lf-mobile-brand :deep(.brand-img.lg) { height: 22px; margin: 0 auto; }
-  .lf-mobile-brand .lz-tag { margin-top: 14px; }
+  .lf-mobile-brand :deep(.brand-img.lg) { height: 20px; margin: 0 auto; }
 }
 </style>

@@ -965,6 +965,7 @@ select:focus {
 .lockup {
   display: inline-flex;
   flex-direction: column;
+  align-items: flex-start; /* never stretch the wordmark image — keep its ratio */
   line-height: 1;
   user-select: none;
 }
