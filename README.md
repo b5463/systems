@@ -43,13 +43,13 @@ DNS points the domains at the server; SYSTEMS. handles routing from there.
 | Frontend | Vue 3 + Vite (PWA) |
 | API | Node.js + Fastify |
 | Containers | Docker (isolated bridge network, per-container resource limits) |
-| Reverse proxy | Caddy route generation implemented; the current dev compose uses nginx |
-| Internal DB | SQLite today; Postgres support implemented (connection is a host step) |
-| Auth | JWT bearer token, bcrypt hashes |
+| Reverse proxy | Caddy (it generates the route files; the local dev setup still uses nginx) |
+| Internal DB | SQLite for now; Postgres is supported, you just point it at one |
+| Auth | JWT bearer token, bcrypt password hashes |
 
-Caddy routing and Postgres are implemented in the repo but connecting them is a
-Windows-host step; see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and
-[`docs/WINDOWS_VALIDATION_CHECKLIST.md`](docs/WINDOWS_VALIDATION_CHECKLIST.md).
+The Caddy and Postgres code is all here — you just connect it on the real
+server. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and the
+[Windows checklist](docs/WINDOWS_VALIDATION_CHECKLIST.md).
 
 ## Admin model
 
@@ -60,19 +60,20 @@ Windows-host step; see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and
 
 ## Deployment support
 
-- **Now:** Vue/Vite source zips and static sites (build type auto-detected).
-- **Implemented, host-validated:** Node API and worker projects, custom
-  Dockerfile (off by default), Postgres provisioning helpers, chunked-upload
-  validation, GitHub webhook verification. See [`docs/V2_ROADMAP.md`](docs/V2_ROADMAP.md).
-- Risky features are off by default and enabled via `.env`.
+- **Working now:** Vue/Vite source zips and static sites (it figures out the
+  build type for you).
+- **Written, but needs a real server to confirm:** Node APIs and background
+  workers, custom Dockerfiles (off by default), Postgres databases per app,
+  big (2 GB) uploads, and GitHub deploys. See [`docs/V2_ROADMAP.md`](docs/V2_ROADMAP.md).
+- The riskier stuff is off until you turn it on in `.env`.
 
 ## Dashboard
 
 - **Systems** — overview: counts, what needs attention, latest deploy, system cards.
 - **Ship** — build & deploy a zip (desktop workbench; stepped on mobile).
 - **Events** — time-stamped audit log of admin and deploy actions.
-- **Server** — observed status of Docker / Caddy / Postgres / wildcard DNS, plus
-  SYSTEMS.' own health.
+- **Server** — what Docker / Caddy / Postgres / DNS are actually doing, plus how
+  SYSTEMS. itself is holding up.
 - **Admin** — profile, password, second admin, limits & retention.
 - **System detail** — overview, deployments, logs, metrics, console, settings.
 
@@ -102,9 +103,10 @@ with PowerShell scripts in [`scripts/`](scripts) (`setup`, `deploy`, `backup`,
 `verify-hardening`). Data lives under `C:\ProgramData\SYSTEMS`. Linux is a
 development path.
 
-> This environment can't validate Docker/Caddy/Postgres/HTTPS/DNS, so anything
-> requiring a live host is marked "requires host validation" in the UI and docs.
-> See [`docs/WINDOWS_VALIDATION_CHECKLIST.md`](docs/WINDOWS_VALIDATION_CHECKLIST.md).
+> Anything that needs a real running server — Docker, Caddy, Postgres, HTTPS,
+> DNS — is labelled "requires host validation" in the dashboard and docs until
+> you've confirmed it on the actual machine. The
+> [Windows checklist](docs/WINDOWS_VALIDATION_CHECKLIST.md) walks through that.
 
 ## Security
 
