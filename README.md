@@ -5,18 +5,18 @@
 # SYSTEMS.
 ### by Acronym
 
-A private, self-hosted deployment platform for one operator. Upload a zip and it
-builds, containerizes, and serves the result at a subdomain. Admin-only; no
-public signup.
+SYSTEMS. is a self-hosted tool for deploying your own apps. You drop in a zip,
+it builds the app, runs it in a Docker container, and serves it at a subdomain.
 
-It is single-tenant and runs on one server — not a multi-tenant SaaS or PaaS.
+It runs on your own server and it's just for you — only admins can log in, and
+there's no public sign-up. It's not a service you'd hand to other people.
 
 ## What it does
 
-- Builds and runs containerized systems from an uploaded zip (Vue/Vite, static).
-- Manages reverse-proxy routes, with public / password / private visibility.
-- Shows status, logs, metrics, and an audited event stream.
-- Provides start/stop/restart/redeploy, rollback, and delete/purge.
+- Takes a zip (Vue/Vite or a static site), builds it, and runs it in a container.
+- Gives each app a URL and lets you make it public, password-protected, or private.
+- Shows status, logs, and metrics, and keeps an audit log of everything you do.
+- Lets you start, stop, restart, redeploy, roll back, and delete apps.
 
 ## Domain model
 
