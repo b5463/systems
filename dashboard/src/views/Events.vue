@@ -31,7 +31,21 @@ const ACTION_LABELS = {
   user_create: 'Added admin',
   user_delete: 'Removed admin',
   password_change: 'Changed password',
-  password_reset: 'Reset password'
+  password_reset: 'Reset password',
+  // SYSTEMS. operating on itself
+  backup_succeeded: 'Backup succeeded',
+  backup_failed: 'Backup failed',
+  restore_started: 'Restore started',
+  restore_completed: 'Restore completed',
+  update_started: 'Update started',
+  update_failed: 'Update failed',
+  update_completed: 'Update completed',
+  caddy_validate_failed: 'Caddy config invalid',
+  docker_unavailable: 'Docker unavailable',
+  postgres_unavailable: 'Postgres unavailable',
+  disk_warning: 'Disk warning',
+  backup_overdue: 'Backup overdue',
+  resource_warning: 'Resource warning'
 }
 
 function humanize(action) {
@@ -43,9 +57,14 @@ function dotClass(action) {
   switch (action) {
     case 'deploy': case 'redeploy': return 'ok'
     case 'start': case 'restart': return 'ok'
+    case 'backup_succeeded': case 'update_completed': case 'restore_completed': return 'ok'
     case 'stop': return 'idle'
-    case 'login_fail': case 'delete': case 'user_delete': case 'error': return 'error'
-    case 'env_update': case 'rollback': return 'warn'
+    case 'login_fail': case 'delete': case 'user_delete': case 'error':
+    case 'backup_failed': case 'update_failed': case 'caddy_validate_failed':
+    case 'docker_unavailable': case 'postgres_unavailable': return 'error'
+    case 'env_update': case 'rollback':
+    case 'disk_warning': case 'backup_overdue': case 'resource_warning':
+    case 'restore_started': case 'update_started': return 'warn'
     default: return 'idle'
   }
 }

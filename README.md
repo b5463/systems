@@ -112,10 +112,12 @@ Open the dashboard, sign in with an `ADMIN_USERS` credential.
 
 ## Production deployment overview
 
-Production runs via `docker-compose` (nginx + API + certbot). The full,
-server-side, step-by-step guide lives in
-[`docs/SERVER_DEPLOYMENT_GUIDE.md`](docs/SERVER_DEPLOYMENT_GUIDE.md) (to be made
-Windows-first before V1.2).
+**Production target is Windows** (Docker Desktop + WSL2, Linux containers). The
+canonical, step-by-step guide is
+[`docs/WINDOWS_DEPLOYMENT.md`](docs/WINDOWS_DEPLOYMENT.md), driven by PowerShell
+scripts in [`scripts/`](scripts) (`setup`, `deploy`, `backup`, `restore`,
+`update`, `check-systems-health`, `check-firewall`). Data lives under
+`C:\ProgramData\SYSTEMS`. Linux remains a dev/secondary path.
 
 ## ⚠️ Security warning
 
@@ -129,10 +131,13 @@ It is hardened and least-privilege by design — it is **not** "unhackable." See
 ## Documentation
 
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — system architecture & data model
+- [`docs/WINDOWS_DEPLOYMENT.md`](docs/WINDOWS_DEPLOYMENT.md) — **canonical** Windows production guide
+- [`docs/SERVER_DEPLOYMENT_GUIDE.md`](docs/SERVER_DEPLOYMENT_GUIDE.md) — deployment surface + Linux dev path
 - [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) — how a zip becomes a live system
-- [`docs/SERVER_DEPLOYMENT_GUIDE.md`](docs/SERVER_DEPLOYMENT_GUIDE.md) — standing up the server
-- [`docs/SECURITY.md`](docs/SECURITY.md) — security model & posture
-- [`docs/OPERATIONS.md`](docs/OPERATIONS.md) — day-2 operations
+- [`docs/SECURITY.md`](docs/SECURITY.md) — security model, posture & firewall
+- [`docs/OPERATIONS.md`](docs/OPERATIONS.md) — day-2 operations, backups, limits, disk
+- [`docs/UPDATE_STRATEGY.md`](docs/UPDATE_STRATEGY.md) — updating SYSTEMS. safely
+- [`docs/DISASTER_RECOVERY.md`](docs/DISASTER_RECOVERY.md) — recovery runbook
 - [`docs/V2_ROADMAP.md`](docs/V2_ROADMAP.md) — what's coming
 
 ---

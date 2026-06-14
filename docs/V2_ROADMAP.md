@@ -15,7 +15,23 @@ backend/server changes are isolated, never bundled.
 - Docs, security direction, and config skeletons.
 - Backend kept functional (SQLite + nginx) — no rushed migrations.
 
+## V1.1.5 — Windows target + hardening baseline ✅ (this pass)
+
+- Windows-first `.env`, paths (`C:\ProgramData\SYSTEMS`), and docs
+  (WINDOWS_DEPLOYMENT, UPDATE_STRATEGY, DISASTER_RECOVERY; firewall in
+  SECURITY/OPERATIONS).
+- PowerShell scripts: setup, deploy, backup, restore, update, health, firewall.
+- Per-deployed-container resource limits (memory/CPU/PIDs/restart/log rotation)
+  from `DEFAULT_CONTAINER_*`.
+- SYSTEMS. self-observability on the Server screen (uptime, disk, backups,
+  defaults) — honest, never faked.
+- Destructive delete requires typing the system slug; backup-awareness before
+  destructive actions.
+
 ## V1.2 — Platform alignment (the dangerous, deliberate migrations)
+
+Now built on the Windows choices above:
+
 
 - **Postgres** internal DB + SQLite→Postgres migration script.
 - **Caddy** reverse proxy: `Caddyfile` + generated `systems.d/` route files;

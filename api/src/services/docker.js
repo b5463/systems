@@ -9,6 +9,32 @@ const docker = new Docker({ socketPath: '/var/run/docker.sock' });
 const ISOLATED_NETWORK = 'acronym-isolated';
 
 /**
+ * Resolve per-deployed-container resource limits from env defaults, with
+ * optional per-system overrides. Keeps any one project from eating the host.
+ * @param {object} [opts] - { memoryMb, cpuLimit, pidsLimit, restartPolicy, logMaxSize, logMaxFile }
+ */
+function containerLimits(opts = {}) {
+  const memMb = Number(opts.memoryMb || process.env.DEFAULT_CONTAINER_MEMORY_MB) || 512;
+  const cpu = Number(opts.cpuLimit || process.env.DEFAULT_CONTAINER_CPU_LIMIT) || 0.5;
+  const pids = Number(opts.pidsLimit || process.env.DEFAULT_CONTAINER_PIDS_LIMIT) || 256;
+  const restart = opts.restartPolicy || process.env.DEFAULT_CONTAINER_RESTART_POLICY || 'unless-stopped';
+  const logMaxSize = opts.logMaxSize || process.env.DEFAULT_CONTAINER_LOG_MAX_SIZE || '10m';
+  const logMaxFile = String(opts.logMaxFile || process.env.DEFAULT_CONTAINER_LOG_MAX_FILE || '3');
+  const period = 100000;
+
+  return {
+    Memory: Math.round(memMb) * 1024 * 1024,
+    CpuPeriod: period,
+    CpuQuota: Math.max(1000, Math.round(cpu * period)),
+    PidsLimit: pids,
+    RestartPolicy: restart === 'on-failure'
+      ? { Name: 'on-failure', MaximumRetryCount: 5 }
+      : { Name: restart },
+    LogConfig: { Type: 'json-file', Config: { 'max-size': logMaxSize, 'max-file': logMaxFile } },
+  };
+}
+
+/**
  * Ensure the isolated Docker network exists.
  * Deployed containers run on this network, which:
  *   - Allows outbound internet access (not Internal)
@@ -103,7 +129,7 @@ async function buildImage(projectSlug, buildContextPath, onProgress) {
  * @param {Object} envVars - Key/value env vars to inject
  * @returns {Promise<string>} Container ID
  */
-async function runContainer(projectSlug, imageId, port, envVars = {}) {
+async function runContainer(projectSlug, imageId, port, envVars = {}, opts = {}) {
   const containerName = `deploy_${projectSlug}`;
 
   const Env = Object.entries(envVars).map(([k, v]) => `${k}=${v}`);
@@ -118,11 +144,10 @@ async function runContainer(projectSlug, imageId, port, envVars = {}) {
         '3000/tcp': [{ HostPort: String(port) }],
       },
       NetworkMode: ISOLATED_NETWORK,
-      RestartPolicy: { Name: 'on-failure', MaximumRetryCount: 5 },
-      Memory: 512 * 1024 * 1024,
-      CpuQuota: 50000,
       CapDrop: ['ALL'],
       SecurityOpt: ['no-new-privileges:true'],
+      // env-driven resource limits (memory, CPU, PIDs, restart, log rotation)
+      ...containerLimits(opts),
     },
     Labels: {
       managed: 'acronym-deploy',
@@ -393,6 +418,7 @@ function createDemuxer(onData) {
 
 module.exports = {
   ensureIsolatedNetwork,
+  containerLimits,
   buildImage,
   runContainer,
   stopContainer,

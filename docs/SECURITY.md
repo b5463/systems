@@ -59,3 +59,45 @@ The dashboard and API must be inaccessible unless authenticated as an admin.
 
 Schema, Docker, proxy, and server-level changes are treated as dangerous and are
 made as dedicated, reviewable steps — never rushed alongside unrelated work.
+
+---
+
+## Windows Firewall posture
+
+**Open publicly (inbound):**
+- `80/tcp`, `443/tcp`
+- remote admin (RDP/SSH) **only if needed**, restricted to your IP
+
+**Never public:**
+- Postgres `5432`
+- Docker API / socket (`2375`/`2376`)
+- Caddy admin API (`2019`)
+- internal backend/API ports, deployment worker ports
+- project internal container ports
+- Redis/queues (if added later)
+
+Verify with PowerShell / the helper script:
+```powershell
+Get-NetFirewallRule -Direction Inbound -Enabled True | Get-NetFirewallPortFilter | Sort-Object LocalPort
+Get-NetTCPConnection -State Listen | Sort-Object LocalPort
+.\scripts\check-firewall-windows.ps1 -PublicIp <SERVER_IP>
+```
+
+Checklist:
+- [ ] Postgres `5432` not externally reachable
+- [ ] Docker API not listening publicly (no `0.0.0.0:2375`)
+- [ ] Caddy admin `2019` not public
+- [ ] only `80`/`443` open
+- [ ] `systems.acronym.sk` behind admin auth
+- [ ] private/internal systems have **no** public Caddy route
+- [ ] wildcard DNS does not imply every subdomain serves something
+
+## Resource & exposure hardening (V1.1 baseline)
+- Every deployed container gets memory/CPU/PIDs limits, a restart policy and
+  log rotation from `DEFAULT_CONTAINER_*` (see OPERATIONS). One project cannot
+  exhaust the host.
+- Destructive **delete** requires typing the system **slug**. V1.2 splits
+  delete vs **purge** (purge = stronger confirmation) and adds DB reset/delete
+  guarded by typing the database name.
+- Pre-destructive-action backup awareness: the UI shows whether a recent backup
+  exists and warns when none does.

@@ -41,7 +41,13 @@ const redeployFile = ref(null)
 const redeploying = ref(false)
 const showBuildLog = ref(false)
 const confirmDelete = ref(false)
+const deleteConfirmText = ref('')
 const deleting = ref(false)
+
+function openDelete() {
+  deleteConfirmText.value = ''
+  confirmDelete.value = true
+}
 const fileInput = ref(null)
 const rollingBack = ref(false)
 
@@ -349,7 +355,7 @@ onBeforeUnmount(() => {
         <div class="action-group danger">
           <div class="ag-label">Danger</div>
           <div class="btn-row">
-            <button class="btn btn-danger" @click="confirmDelete = true">Delete system</button>
+            <button class="btn btn-danger" @click="openDelete">Delete system</button>
           </div>
         </div>
       </div>
@@ -464,7 +470,7 @@ onBeforeUnmount(() => {
       <div class="card stack">
         <div class="section-label danger-label" style="margin:0">Danger zone</div>
         <div class="hint">Deleting removes the container, image, and route. This cannot be undone.</div>
-        <button class="btn btn-danger" @click="confirmDelete = true">Delete system</button>
+        <button class="btn btn-danger" @click="openDelete">Delete system</button>
       </div>
     </div>
   </template>
@@ -481,10 +487,17 @@ onBeforeUnmount(() => {
             This permanently removes <strong>{{ system?.name }}</strong>, its container, image and
             public route. This cannot be undone.
           </p>
+          <div class="callout warn" style="margin:0">
+            <div class="co-bar"></div>
+            <div>No automatic pre-delete backup in V1.1. If you may need this system again, take a
+              backup first (see docs/DISASTER_RECOVERY.md).</div>
+          </div>
+          <label class="label" style="margin:0">Type <span class="mono" style="color:var(--text)">{{ system?.slug }}</span> to confirm</label>
+          <input v-model="deleteConfirmText" :placeholder="system?.slug" autocapitalize="none" autocorrect="off" />
           <div class="btn-row">
             <button class="btn" :disabled="deleting" @click="confirmDelete = false">Cancel</button>
-            <button class="btn btn-danger" :disabled="deleting" @click="doDelete">
-              <span v-if="deleting" class="spinner"></span><span v-else>Delete</span>
+            <button class="btn btn-danger" :disabled="deleting || deleteConfirmText !== system?.slug" @click="doDelete">
+              <span v-if="deleting" class="spinner"></span><span v-else>Delete system</span>
             </button>
           </div>
         </div>

@@ -55,3 +55,58 @@
 - Release retention default is `3` (`RELEASE_RETENTION_DEFAULT`). Automated
   pruning is planned; until then old images accumulate and can be pruned
   manually with care (never prune an image a system or its rollback points to).
+
+---
+
+## Windows operations (production)
+
+Scripts in [`../scripts`](../scripts), all printing `[systems] ...` lines:
+
+| Task | Script |
+| --- | --- |
+| Prepare host (dirs, network, checks) | `setup-windows.ps1` |
+| Build + start SYSTEMS. | `deploy-systems-windows.ps1` |
+| Backup (DB + routes + releases) | `backup-systems-windows.ps1` |
+| Restore (typed confirmation) | `restore-systems-windows.ps1` |
+| Update SYSTEMS. (backup + rollback) | `update-systems-windows.ps1` |
+| Health check | `check-systems-health-windows.ps1` |
+| Firewall/exposure audit | `check-firewall-windows.ps1` |
+
+## SYSTEMS. self-health
+The **Server** screen shows SYSTEMS. watching itself: backend uptime + memory,
+disk usage of the data volume (warn ≥75%, alert ≥90%), and backup status (last
+backup age / count, "overdue" after 7 days). Anything unmeasurable shows
+*not measured yet* — never a fake green.
+
+## Backups
+- Schedule `backup-systems-windows.ps1` (Task Scheduler) at least daily.
+- Backs up the database (pg_dump or SQLite copy), Caddy routes + `Caddyfile`,
+  and releases; optionally logs/uploads (`BACKUP_INCLUDE_*`).
+- Retention: `BACKUP_RETENTION_DAYS` (default 14). Secrets are never archived
+  in the manifest or logged.
+- **Before destructive actions** (purge, delete-all-releases, DB reset/delete,
+  remove routes, major update, restore): the UI/script shows what's removed and
+  whether a recent backup exists; purge/DB actions require typing the slug/name.
+
+## Resource limits (per deployed system)
+Defaults from `.env` (`DEFAULT_CONTAINER_*`), applied to every container:
+
+| Setting | Env | Default |
+| --- | --- | --- |
+| Memory | `DEFAULT_CONTAINER_MEMORY_MB` | 512 MB |
+| CPU | `DEFAULT_CONTAINER_CPU_LIMIT` | 0.5 cores |
+| PIDs | `DEFAULT_CONTAINER_PIDS_LIMIT` | 256 |
+| Restart | `DEFAULT_CONTAINER_RESTART_POLICY` | unless-stopped |
+| Log size/files | `DEFAULT_CONTAINER_LOG_MAX_SIZE` / `_FILE` | 10m × 3 |
+| Disk warn | `DEFAULT_CONTAINER_DISK_WARN_MB` | 1024 MB |
+
+Current defaults are shown on the **Server** screen. Per-system overrides
+(CPU/memory/restart/log/disk/internal port/health path) arrive in V1.2.
+
+## Disk & cleanup
+Track total disk, `SYSTEMS_DATA_DIR`, releases, uploads, logs, backups, and
+Docker usage (`docker system df`). Warn at 75% / 90%, on oversized logs/backups,
+accumulating failed uploads, and old images. **Safe** cleanup: temp extraction
+folders, old failed uploads, logs by retention, releases by retention, and only
+**clearly-scoped, confirmed** old images. Never run a broad automatic
+`docker system prune`.
