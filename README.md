@@ -3,155 +3,134 @@
   <img src="docs/assets/systems-wordmark.png#gh-light-mode-only" alt="SYSTEMS." width="420" />
 </p>
 <p align="center">
-  <img src="docs/assets/header.svg" alt="SYSTEMS. — by Acronym — Private deployment infrastructure" width="100%" />
+  <img src="docs/assets/header.svg" alt="SYSTEMS. by Acronym" width="100%" />
 </p>
 
 # SYSTEMS.
 ### by Acronym
 
-A private, self-hosted deployment platform. A deployment cockpit for one
-operator's own infrastructure — not a SaaS, not a generic admin dashboard.
+A private, self-hosted deployment platform for one operator. Upload a zip and it
+builds, containerizes, and serves the result at a subdomain. Admin-only; no
+public signup.
 
-> **North star:** Drop a zip. Get a live system at `slug.acronym.sk`.
+It is single-tenant and runs on one server — not a multi-tenant SaaS or PaaS.
 
-SYSTEMS. is a private control surface for shipping, running, and monitoring
-containerized systems on a single server — think lightweight, self-hosted
-Heroku/Vercel/Fly.io for your own boxes.
+## What it does
 
----
-
-## What SYSTEMS. is
-
-- A **private deployment console** — admin-only, no public signup.
-- A **system monitor & control surface** — live status, logs, metrics, console.
-- A **routing manager** — it owns internal routing through a reverse proxy.
-
-It is **not** a multi-tenant SaaS, a public PaaS, or a generic dashboard
-template.
+- Builds and runs containerized systems from an uploaded zip (Vue/Vite, static).
+- Manages reverse-proxy routes, with public / password / private visibility.
+- Shows status, logs, metrics, and an audited event stream.
+- Provides start/stop/restart/redeploy, rollback, and delete/purge.
 
 ## Domain model
 
 | Domain | Purpose |
 | --- | --- |
-| `acronym.sk` | Public portfolio (separate, not part of SYSTEMS.) |
-| `systems.acronym.sk` | The private SYSTEMS. dashboard |
-| `{slug}.acronym.sk` | A deployed system (e.g. `notes.acronym.sk`, `demo.acronym.sk`) |
+| `acronym.sk` | Public portfolio (separate from SYSTEMS.) |
+| `systems.acronym.sk` | The SYSTEMS. dashboard |
+| `{slug}.acronym.sk` | A deployed system (e.g. `notes.acronym.sk`) |
 
-### DNS — manual, wildcard, Websupport
-
-DNS is managed **manually in Websupport** with a wildcard record. SYSTEMS. does
-**not** automate DNS and has **no** Cloudflare/Websupport integration. Assume
-these records exist:
+DNS is configured **manually in Websupport** with a wildcard; SYSTEMS. does not
+automate DNS. Assume these records exist:
 
 ```
 A   acronym.sk     → SERVER_IP
 A   *.acronym.sk   → SERVER_IP
 ```
 
-DNS only points domains at the server. SYSTEMS. manages internal routing from
-there (via the reverse proxy).
+DNS points the domains at the server; SYSTEMS. handles routing from there.
 
-## The stack
+## Stack
 
-| Concern | V1.1 (today) | V1.2 target |
-| --- | --- | --- |
-| Frontend | Vue 3 + Vite PWA | — |
-| API | Node.js + Fastify | — |
-| Internal DB | **SQLite** | **Postgres** (documented, not yet wired) |
-| Reverse proxy | **nginx** + per-route configs | **Caddy** + `systems.d` route files |
-| Containers | Docker (isolated bridge network) | — |
-| Auth | JWT bearer token, bcrypt hashes | HTTP-only cookie sessions + CSRF |
+| Part | Details |
+| --- | --- |
+| Frontend | Vue 3 + Vite (PWA) |
+| API | Node.js + Fastify |
+| Containers | Docker (isolated bridge network, per-container resource limits) |
+| Reverse proxy | Caddy route generation implemented; the current dev compose uses nginx |
+| Internal DB | SQLite today; Postgres support implemented (connection is a host step) |
+| Auth | JWT bearer token, bcrypt hashes |
 
-> **Honesty note:** The locked platform decisions target **Postgres** and
-> **Caddy**. V1.1 deliberately keeps the working **SQLite + nginx** backend
-> intact rather than rushing a risky migration mid-flight. See
-> [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the reasoning and the
-> migration plan.
+Caddy routing and Postgres are implemented in the repo but connecting them is a
+Windows-host step; see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and
+[`docs/WINDOWS_VALIDATION_CHECKLIST.md`](docs/WINDOWS_VALIDATION_CHECKLIST.md).
 
-## Admin-only model
+## Admin model
 
-- No public signup, ever.
-- V1 supports **two admins**. The first comes from `.env` (`ADMIN_USERS`);
-  the second is added in the Admin screen.
-- Every dashboard, API, and deployment action is admin-only.
+- No public signup.
+- Two admins maximum. The first comes from `.env` (`ADMIN_USERS`); the second is
+  added on the Admin screen.
+- All dashboard, API, and deployment actions require admin auth.
 
-## Deployment capability split
+## Deployment support
 
-- **V1 / V1.1:** Vue/Vite source zips and static-site zips → static container.
-  The build type is auto-detected from the archive.
-- **V1.5 (if safe):** Node APIs; custom Dockerfile (advanced/admin-only).
-- **V2:** 2 GB chunked uploads, databases, workers/bots, GitHub deploys,
-  backups/restores, shell console, advanced metrics. See
-  [`docs/V2_ROADMAP.md`](docs/V2_ROADMAP.md).
+- **Now:** Vue/Vite source zips and static sites (build type auto-detected).
+- **Implemented, host-validated:** Node API and worker projects, custom
+  Dockerfile (off by default), Postgres provisioning helpers, chunked-upload
+  validation, GitHub webhook verification. See [`docs/V2_ROADMAP.md`](docs/V2_ROADMAP.md).
+- Risky features are off by default and enabled via `.env`.
 
-## The dashboard
+## Dashboard
 
-Five operational surfaces plus a system detail view:
+- **Systems** — overview: counts, what needs attention, latest deploy, system cards.
+- **Ship** — build & deploy a zip (desktop workbench; stepped on mobile).
+- **Events** — time-stamped audit log of admin and deploy actions.
+- **Server** — observed status of Docker / Caddy / Postgres / wildcard DNS, plus
+  SYSTEMS.' own health.
+- **Admin** — profile, password, second admin, limits & retention.
+- **System detail** — overview, deployments, logs, metrics, console, settings.
 
-- **Systems** — command center: snapshot counts, needs-attention, latest deploy, system cards.
-- **Ship** — desktop-first workbench to build & deploy a zip; guided steps on mobile.
-- **Events** — audited, time-stamped stream of every admin/deploy action.
-- **Server** — honest status of Docker / reverse proxy / database / wildcard DNS.
-- **Admin** — profile, password, second admin, limits & retention, security/audit.
-- **System detail** — Overview (truth model + grouped actions), Deployments, Logs, Metrics, Console, Settings.
-
-## Local run basics
+## Run locally
 
 ```bash
-# 1. API (needs a Docker socket for full functionality)
-cp .env.example .env            # fill in JWT_SECRET, ENV_SECRET, ADMIN_USERS
+# API (full functionality needs a Docker socket)
+cp .env.example .env            # set JWT_SECRET, ENV_SECRET, ADMIN_USERS
 cd api && npm install && npm run dev      # http://localhost:3000
 
-# 2. Dashboard
-cd dashboard
-cp .env.example .env            # optional; sets VITE_BASE_DOMAIN etc.
-npm install && npm run dev      # proxies /api to localhost:3000
+# Dashboard
+cd dashboard && npm install && npm run dev   # proxies /api to :3000
 ```
 
-Open the dashboard, sign in with an `ADMIN_USERS` credential.
+Run the tests:
 
-## Production deployment overview
+```bash
+cd api && npm test               # pure-logic unit tests
+```
 
-**Production target is Windows** (Docker Desktop + WSL2, Linux containers). The
-canonical, step-by-step guide is
-[`docs/WINDOWS_DEPLOYMENT.md`](docs/WINDOWS_DEPLOYMENT.md), driven by PowerShell
-scripts in [`scripts/`](scripts) (`setup`, `deploy`, `backup`, `restore`,
-`update`, `check-systems-health`, `check-firewall`). Data lives under
-`C:\ProgramData\SYSTEMS`. Linux remains a dev/secondary path.
+## Production (Windows)
 
-## ⚠️ Security warning
+The target is a Windows host with Docker Desktop (WSL2, Linux containers). The
+step-by-step guide is [`docs/WINDOWS_DEPLOYMENT.md`](docs/WINDOWS_DEPLOYMENT.md),
+with PowerShell scripts in [`scripts/`](scripts) (`setup`, `deploy`, `backup`,
+`restore`, `update`, `check-systems-health`, `check-firewall`,
+`verify-hardening`). Data lives under `C:\ProgramData\SYSTEMS`. Linux is a
+development path.
 
-SYSTEMS. controls Docker, the reverse proxy, uploaded source code, environment
-variables, routes, and logs. It is **privileged infrastructure**. Run it
-**admin-only and private**, never expose the Docker socket, the proxy admin API,
-or the database to the public internet, and treat uploaded code as untrusted.
-It is hardened and least-privilege by design — it is **not** "unhackable." See
-[`docs/SECURITY.md`](docs/SECURITY.md).
+> This environment can't validate Docker/Caddy/Postgres/HTTPS/DNS, so anything
+> requiring a live host is marked "requires host validation" in the UI and docs.
+> See [`docs/WINDOWS_VALIDATION_CHECKLIST.md`](docs/WINDOWS_VALIDATION_CHECKLIST.md).
+
+## Security
+
+SYSTEMS. controls Docker, the reverse proxy, uploaded code, env vars, routes,
+and logs, so it is privileged. Keep it admin-only and private; never expose the
+Docker socket, the proxy admin API, or the database to the internet; treat
+uploaded code as untrusted. It is built to be hardened and least-privilege — not
+"unhackable." See [`docs/SECURITY.md`](docs/SECURITY.md).
 
 ## Documentation
 
-- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — system architecture & data model
-- [`docs/WINDOWS_DEPLOYMENT.md`](docs/WINDOWS_DEPLOYMENT.md) — **canonical** Windows production guide
-- [`docs/SERVER_DEPLOYMENT_GUIDE.md`](docs/SERVER_DEPLOYMENT_GUIDE.md) — deployment surface + Linux dev path
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — architecture & data model
+- [`docs/WINDOWS_DEPLOYMENT.md`](docs/WINDOWS_DEPLOYMENT.md) — Windows production guide
+- [`docs/SERVER_DEPLOYMENT_GUIDE.md`](docs/SERVER_DEPLOYMENT_GUIDE.md) — deployment surface + Linux dev
 - [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) — how a zip becomes a live system
-- [`docs/SECURITY.md`](docs/SECURITY.md) — security model, posture & firewall
-- [`docs/OPERATIONS.md`](docs/OPERATIONS.md) — day-2 operations, backups, limits, disk
-- [`docs/BACKUPS.md`](docs/BACKUPS.md) — what's backed up, how to back up & restore
+- [`docs/SECURITY.md`](docs/SECURITY.md) — security model & firewall
+- [`docs/OPERATIONS.md`](docs/OPERATIONS.md) — day-2 operations
+- [`docs/BACKUPS.md`](docs/BACKUPS.md) — backup & restore
 - [`docs/RESOURCE_LIMITS.md`](docs/RESOURCE_LIMITS.md) — per-container limits
-- [`docs/HARDENING.md`](docs/HARDENING.md) — hardening verification (repo vs host)
-- [`docs/UPDATE_STRATEGY.md`](docs/UPDATE_STRATEGY.md) — updating SYSTEMS. safely
+- [`docs/HARDENING.md`](docs/HARDENING.md) — hardening verification
+- [`docs/UPDATE_STRATEGY.md`](docs/UPDATE_STRATEGY.md) — updating SYSTEMS.
 - [`docs/DISASTER_RECOVERY.md`](docs/DISASTER_RECOVERY.md) — recovery runbook
-- [`docs/WINDOWS_VALIDATION_CHECKLIST.md`](docs/WINDOWS_VALIDATION_CHECKLIST.md) — host-only validation steps
-- [`docs/V2_ROADMAP.md`](docs/V2_ROADMAP.md) — what's coming
-- **V2 (in progress, mostly off-by-default):**
-  [`DATABASES`](docs/DATABASES.md) ·
-  [`LARGE_UPLOADS`](docs/LARGE_UPLOADS.md) ·
-  [`DOCKERFILE_MODE`](docs/DOCKERFILE_MODE.md) ·
-  [`WORKERS`](docs/WORKERS.md) ·
-  [`GITHUB_DEPLOYS`](docs/GITHUB_DEPLOYS.md) ·
-  [`NOTIFICATIONS`](docs/NOTIFICATIONS.md) ·
-  [`SHELL_CONSOLE`](docs/SHELL_CONSOLE.md)
-
----
-
-**SYSTEMS.** — *by Acronym.* A private deployment cockpit. Not another generic dashboard.
+- [`docs/WINDOWS_VALIDATION_CHECKLIST.md`](docs/WINDOWS_VALIDATION_CHECKLIST.md) — host validation steps
+- [`docs/V2_ROADMAP.md`](docs/V2_ROADMAP.md) — roadmap
+- V2 features: [`DATABASES`](docs/DATABASES.md) · [`LARGE_UPLOADS`](docs/LARGE_UPLOADS.md) · [`DOCKERFILE_MODE`](docs/DOCKERFILE_MODE.md) · [`WORKERS`](docs/WORKERS.md) · [`GITHUB_DEPLOYS`](docs/GITHUB_DEPLOYS.md) · [`NOTIFICATIONS`](docs/NOTIFICATIONS.md) · [`SHELL_CONSOLE`](docs/SHELL_CONSOLE.md)
