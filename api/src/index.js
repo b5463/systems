@@ -5,12 +5,27 @@ const { initDefaultUsers } = require('./db');
 const { ensureIsolatedNetwork } = require('./services/docker');
 
 async function main() {
-  // Register @fastify/jwt
+  // Register @fastify/jwt.
+  // extractToken supports both the Authorization header (normal REST calls)
+  // and a ?token= query param (WebSocket connections, since browsers cannot
+  // set custom headers on the WebSocket handshake).
   await fastify.register(require('@fastify/jwt'), {
     secret: process.env.JWT_SECRET || (() => {
       console.warn('[startup] WARNING: JWT_SECRET is not set. Using insecure default.');
       return 'insecure-default-secret-change-me';
     })(),
+    verify: {
+      extractToken: (request) => {
+        const auth = request.headers && request.headers.authorization;
+        if (auth && auth.startsWith('Bearer ')) {
+          return auth.slice(7);
+        }
+        if (request.query && request.query.token) {
+          return request.query.token;
+        }
+        return undefined;
+      },
+    },
   });
 
   // Register @fastify/cors
