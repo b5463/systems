@@ -70,8 +70,8 @@ const cpuData = computed(() => ({
     {
       label: 'CPU %',
       data: props.history.map((p) => p.cpu),
-      borderColor: '#2dd4bf',
-      backgroundColor: 'rgba(45,212,191,0.12)',
+      borderColor: '#5fb0d4',
+      backgroundColor: 'rgba(95,176,212,0.12)',
       borderWidth: 2,
       fill: true,
       tension: 0.3
@@ -85,8 +85,8 @@ const memData = computed(() => ({
     {
       label: 'Memory MB',
       data: props.history.map((p) => p.mem),
-      borderColor: '#58a6ff',
-      backgroundColor: 'rgba(88,166,255,0.12)',
+      borderColor: 'rgba(236,236,238,0.7)',
+      backgroundColor: 'rgba(236,236,238,0.08)',
       borderWidth: 2,
       fill: true,
       tension: 0.3
@@ -123,7 +123,7 @@ const txVal = computed(() => (props.latest ? fmtBytes(props.latest.tx_bytes) : '
     <div class="card">
       <div class="spread" style="margin-bottom: 10px">
         <span class="label" style="margin: 0">Memory</span>
-        <strong class="mono" style="color: #58a6ff">{{ memVal }}</strong>
+        <strong class="mono">{{ memVal }}</strong>
       </div>
       <div style="height: 140px">
         <Line :data="memData" :options="baseOptions" />

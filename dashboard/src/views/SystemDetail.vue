@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '../api/client'
 import StatusBadge from '../components/StatusBadge.vue'
@@ -299,11 +299,14 @@ function copyUrl() {
 }
 
 /* ---- Tab side effects ---- */
-watch(tab, (t) => {
+// Select a tab and run its data load. Done explicitly (not via watch) so the
+// side-effects reliably fire on every tab change.
+function selectTab(t) {
+  tab.value = t
   if (t === 'Metrics') startStats(); else stopStats()
   if (t === 'Settings' && !envKeys.value.length) loadEnv()
   if (t === 'Deployments') loadDeployHistory()
-})
+}
 
 function onVisibility() {
   if (document.visibilityState === 'visible' && tab.value === 'Metrics' && !statsTimer) startStats()
@@ -358,7 +361,7 @@ onBeforeUnmount(() => {
 
     <!-- Tabs -->
     <div class="tabs">
-      <button v-for="t in TABS" :key="t" :class="{ active: tab === t }" @click="tab = t">{{ t }}</button>
+      <button v-for="t in TABS" :key="t" :class="{ active: tab === t }" @click="selectTab(t)">{{ t }}</button>
     </div>
 
     <div v-if="error" class="error-box" style="margin-bottom:14px">{{ error }}</div>
@@ -489,7 +492,8 @@ onBeforeUnmount(() => {
       </div>
       <template v-else>
         <div v-if="historyMinutes > 0" class="small muted" style="margin-bottom:10px">Showing last {{ historyMinutes }} minutes</div>
-        <StatsCharts :history="history" :latest="latestStats" />
+        <!-- mount only when visible so Chart.js sizes the canvas correctly -->
+        <StatsCharts v-if="tab === 'Metrics'" :history="history" :latest="latestStats" />
       </template>
     </div>
 
