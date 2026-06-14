@@ -347,7 +347,10 @@ onBeforeUnmount(() => {
     <div class="page-head" style="margin-bottom:18px">
       <div>
         <div class="row gap-sm">
-          <RouterLink class="btn btn-sm btn-ghost" :to="{ name: 'systems' }" style="min-height:32px;padding:0 10px">← Systems</RouterLink>
+          <RouterLink class="btn btn-sm btn-ghost" :to="{ name: 'systems' }" style="min-height:32px;padding:0 10px">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7" /><path d="M19 12H5" /></svg>
+            Systems
+          </RouterLink>
           <StatusBadge :status="system.status" />
         </div>
         <h1 style="margin-top:10px">{{ system.name }}</h1>
