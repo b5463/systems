@@ -1,8 +1,9 @@
 # SYSTEMS. — Backups & Restore
 
-> Status: **scripts implemented & dry-run-capable**; actual Postgres dump /
-> Caddy reload / service restart **require the Windows host**. Local-only
-> backups are **not** disaster-proof — keep secure **off-server** copies.
+> The backup and restore scripts are written and have a `-DryRun` mode, but the
+> real Postgres dump, Caddy reload and service restart only happen on the actual
+> server. A backup that only lives on the same disk won't save you if the disk
+> dies — keep a copy somewhere else.
 
 ## Scripts
 - `scripts\backup-systems-windows.ps1` — `[-IncludeLogs] [-IncludeUploads] [-DryRun]`

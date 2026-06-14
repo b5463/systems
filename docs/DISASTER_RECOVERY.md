@@ -1,6 +1,6 @@
 # SYSTEMS. — Disaster Recovery (Windows)
 
-> Calm, ordered recovery for SYSTEMS. on Windows. **No secrets in any command.**
+> What to do when something breaks, on Windows. **Don't paste secrets into any command.**
 > Tools: SYSTEMS. **Server** screen, `scripts\check-systems-health-windows.ps1`,
 > `scripts\check-firewall-windows.ps1`, `scripts\restore-systems-windows.ps1`,
 > Docker Desktop, and PowerShell.

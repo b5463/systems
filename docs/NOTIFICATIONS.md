@@ -1,7 +1,7 @@
 # SYSTEMS. — Notifications (V2)
 
-> Status: **planned / scaffold**. Off by default (`ENABLE_NOTIFICATIONS=false`).
-> Not implemented live — do not assume alerts are sent.
+> This isn't built yet — it's a plan. Off by default
+> (`ENABLE_NOTIFICATIONS=false`). Nothing sends alerts right now.
 
 ## Planned triggers
 deploy failed · health check failed · health recovered · disk low · DB backup

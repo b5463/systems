@@ -2,8 +2,8 @@
 
 # SYSTEMS. — Architecture
 
-> Status: **V1.1 foundation.** This documents what exists today and the locked
-> targets for V1.2. Where today ≠ target, both are stated plainly.
+> How SYSTEMS. is put together — what's running today and what it's heading
+> toward, side by side.
 
 ## 1. Components
 
@@ -94,7 +94,7 @@ restructuring the entire UI would:
 - precede the V1.2 deploy-engine work that actually consumes the new schema
   (visibility, routes table) and Caddy route files.
 
-**Decision:** keep SQLite + nginx running and *honest* in V1.1; perform the
+**Decision:** keep SQLite + nginx running in V1.1; do the
 Postgres and Caddy migrations as dedicated, reviewable V1.2 steps with a
 data-migration script and a route-file generator. The Server screen reports the
 real components in use (nginx, sqlite) — it never claims Caddy/Postgres are live.

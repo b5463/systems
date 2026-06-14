@@ -1,14 +1,14 @@
 # SYSTEMS. — GitHub Auto-Deploy (V2)
 
-> Status: **webhook signature verification implemented & unit-tested**; the
-> deploy-on-push wiring is **scaffold / planned** and **host-validation
-> required**. Off by default (`ENABLE_GITHUB_DEPLOYS=false`).
+> The webhook signature check is written and tested. The rest — deploying on
+> push — is just a sketch so far and needs a real server. Off by default
+> (`ENABLE_GITHUB_DEPLOYS=false`).
 
 ## Implemented (pure, tested) — `util/webhook.js`
 - `verifySignature` — `X-Hub-Signature-256` HMAC-SHA256, constant-time compare
 - `branchAllowed` — `refs/heads/<branch>` filter
 
-## Planned / host-validated
+## Still to do (needs a real server)
 Repo connection model, webhook endpoint (rate-limited, signature-verified),
 secret storage (masked), deploy-on-push → existing build pipeline, build logs +
 events. Tokens never exposed; setup + deploys audited.

@@ -1,6 +1,6 @@
 # SYSTEMS. — Operations (day 2)
 
-> Status: V1.1 skeleton. Operational runbook for the running platform.
+> The day-to-day: running, watching, and looking after SYSTEMS.
 
 ## Daily / at-a-glance
 

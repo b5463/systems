@@ -1,7 +1,8 @@
 # SYSTEMS. — Shell Console (V2)
 
-> Status: **implemented but DISABLED by default** (`ENABLE_SHELL_CONSOLE=false`).
-> High risk — enable only deliberately. Live use **requires host validation**.
+> This works but is off by default (`ENABLE_SHELL_CONSOLE=false`), because a
+> shell into a container is risky. Turn it on deliberately, and try it on a real
+> server before relying on it.
 
 ## Behaviour (implemented)
 The interactive container shell (`/api/projects/:slug/exec`, admin-only,

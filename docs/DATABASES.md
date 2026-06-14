@@ -1,7 +1,8 @@
 # SYSTEMS. — Databases (V2)
 
-> Status: **helpers implemented & unit-tested**; live provisioning **requires
-> Windows host validation**. Off by default (`ENABLE_DB_PROVISIONING=false`).
+> The naming and credential helpers are written and tested, but actually
+> creating databases hasn't been run on a real server yet. Off by default
+> (`ENABLE_DB_PROVISIONING=false`).
 
 ## Architecture (recommended)
 **One shared Postgres** with a **per-system database + least-privilege role**
@@ -14,11 +15,11 @@ for strong isolation needs.
 - Password: random url-safe (24 bytes); `DATABASE_URL` built and injected as a
   **secret env var**. Secrets are **masked** in the UI and never returned after save.
 
-## Flow (planned execution / host-validated)
+## How it would work (not run on a real server yet)
 create DB + role → grant least privilege → build `DATABASE_URL` → inject as
 secret env → redeploy. The parameterized SQL plan is generated in code
-(`util/dbprovision.provisionPlan`); **executing it against Postgres is the
-host-validated step.**
+(`util/dbprovision.provisionPlan`); actually running it against Postgres is
+the part you do on the server.
 
 ## Controls (planned UI)
 Database section in Ship + System detail; status/disk card; backup/export;

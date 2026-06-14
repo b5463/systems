@@ -1,8 +1,7 @@
 # SYSTEMS. — Resource Limits
 
-> Status: **implemented & unit-tested** (`api/test/limits.test.js`). Applied to
-> every deployed container via Docker `HostConfig`. Live enforcement is
-> Docker's job — **host-validated**.
+> The limits are written and tested, and applied to every container. Docker is
+> what actually enforces them, so confirm it once on a real server.
 
 ## Defaults (`.env`, applied to every system)
 | Setting | Env | Default | Docker field |

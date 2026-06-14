@@ -1,7 +1,7 @@
 # SYSTEMS. — Dockerfile Mode (V2, advanced)
 
-> Status: **gated & implemented in the deploy path**; building a project
-> Dockerfile **requires Windows host validation**. **Disabled by default**
+> The deploy path already handles (and gates) Dockerfile projects, but actually
+> building one hasn't been tried on a real server. Off by default
 > (`ENABLE_DOCKERFILE_MODE=false`).
 
 ## Behaviour (implemented)
@@ -16,5 +16,5 @@ admin-only, build timeout, resource/PIDs limits, no secrets in build logs,
 audited. Enable only for code you trust.
 
 ## Repo tests
-Flag defaults to false; enabling via env verified (`api/test/v2.test.js`). Live
-Dockerfile build is host-validated.
+The flag defaults to false, and turning it on via env is covered by a test
+(`api/test/v2.test.js`). Actually building a Dockerfile still needs a real server.

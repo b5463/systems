@@ -1,7 +1,7 @@
 # SYSTEMS. — Workers / Bots (V2)
 
-> Status: **classification + no-route plan implemented & unit-tested**; live
-> worker runtime **requires Windows host validation**.
+> Detecting a worker and skipping its public route is written and tested.
+> Actually running one hasn't been tried on a real server yet.
 
 ## What a worker is
 A long-running background process (bot, queue consumer) with **no public

@@ -1,8 +1,8 @@
 # SYSTEMS. — Large Uploads (V2, 2 GB)
 
-> Status: **validation logic implemented & unit-tested**; the streaming/chunked
-> endpoint is **host-validation required** (not wired live). V1 stays at
-> `UPLOAD_MAX_MB=100`; V2 target `V2_UPLOAD_MAX_MB=2048`.
+> The size and chunk checks are written and tested. The actual streaming
+> upload endpoint isn't wired up yet and needs trying on a real server. For now
+> the limit is `UPLOAD_MAX_MB=100`; the 2 GB target is `V2_UPLOAD_MAX_MB=2048`.
 
 ## Why not just raise the limit
 A 2 GB upload must **never be buffered in memory**. V2 uses **chunked/streamed**

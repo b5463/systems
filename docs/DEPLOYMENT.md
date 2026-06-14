@@ -1,7 +1,7 @@
 # SYSTEMS. — Deployment (how a zip becomes a live system)
 
-> Status: V1.1. Describes the **current** deploy pipeline (nginx-based) and
-> notes the V1.2 Caddy changes inline.
+> How a zip turns into a running container. Notes where the Caddy version
+> differs from the current nginx setup as it comes up.
 
 ## Supported sources (V1 / V1.1)
 

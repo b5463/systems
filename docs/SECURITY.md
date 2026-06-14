@@ -5,7 +5,7 @@
 > private, least-privilege, and admin-only**. It is **not** claimed to be
 > unhackable.
 
-## Posture: secure-by-default
+## Security posture
 
 The dashboard and API must be inaccessible unless authenticated as an admin.
 

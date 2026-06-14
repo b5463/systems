@@ -24,7 +24,7 @@ backend/server changes are isolated, never bundled.
 - Per-deployed-container resource limits (memory/CPU/PIDs/restart/log rotation)
   from `DEFAULT_CONTAINER_*`.
 - SYSTEMS. self-observability on the Server screen (uptime, disk, backups,
-  defaults) — honest, never faked.
+  defaults) — real data, nothing faked.
 - Destructive delete requires typing the system slug; backup-awareness before
   destructive actions.
 
@@ -80,14 +80,13 @@ Built on the Windows choices above:
 *Art direction and the Windows-target lock are handled in their own dedicated
 prompts before the V1.2 engine work.*
 
-## V2 — repo-only implementation status (this pass)
+## V2 — what's actually built so far
 
 **Implemented & unit-tested (pure logic):** project classification
 (static/vue/node-api/worker/dockerfile), DB provisioning helpers
 (names/credentials/URL/masking), chunked-upload validation, GitHub webhook
 HMAC verification, feature flags. **Gated in the deploy/exec paths:** Dockerfile
-mode (off by default, never silent), shell console (off by default). **Surfaced
-honestly:** V2 feature flags on the Server screen; `/api/deploy/plan` dry-run.
+mode (off by default, never silent), shell console (off by default). **Shown in the UI:** V2 feature flags on the Server screen; `/api/deploy/plan` dry-run.
 
 **Requires Windows host validation:** live chunked 2 GB upload endpoint, DB
 provisioning execution, Node-API/worker container runtime + Caddy reachability,

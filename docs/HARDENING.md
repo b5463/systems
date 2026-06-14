@@ -1,7 +1,7 @@
 # SYSTEMS. — Hardening Verification
 
-> Final ops/hardening pass. Separates what is **verified in the repo** from what
-> **requires the Windows host**. No live-infra claims.
+> This page splits what's actually checked in the code from what you still need
+> to verify on the real Windows machine.
 
 ## Run the checks
 ```bash
