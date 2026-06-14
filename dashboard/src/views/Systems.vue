@@ -9,11 +9,13 @@ const router = useRouter()
 const { showToast } = useToast()
 
 const BASE_DOMAIN = import.meta.env.VITE_BASE_DOMAIN || 'acronym.sk'
+const SCHEME = import.meta.env.VITE_PUBLIC_SCHEME || 'https'
 
 const systems = ref([])
 const loading = ref(true)
 const error = ref('')
 const stats = ref({})
+const server = ref(null)
 const prevStatuses = ref({})
 let timer = null
 
@@ -22,7 +24,6 @@ async function load(silent = false) {
   try {
     const data = await api.get('/projects')
     systems.value = data.projects || []
-
     for (const s of systems.value) {
       const prev = prevStatuses.value[s.slug]
       if (prev === 'running' && (s.status === 'error' || s.status === 'stopped')) {
@@ -30,15 +31,10 @@ async function load(silent = false) {
       }
       prevStatuses.value[s.slug] = s.status
     }
-
     const running = systems.value.filter((s) => s.status === 'running')
-    await Promise.all(
-      running.map(async (s) => {
-        try {
-          stats.value[s.slug] = await api.get(`/projects/${s.slug}/stats`)
-        } catch { /* per-system stats are best-effort */ }
-      })
-    )
+    await Promise.all(running.map(async (s) => {
+      try { stats.value[s.slug] = await api.get(`/projects/${s.slug}/stats`) } catch { /* best-effort */ }
+    }))
   } catch (e) {
     if (e.status !== 401) error.value = e.message || 'Failed to load systems.'
   } finally {
@@ -46,13 +42,14 @@ async function load(silent = false) {
   }
 }
 
-function tick() {
-  if (document.visibilityState === 'visible') load(true)
+async function loadServer() {
+  try { server.value = await api.get('/server/info') } catch { /* best-effort */ }
 }
 
-function open(s) {
-  router.push({ name: 'system-detail', params: { slug: s.slug } })
-}
+function tick() { if (document.visibilityState === 'visible') load(true) }
+function open(s) { router.push({ name: 'system-detail', params: { slug: s.slug } }) }
+function hostFor(slug) { return `${slug}.${BASE_DOMAIN}` }
+function urlFor(slug) { return `${SCHEME}://${hostFor(slug)}` }
 
 const counts = computed(() => {
   const c = { live: 0, building: 0, stopped: 0, failed: 0 }
@@ -65,27 +62,23 @@ const counts = computed(() => {
   return c
 })
 
-const snapshot = computed(() => [
-  { label: 'Live', value: counts.value.live, tone: counts.value.live ? 'ok' : 'dim' },
-  { label: 'Building', value: counts.value.building, tone: counts.value.building ? 'warn' : 'dim' },
-  { label: 'Stopped', value: counts.value.stopped, tone: 'dim' },
-  { label: 'Failed', value: counts.value.failed, tone: counts.value.failed ? 'error' : 'dim' }
-])
-
-const needsAttention = computed(() =>
-  systems.value.filter((s) => s.status === 'error' || s.status === 'stopped')
-)
+const needsAttention = computed(() => systems.value.filter((s) => s.status === 'error' || s.status === 'stopped'))
 
 const latest = computed(() => {
   if (!systems.value.length) return null
-  return [...systems.value].sort(
-    (a, b) => new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at)
-  )[0]
+  return [...systems.value].sort((a, b) => new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at))[0]
 })
 
-function hostFor(slug) {
-  return `${slug}.${BASE_DOMAIN}`
+// Honest server mini-status line.
+function statusLabel(s) {
+  switch (s) {
+    case 'connected': return 'connected'
+    case 'unavailable': return 'not connected'
+    case 'planned': return 'planned for V1.2'
+    default: return 'not measured'
+  }
 }
+function statusTone(s) { return s === 'connected' ? 'ok' : s === 'unavailable' ? 'error' : 'idle' }
 
 function fmtAgo(s) {
   if (!s) return '—'
@@ -100,7 +93,7 @@ function fmtAgo(s) {
 }
 
 onMounted(async () => {
-  await load()
+  await Promise.all([load(), loadServer()])
   timer = setInterval(tick, 5000)
 })
 onBeforeUnmount(() => clearInterval(timer))
@@ -108,88 +101,77 @@ onBeforeUnmount(() => clearInterval(timer))
 
 <template>
   <div class="page-head">
-    <h1>Systems</h1>
+    <div>
+      <h1>Systems</h1>
+      <div v-if="!loading && systems.length" class="watching">
+        Watching {{ systems.length }} system{{ systems.length === 1 ? '' : 's' }} —
+        <span class="ok">{{ counts.live }} live</span> ·
+        <span :class="{ warn: counts.building }">{{ counts.building }} building</span> ·
+        <span>{{ counts.stopped }} stopped</span> ·
+        <span :class="{ err: counts.failed }">{{ counts.failed }} failed</span>
+      </div>
+    </div>
     <div class="head-actions">
       <button class="btn btn-sm btn-ghost" @click="load()">Refresh</button>
       <RouterLink class="btn btn-sm btn-primary" :to="{ name: 'ship' }">Ship a system</RouterLink>
     </div>
   </div>
 
-  <!-- Server snapshot -->
-  <div class="grid grid-4" style="margin-bottom: 22px">
-    <div v-for="m in snapshot" :key="m.label" class="metric">
-      <div class="m-label">{{ m.label }}</div>
-      <div class="m-value tnum" :class="{ dim: m.tone === 'dim' && !m.value }">
-        <template v-if="loading">—</template>
-        <template v-else>{{ m.value }}</template>
-      </div>
-    </div>
-  </div>
-
   <!-- Skeleton -->
   <div v-if="loading && !systems.length" class="grid grid-auto">
     <div v-for="i in 3" :key="i" class="skel-card" :style="{ animationDelay: (i - 1) * 0.08 + 's' }">
-      <div class="spread">
-        <div style="flex:1"><div class="skel skel-title" style="width:55%"></div></div>
-        <div class="skel skel-badge"></div>
-      </div>
+      <div class="spread"><div style="flex:1"><div class="skel skel-title" style="width:55%"></div></div><div class="skel skel-badge"></div></div>
       <div class="skel skel-line" style="width:70%;margin-top:14px"></div>
     </div>
   </div>
 
   <div v-else-if="error" class="error-box">{{ error }}</div>
 
-  <!-- Honest empty state -->
+  <!-- Empty -->
   <div v-else-if="!systems.length" class="empty-block">
     <div class="eb-title">No systems yet.</div>
     <div class="eb-sub">Ship a <span class="mono">.zip</span> to deploy one at <span class="mono">slug.{{ BASE_DOMAIN }}</span>.</div>
-    <div class="eb-actions">
-      <RouterLink class="btn btn-primary" :to="{ name: 'ship' }">Ship a system</RouterLink>
-    </div>
+    <div class="eb-actions"><RouterLink class="btn btn-primary" :to="{ name: 'ship' }">Ship a system</RouterLink></div>
   </div>
 
   <template v-else>
     <!-- Needs attention -->
     <template v-if="needsAttention.length">
       <div class="section-label">Needs attention</div>
-      <div class="callout danger" style="margin-bottom: 22px">
+      <div class="callout danger" style="margin-bottom: 20px">
         <div class="co-bar"></div>
         <div>
-          {{ needsAttention.length }}
-          system{{ needsAttention.length === 1 ? '' : 's' }} not live —
-          <template v-for="(s, i) in needsAttention" :key="s.slug">
-            <a href="#" @click.prevent="open(s)">{{ s.name }}</a><span v-if="i < needsAttention.length - 1">, </span>
-          </template>
+          {{ needsAttention.length }} system{{ needsAttention.length === 1 ? '' : 's' }} not live —
+          <template v-for="(s, i) in needsAttention" :key="s.slug"><a href="#" @click.prevent="open(s)">{{ s.name }}</a>{{ i < needsAttention.length - 1 ? ', ' : '' }}</template>
         </div>
       </div>
     </template>
 
-    <!-- Latest deploy -->
-    <template v-if="latest">
-      <div class="section-label">Latest deploy</div>
-      <div class="card card-tap" style="margin-bottom: 22px" @click="open(latest)">
+    <!-- Latest deploy + server mini-status, side by side on desktop -->
+    <div class="grid grid-2" style="margin-bottom: 22px; align-items:stretch">
+      <div v-if="latest" class="card card-tap" @click="open(latest)">
+        <div class="section-label" style="margin-bottom:10px">Latest deploy</div>
         <div class="spread">
-          <div style="min-width:0">
-            <div class="sc-name">{{ latest.name }}</div>
-            <div class="mono small dim">{{ hostFor(latest.slug) }}</div>
-          </div>
-          <div class="row gap-sm">
-            <span class="small muted">{{ fmtAgo(latest.updated_at || latest.created_at) }}</span>
-            <StatusBadge :status="latest.status" />
-          </div>
+          <div style="min-width:0"><div class="sc-name">{{ latest.name }}</div><div class="mono small dim">{{ hostFor(latest.slug) }}</div></div>
+          <div class="row gap-sm"><span class="small muted">{{ fmtAgo(latest.updated_at || latest.created_at) }}</span><StatusBadge :status="latest.status" /></div>
         </div>
       </div>
-    </template>
+      <div class="card">
+        <div class="section-label" style="margin-bottom:10px">Server</div>
+        <div v-if="server" class="server-mini">
+          <span><span class="sdot" :class="statusTone(server.docker.status)"></span>Docker {{ statusLabel(server.docker.status) }}</span>
+          <span><span class="sdot" :class="statusTone(server.caddy.status)"></span>Caddy {{ statusLabel(server.caddy.status) }}</span>
+          <span><span class="sdot" :class="statusTone(server.postgres.status)"></span>Postgres {{ statusLabel(server.postgres.status) }}</span>
+          <RouterLink class="small" :to="{ name: 'server' }">Details →</RouterLink>
+        </div>
+        <div v-else class="muted small">Server status unavailable.</div>
+      </div>
+    </div>
 
     <!-- All systems -->
     <div class="section-label">All systems · {{ systems.length }}</div>
     <div class="grid grid-auto">
-      <div
-        v-for="s in systems"
-        :key="s.id"
-        class="card card-tap sys-card"
-        @click="open(s)"
-      >
+      <div v-for="s in systems" :key="s.id" class="card card-tap sys-card" @click="open(s)">
         <div class="sc-top">
           <div style="min-width:0">
             <div class="sc-name">{{ s.name }}</div>
@@ -197,17 +179,47 @@ onBeforeUnmount(() => clearInterval(timer))
           </div>
           <StatusBadge :status="s.status" />
         </div>
-        <div v-if="s.status === 'running' && stats[s.slug]" class="sc-meta">
-          <span>CPU {{ (stats[s.slug].cpu_percent ?? 0).toFixed(1) }}%</span>
-          <span>RAM {{ (stats[s.slug].memory_mb ?? 0).toFixed(0) }} MB</span>
-          <span v-if="s.port" class="mono">:{{ s.port }}</span>
+
+        <div class="sc-facts">
+          <span><i>Route</i>{{ s.status === 'running' ? 'Active' : 'None' }}</span>
+          <span><i>HTTPS</i>{{ s.status === 'running' ? 'At proxy' : '—' }}</span>
+          <span><i>Visibility</i>Public</span>
+          <span><i>Last deploy</i>{{ fmtAgo(s.updated_at || s.created_at) }}</span>
         </div>
-        <div v-else class="sc-meta dim">
-          <span v-if="s.status === 'building'">Building…</span>
-          <span v-else-if="s.status === 'error'">Last deploy failed</span>
-          <span v-else>Not running</span>
+
+        <div class="sc-foot">
+          <span v-if="s.status === 'running' && stats[s.slug]" class="mono small muted">
+            CPU {{ (stats[s.slug].cpu_percent ?? 0).toFixed(1) }}% · RAM {{ (stats[s.slug].memory_mb ?? 0).toFixed(0) }} MB<span v-if="s.port"> · :{{ s.port }}</span>
+          </span>
+          <span v-else class="small dim">{{ s.status === 'building' ? 'Building…' : s.status === 'error' ? 'Last deploy failed' : 'Not running' }}</span>
+          <a v-if="s.status === 'running'" class="sc-open small" :href="urlFor(s.slug)" target="_blank" rel="noopener" @click.stop>Open ↗</a>
         </div>
       </div>
     </div>
   </template>
 </template>
+
+<style scoped>
+.watching { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.watching .ok { color: var(--ok); }
+.watching .warn { color: var(--warn); }
+.watching .err { color: var(--danger); }
+
+.server-mini { display: flex; flex-direction: column; gap: 9px; font-size: 13px; color: var(--text-muted); }
+.server-mini span { display: inline-flex; align-items: center; gap: 8px; }
+.server-mini .sdot { width: 8px; height: 8px; border-radius: 50%; }
+
+.sc-facts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 14px;
+  font-size: 12.5px;
+}
+.sc-facts span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.sc-facts i {
+  font-style: normal; font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--text-dim);
+}
+.sc-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.sc-open { color: var(--accent); white-space: nowrap; }
+</style>

@@ -24,6 +24,7 @@ const acting = ref('')
 /* Metrics */
 const history = ref([])
 const latestStats = ref(null)
+const overviewStat = ref(null)
 let statsTimer = null
 const historyMinutes = ref(0)
 
@@ -254,8 +255,15 @@ function onVisibility() {
   if (document.visibilityState === 'visible' && tab.value === 'Metrics' && !statsTimer) startStats()
 }
 
+// One-shot stat for the Overview metadata (Metrics tab does the live polling).
+async function fetchOverviewStat() {
+  if (!isRunning.value) { overviewStat.value = null; return }
+  try { overviewStat.value = await api.get(`/projects/${props.slug}/stats`) } catch { /* best-effort */ }
+}
+
 onMounted(async () => {
   await loadSystem()
+  fetchOverviewStat()
   document.addEventListener('visibilitychange', onVisibility)
 })
 onBeforeUnmount(() => {
@@ -364,8 +372,10 @@ onBeforeUnmount(() => {
 
       <!-- Metadata -->
       <div class="card">
+        <div v-if="isRunning && overviewStat" class="kv"><span class="k">CPU / RAM</span><span class="v mono">{{ (overviewStat.cpu_percent ?? 0).toFixed(1) }}% · {{ (overviewStat.memory_mb ?? 0).toFixed(0) }} MB</span></div>
         <div class="kv"><span class="k">Port</span><span class="v mono">{{ system.port ?? '–' }}</span></div>
         <div class="kv"><span class="k">Container</span><span class="v mono small">{{ system.container_id ? String(system.container_id).slice(0,12) : '–' }}</span></div>
+        <div class="kv"><span class="k">Image</span><span class="v mono small">{{ system.image_id ? String(system.image_id).replace('sha256:','').slice(0,12) : '–' }}</span></div>
         <div class="kv"><span class="k">Created</span><span class="v small">{{ fmtDate(system.created_at) }}</span></div>
         <div class="kv"><span class="k">Last updated</span><span class="v small">{{ fmtDate(system.updated_at) }}</span></div>
       </div>

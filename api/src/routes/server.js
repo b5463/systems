@@ -1,6 +1,7 @@
 'use strict';
 
 const Docker = require('dockerode');
+const net = require('net');
 const fs = require('fs');
 const fsp = require('fs/promises');
 const path = require('path');
@@ -16,12 +17,26 @@ function backupDir() {
   return process.env.BACKUP_DIR || path.join(dataDir(), 'backups');
 }
 
+// Short TCP probe — used to honestly check whether Postgres is reachable.
+function probeTcp(host, port, timeout = 1000) {
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = (v) => { if (!done) { done = true; try { sock.destroy(); } catch {} resolve(v); } };
+    const sock = net.connect({ host, port });
+    sock.setTimeout(timeout);
+    sock.on('connect', () => finish(true));
+    sock.on('timeout', () => finish(false));
+    sock.on('error', () => finish(false));
+  });
+}
+
 /**
  * Read-only server + SYSTEMS.-self status.
  *
- * Never asserts a component is healthy unless it has actually observed it.
- * Anything it cannot verify from inside the API container is reported honestly
- * as `unknown` / `not_measured` / `unavailable` rather than faked as online.
+ * Shows the LOCKED target stack (Caddy + Postgres, Windows-first) and reports
+ * each component's status honestly. Nothing is shown as healthy/online unless
+ * it was actually observed. Things not yet wired are `planned` (V1.2) or
+ * `not_configured`; things we cannot see from here are `not_measured`.
  */
 async function serverRoutes(fastify, options) {
   fastify.get('/api/server/info', {
@@ -31,32 +46,44 @@ async function serverRoutes(fastify, options) {
       platform: {
         name: 'SYSTEMS.',
         version: PLATFORM_VERSION,
+        target: 'Windows (Docker Desktop / WSL2)',
         baseDomain: process.env.BASE_DOMAIN || null,
         dashboardDomain: process.env.DASHBOARD_DOMAIN || null,
         wildcardDomain: process.env.WILDCARD_DOMAIN || null,
+        dataDir: dataDir(),
+        uploadMaxMb: Number(process.env.UPLOAD_MAX_MB) || 100,
+        releaseRetention: Number(process.env.RELEASE_RETENTION_DEFAULT) || 3,
       },
+      // Core services — locked target stack.
       docker: { status: 'unavailable', managed: null, running: null },
-      reverseProxy: { type: (process.env.REVERSE_PROXY || 'nginx').toLowerCase(), status: 'unknown' },
-      database: { type: 'sqlite', status: 'connected' },
+      caddy: { type: 'caddy', status: 'planned' },        // wired in V1.2
+      postgres: { type: 'postgres', status: 'planned' },  // wired in V1.2
       wildcard: { domain: process.env.WILDCARD_DOMAIN || null, status: 'not_measured' },
 
-      // ---- SYSTEMS. monitoring itself ----
+      // SYSTEMS. monitoring itself.
       self: {
         version: PLATFORM_VERSION,
         node: process.version,
         uptimeSeconds: Math.round(process.uptime()),
         rssMb: Math.round((process.memoryUsage().rss / (1024 * 1024)) * 10) / 10,
       },
+      health: {
+        deploymentWorker: 'in_api',  // V1.1 runs the deploy pipeline in-process
+        caddyConfig: 'planned',
+        postgres: 'planned',
+        dockerAccess: 'unavailable',
+      },
       disk: { status: 'not_measured', usedPct: null, freeGb: null, totalGb: null },
       backup: { status: 'not_measured', last: null, ageHours: null, count: 0 },
       defaults: dockerService.containerLimits(),
     };
 
-    // Docker — the one component we can truly probe.
+    // Docker — the one component we can truly probe today.
     try {
       const docker = new Docker({ socketPath: '/var/run/docker.sock' });
       await docker.ping();
       info.docker.status = 'connected';
+      info.health.dockerAccess = 'connected';
       try {
         const managed = await docker.listContainers({
           all: true,
@@ -67,11 +94,16 @@ async function serverRoutes(fastify, options) {
       } catch { /* best-effort */ }
     } catch {
       info.docker.status = 'unavailable';
+      info.health.dockerAccess = 'unavailable';
     }
 
-    // Database — report only what we can actually query.
-    try { db.prepare('SELECT 1').get(); info.database.status = 'connected'; }
-    catch { info.database.status = 'unavailable'; }
+    // Postgres — only claim connected if a host is configured and reachable.
+    const pgHost = process.env.POSTGRES_HOST;
+    if (pgHost) {
+      const reachable = await probeTcp(pgHost, Number(process.env.POSTGRES_PORT) || 5432);
+      info.postgres.status = reachable ? 'connected' : 'unavailable';
+      info.health.postgres = info.postgres.status;
+    }
 
     // Disk — usage of the SYSTEMS data volume (honest if unavailable).
     try {
@@ -88,14 +120,13 @@ async function serverRoutes(fastify, options) {
           };
         }
       }
-    } catch { /* leave not_measured */ }
+    } catch { /* not_measured */ }
 
-    // Backup — newest timestamped backup folder under BACKUP_DIR.
+    // Backups — newest timestamped folder under BACKUP_DIR.
     try {
       const dir = backupDir();
       const entries = await fsp.readdir(dir, { withFileTypes: true });
       const dirs = entries.filter((e) => e.isDirectory());
-      info.backup.count = dirs.length;
       if (dirs.length) {
         let newest = 0;
         for (const d of dirs) {
@@ -112,7 +143,7 @@ async function serverRoutes(fastify, options) {
       } else {
         info.backup.status = 'none';
       }
-    } catch { /* leave not_measured */ }
+    } catch { /* not_measured */ }
 
     return info;
   });

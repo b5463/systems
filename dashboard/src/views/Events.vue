@@ -186,13 +186,15 @@ onMounted(load)
           </div>
           <div class="tl-body card" style="padding: 12px 14px">
             <div class="spread">
-              <strong>{{ humanize(e.action) }}</strong>
+              <div class="row gap-sm" style="min-width:0">
+                <strong>{{ humanize(e.action) }}</strong>
+                <span v-if="e.target" class="chip">{{ e.target }}</span>
+              </div>
               <span class="dim small" style="white-space:nowrap">{{ fmtTime(e.created_at) }}</span>
             </div>
-            <div v-if="e.target" class="mono small muted" style="margin-top:4px">{{ e.target }}</div>
-            <div v-if="e.detail" class="small muted" style="margin-top:4px">{{ e.detail }}</div>
-            <div v-if="e.username || e.ip" class="row small dim" style="margin-top:8px; gap:14px">
-              <span v-if="e.username" class="mono">{{ e.username }}</span>
+            <div v-if="e.detail" class="small muted" style="margin-top:6px">{{ e.detail }}</div>
+            <div class="row small dim" style="margin-top:8px; gap:14px">
+              <span class="mono">{{ e.username || 'system' }}</span>
               <span v-if="e.ip" class="mono">{{ e.ip }}</span>
             </div>
           </div>

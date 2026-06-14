@@ -1655,3 +1655,34 @@ select:focus {
 
 /* dropzone stays clean — functional UI carries no art */
 .dropzone { position: relative; }
+
+/* ============================================================
+   Mobile polish (control-app density, not enlarged desktop)
+   ============================================================ */
+@media (max-width: 720px) {
+  .content-inner { padding: 14px 14px 48px; }
+  .page-head { margin-bottom: 16px; }
+  .page-head h1 { font-size: 19px; }
+
+  /* compact metric tiles — no giant single-number blocks */
+  .metric { padding: 12px 13px; }
+  .metric .m-value { font-size: 20px; margin-top: 4px; }
+
+  /* tighter cards + section rhythm */
+  .card { padding: 14px; }
+  .section-label { margin-bottom: 9px; }
+
+  /* buttons touch-friendly but not massive */
+  .btn { min-height: 42px; }
+  .btn-sm { min-height: 36px; }
+  .btn-row { gap: 8px; }
+
+  /* tabs scroll cleanly, comfortable targets */
+  .tabs button { padding: 11px 13px; font-size: 13.5px; }
+
+  /* status truth grid: 2-up on phones instead of cramped auto-fill */
+  .truth { grid-template-columns: 1fr 1fr; }
+
+  /* system-detail action groups closer together */
+  .action-group + .action-group { margin-top: 12px; }
+}
