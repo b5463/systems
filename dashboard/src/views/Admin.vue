@@ -111,10 +111,7 @@ onMounted(loadUsers)
 
 <template>
   <div class="page-head">
-    <div>
-      <h1>Admin</h1>
-      <div class="sub">Your account, the admins who can operate SYSTEMS., and platform limits.</div>
-    </div>
+    <h1>Admin</h1>
   </div>
 
   <div class="grid grid-2" style="align-items:start">
@@ -187,10 +184,7 @@ onMounted(loadUsers)
           <!-- Second-admin empty state -->
           <div v-if="!otherAdmins.length && !showAddForm" class="empty-block" style="padding:24px 18px">
             <div class="eb-title">No second admin yet.</div>
-            <div class="eb-sub">
-              Add one trusted admin so SYSTEMS. is not tied to a single login. V1 supports two admins
-              and no public signup.
-            </div>
+            <div class="eb-sub">Add a second admin so access isn't tied to one login.</div>
             <div class="eb-actions">
               <button class="btn btn-primary btn-sm" @click="showAddForm = true">Add second admin</button>
             </div>

@@ -130,10 +130,7 @@ onMounted(load)
 
 <template>
   <div class="page-head">
-    <div>
-      <h1>Events</h1>
-      <div class="sub">Every admin and deployment action, audited and time-stamped.</div>
-    </div>
+    <h1>Events</h1>
     <div class="head-actions">
       <button class="btn btn-sm btn-ghost" @click="load">Refresh</button>
     </div>
@@ -174,10 +171,7 @@ onMounted(load)
   <!-- Honest empty state -->
   <div v-else-if="!entries.length" class="empty-block">
     <div class="eb-title">No events yet.</div>
-    <div class="eb-sub">
-      Activity appears here the moment you sign in, ship a system, or change a setting. Every action
-      is recorded to the audit log.
-    </div>
+    <div class="eb-sub">Actions you take are recorded here.</div>
   </div>
 
   <!-- Grouped stream -->

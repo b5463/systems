@@ -48,7 +48,6 @@ function onSlugInput(e) {
 }
 
 const slugValid = computed(() => /^[a-z0-9-]{2,50}$/.test(slug.value))
-const previewHost = computed(() => `${slug.value || 'your-system'}.${BASE_DOMAIN}`)
 
 function setFile(f) {
   if (!f) return
@@ -102,10 +101,7 @@ function openSystem() {
 
 <template>
   <div class="page-head">
-    <div>
-      <h1>Ship</h1>
-      <div class="sub">Drop a zip. Get a live system at <span class="mono">{{ previewHost }}</span>.</div>
-    </div>
+    <h1>Ship</h1>
   </div>
 
   <!-- BUILDING -->
@@ -181,28 +177,17 @@ function openSystem() {
           <button type="button" :class="{ active: visibility === 'password' }" disabled title="Arrives in V1.2">Password</button>
           <button type="button" :class="{ active: visibility === 'private' }" disabled title="Arrives in V1.2">Private</button>
         </div>
-        <div class="hint">
-          V1.1 ships public systems with a public route. Password-protected and private modes arrive in V1.2.
-        </div>
+        <div class="hint">Password-protected and private modes arrive in V1.2.</div>
       </div>
 
       <div class="card stack">
         <div class="section-label" style="margin: 0">Deployment type</div>
-        <div class="callout">
-          <div class="co-bar"></div>
-          <div>
-            SYSTEMS. auto-detects the build from your archive — Vue/Vite, static site, Node, or a
-            custom Dockerfile — and containerizes it. The detected type is shown in the build log.
-          </div>
-        </div>
+        <div class="hint">Detected from the archive — Vue/Vite, static, Node, or Dockerfile. Shown in the build log.</div>
       </div>
 
       <div class="card stack">
         <div class="section-label" style="margin: 0">Environment variables</div>
-        <div class="hint">
-          Set env vars after the first deploy from the system's Settings tab. They are encrypted at
-          rest and never shown again once saved.
-        </div>
+        <div class="hint">Set after the first deploy, in Settings. Stored encrypted; values aren't shown again.</div>
       </div>
     </div>
 
@@ -261,7 +246,7 @@ function openSystem() {
             <span v-if="i < LIFECYCLE.length - 1" class="lc-link"></span>
           </template>
         </div>
-        <div class="hint">Progress streams into the build log once the upload completes.</div>
+        <div class="hint">Build progress streams into the log after upload.</div>
       </div>
     </div>
   </form>

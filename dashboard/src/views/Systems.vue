@@ -108,10 +108,7 @@ onBeforeUnmount(() => clearInterval(timer))
 
 <template>
   <div class="page-head">
-    <div>
-      <h1>Systems</h1>
-      <div class="sub">Deployment cockpit — every system, live status, and what needs attention.</div>
-    </div>
+    <h1>Systems</h1>
     <div class="head-actions">
       <button class="btn btn-sm btn-ghost" @click="load()">Refresh</button>
       <RouterLink class="btn btn-sm btn-primary" :to="{ name: 'ship' }">Ship a system</RouterLink>
@@ -145,12 +142,9 @@ onBeforeUnmount(() => clearInterval(timer))
   <!-- Honest empty state -->
   <div v-else-if="!systems.length" class="empty-block">
     <div class="eb-title">No systems yet.</div>
-    <div class="eb-sub">
-      Drop your first project zip and SYSTEMS. will build it, containerize it, and publish it at
-      <span class="mono">slug.{{ BASE_DOMAIN }}</span>.
-    </div>
+    <div class="eb-sub">Ship a <span class="mono">.zip</span> to deploy one at <span class="mono">slug.{{ BASE_DOMAIN }}</span>.</div>
     <div class="eb-actions">
-      <RouterLink class="btn btn-primary" :to="{ name: 'ship' }">Ship your first system</RouterLink>
+      <RouterLink class="btn btn-primary" :to="{ name: 'ship' }">Ship a system</RouterLink>
     </div>
   </div>
 

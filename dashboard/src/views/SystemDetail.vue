@@ -378,10 +378,7 @@ onBeforeUnmount(() => {
 
     <!-- DEPLOYMENTS -->
     <div v-show="tab === 'Deployments'" class="stack">
-      <div class="callout">
-        <div class="co-bar"></div>
-        <div>Each redeploy snapshots the previous release so you can roll back. Streaming build logs appear here during a build.</div>
-      </div>
+      <div class="hint">Each redeploy keeps the previous release for rollback.</div>
 
       <div class="row gap-sm flex-wrap">
         <button class="btn btn-sm" :disabled="redeploying" @click="pickRedeploy">
@@ -394,7 +391,7 @@ onBeforeUnmount(() => {
 
       <div v-if="!deployHistory.length" class="empty-block">
         <div class="eb-title">No previous releases yet.</div>
-        <div class="eb-sub">The first redeploy records a rollback point. Until then, this system has a single release.</div>
+        <div class="eb-sub">The first redeploy creates a rollback point.</div>
       </div>
       <div v-else class="card" style="padding:0">
         <div v-for="(h, i) in deployHistory" :key="h.id" class="conn-row">
@@ -421,7 +418,7 @@ onBeforeUnmount(() => {
     <div v-show="tab === 'Metrics'">
       <div v-if="!isRunning" class="empty-block">
         <div class="eb-title">No metrics yet.</div>
-        <div class="eb-sub">SYSTEMS. needs a running container before telemetry appears. Start the system to collect CPU, memory, and network.</div>
+        <div class="eb-sub">Metrics appear once the container is running.</div>
       </div>
       <template v-else>
         <div v-if="historyMinutes > 0" class="small muted" style="margin-bottom:10px">Showing last {{ historyMinutes }} minutes</div>
@@ -433,17 +430,14 @@ onBeforeUnmount(() => {
     <div v-show="tab === 'Console'">
       <div v-if="!isRunning" class="empty-block">
         <div class="eb-title">Console unavailable.</div>
-        <div class="eb-sub">The interactive shell only attaches while the container is running.</div>
+        <div class="eb-sub">The shell attaches only while the container is running.</div>
       </div>
       <ExecTerminal v-if="tab === 'Console' && isRunning" :slug="system.slug" />
     </div>
 
     <!-- SETTINGS -->
     <div v-show="tab === 'Settings'" class="stack">
-      <div class="callout warn">
-        <div class="co-bar"></div>
-        <div>Saving environment variables restarts the container. Existing values are encrypted and never shown again.</div>
-      </div>
+      <div class="hint">Saving restarts the container. Stored values are encrypted and aren't shown again.</div>
 
       <div class="card">
         <div class="section-label">Current env keys</div>
@@ -489,8 +483,7 @@ onBeforeUnmount(() => {
           </p>
           <div class="callout warn" style="margin:0">
             <div class="co-bar"></div>
-            <div>No automatic pre-delete backup in V1.1. If you may need this system again, take a
-              backup first (see docs/DISASTER_RECOVERY.md).</div>
+            <div>No backup is taken automatically. Back up first if you might need this system again.</div>
           </div>
           <label class="label" style="margin:0">Type <span class="mono" style="color:var(--text)">{{ system?.slug }}</span> to confirm</label>
           <input v-model="deleteConfirmText" :placeholder="system?.slug" autocapitalize="none" autocorrect="off" />

@@ -77,10 +77,7 @@ onMounted(load)
 
 <template>
   <div class="page-head">
-    <div>
-      <h1>Server</h1>
-      <div class="sub">Infrastructure SYSTEMS. depends on — and SYSTEMS. watching itself. Status is observed, never assumed.</div>
-    </div>
+    <h1>Server</h1>
     <div class="head-actions">
       <button class="btn btn-sm btn-ghost" @click="load">Refresh</button>
     </div>
@@ -177,12 +174,7 @@ onMounted(load)
 
     <div class="callout warn mt">
       <div class="co-bar"></div>
-      <div>
-        DNS records are managed manually in Websupport and point the wildcard at this server.
-        SYSTEMS. cannot verify external resolution from inside the container, so wildcard status
-        is reported as <span class="mono">not measured</span>. The Caddy reverse proxy and Postgres
-        migration land in V1.2.
-      </div>
+      <div>DNS is set manually in Websupport and can't be checked from here, so wildcard shows <span class="mono">not measured</span>. Caddy and Postgres arrive in V1.2.</div>
     </div>
   </template>
 </template>
