@@ -77,7 +77,8 @@ function statusLabel(s) {
   switch (s) {
     case 'connected': return 'connected'
     case 'unavailable': return 'not connected'
-    case 'planned': return 'planned for V1.2'
+    case 'host_validation': return 'host validation'
+    case 'planned': return 'planned'
     default: return 'not measured'
   }
 }

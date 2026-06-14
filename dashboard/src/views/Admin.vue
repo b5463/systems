@@ -130,7 +130,7 @@ onMounted(loadUsers)
           </div>
         </div>
         <div class="kv"><span class="k">Role</span><span class="v">Admin (full access)</span></div>
-        <div class="kv"><span class="k">Platform</span><span class="v mono small">SYSTEMS. v1.1</span></div>
+        <div class="kv"><span class="k">Platform</span><span class="v mono small">SYSTEMS. · repo-ready</span></div>
       </div>
 
       <!-- Change password -->
@@ -214,7 +214,7 @@ onMounted(loadUsers)
         <div class="kv"><span class="k">Max upload size</span><span class="v mono">{{ UPLOAD_MAX_MB }} MB</span></div>
         <div class="kv"><span class="k">Release retention</span><span class="v mono">{{ RELEASE_RETENTION }} releases</span></div>
         <div class="hint">
-          Configured in <span class="mono">.env</span> for V1.1. Editable in-app settings arrive in V1.2.
+          Configured in <span class="mono">.env</span>. Per-system overrides are planned.
         </div>
       </div>
 

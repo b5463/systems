@@ -9,7 +9,8 @@ const { db } = require('../db');
 const dockerService = require('../services/docker');
 const { features } = require('../util/flags');
 
-const PLATFORM_VERSION = '1.1.0';
+const PLATFORM_VERSION = '2.0.0-rc.1';
+const PLATFORM_STAGE = 'repo-complete · host validation pending';
 
 function dataDir() {
   return process.env.SYSTEMS_DATA_DIR || process.env.DATA_DIR || path.join(__dirname, '..', '..', '..', 'data');
@@ -47,6 +48,8 @@ async function serverRoutes(fastify, options) {
       platform: {
         name: 'SYSTEMS.',
         version: PLATFORM_VERSION,
+        stage: PLATFORM_STAGE,
+        commit: process.env.SYSTEMS_COMMIT || null,
         target: 'Windows (Docker Desktop / WSL2)',
         baseDomain: process.env.BASE_DOMAIN || null,
         dashboardDomain: process.env.DASHBOARD_DOMAIN || null,
@@ -54,11 +57,14 @@ async function serverRoutes(fastify, options) {
         dataDir: dataDir(),
         uploadMaxMb: Number(process.env.UPLOAD_MAX_MB) || 100,
         releaseRetention: Number(process.env.RELEASE_RETENTION_DEFAULT) || 3,
+        firewall: 'host_validation',   // verify with check-firewall-windows.ps1
+        hardening: 'host_validation',  // verify with verify-hardening-windows.ps1
       },
-      // Core services — locked target stack.
+      // Core services — locked target stack. Route generation + Postgres config
+      // are implemented in the repo; connecting them is a Windows-host step.
       docker: { status: 'unavailable', managed: null, running: null },
-      caddy: { type: 'caddy', status: 'planned' },        // wired in V1.2
-      postgres: { type: 'postgres', status: 'planned' },  // wired in V1.2
+      caddy: { type: 'caddy', status: 'host_validation' },
+      postgres: { type: 'postgres', status: 'host_validation' },
       wildcard: { domain: process.env.WILDCARD_DOMAIN || null, status: 'not_measured' },
 
       // SYSTEMS. monitoring itself.
@@ -69,9 +75,9 @@ async function serverRoutes(fastify, options) {
         rssMb: Math.round((process.memoryUsage().rss / (1024 * 1024)) * 10) / 10,
       },
       health: {
-        deploymentWorker: 'in_api',  // V1.1 runs the deploy pipeline in-process
-        caddyConfig: 'planned',
-        postgres: 'planned',
+        deploymentWorker: 'in_api',  // the deploy pipeline runs in-process
+        caddyConfig: 'host_validation',
+        postgres: 'host_validation',
         dockerAccess: 'unavailable',
       },
       disk: { status: 'not_measured', usedPct: null, freeGb: null, totalGb: null },

@@ -173,7 +173,7 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
           <label class="label">Output folder</label>
           <input value="" placeholder="detected" disabled />
         </div>
-        <div class="hint">Overrides arrive in V1.2.</div>
+        <div class="hint">Overrides are planned.</div>
       </div>
 
       <div class="card stack">
@@ -197,14 +197,15 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
       <div class="card stack">
         <div class="step-head"><span class="step-num" :class="{ active: !!file }">2</span><div class="section-label" style="margin:0">Detection &amp; plan</div></div>
         <div class="detect-row">
-          <span class="kv"><span class="k">Type</span><span class="v dim">detected on upload</span></span>
-          <span class="kv"><span class="k">Container</span><span class="v mono small">{{ plan ? plan.containerName : 'systems-{slug}' }}</span></span>
+          <span class="kv"><span class="k">Type</span><span class="v dim">{{ file ? 'detected during build' : 'waiting for archive…' }}</span></span>
+          <span class="kv"><span class="k">Container</span><span class="v mono small">{{ plan ? plan.containerName : (slug ? 'systems-' + slug : 'systems-{slug}') }}</span></span>
+          <span class="kv"><span class="k">Network</span><span class="v mono small">systems</span></span>
           <span class="kv"><span class="k">Proxy</span><span class="v dim">{{ plan ? plan.proxy : '—' }}</span></span>
-          <span class="kv"><span class="k">Route</span><span class="v dim">{{ plan ? (plan.routePublished ? 'public route' : 'none (private)') : '—' }}</span></span>
+          <span class="kv"><span class="k">Route</span><span class="v dim">{{ plan ? (plan.routePublished ? 'Caddy route generated after upload' : 'none (private)') : '—' }}</span></span>
         </div>
         <div v-if="plan && plan.valid === false" class="error-box" style="margin-top:8px">{{ plan.error }}</div>
         <details v-if="plan && plan.route" style="margin-top:8px">
-          <summary class="small muted" style="cursor:pointer">Planned Caddy route (dry-run)</summary>
+          <summary class="small muted" style="cursor:pointer">Planned Caddy route (dry-run preview)</summary>
           <pre class="plan-route">{{ plan.route }}</pre>
         </details>
       </div>

@@ -29,7 +29,8 @@ function present(status) {
     case 'unavailable': return { tone: 'error', label: 'Not connected' }
     case 'overdue': return { tone: 'warn', label: 'Overdue' }
     case 'none': return { tone: 'warn', label: 'None yet' }
-    case 'planned': return { tone: 'idle', label: 'Planned for V1.2' }
+    case 'host_validation': return { tone: 'idle', label: 'Requires host validation' }
+    case 'planned': return { tone: 'idle', label: 'Planned' }
     case 'not_configured': return { tone: 'idle', label: 'Not configured' }
     case 'not_measured': return { tone: 'idle', label: 'Not measured yet' }
     default: return { tone: 'idle', label: '—' }
@@ -154,12 +155,22 @@ onMounted(load)
         <div style="flex:1"><div class="c-name">Backups</div><div class="c-sub">{{ backup.sub }}</div></div>
         <div class="conn-state"><span class="sdot" :class="backup.tone"></span>{{ backup.label }}</div>
       </div>
+      <div class="conn-row">
+        <div style="flex:1"><div class="c-name">Firewall</div><div class="c-sub">check-firewall-windows.ps1</div></div>
+        <div class="conn-state"><span class="sdot" :class="present(info.platform.firewall).tone"></span>{{ present(info.platform.firewall).label }}</div>
+      </div>
+      <div class="conn-row">
+        <div style="flex:1"><div class="c-name">Hardening</div><div class="c-sub">verify-hardening-windows.ps1</div></div>
+        <div class="conn-state"><span class="sdot" :class="present(info.platform.hardening).tone"></span>{{ present(info.platform.hardening).label }}</div>
+      </div>
     </div>
 
     <!-- Platform -->
     <div class="section-label">Platform</div>
     <div class="card" style="margin-bottom: 22px">
       <div class="kv"><span class="k">Version</span><span class="v mono">SYSTEMS. {{ info.platform.version }}</span></div>
+      <div v-if="info.platform.stage" class="kv"><span class="k">Stage</span><span class="v">{{ info.platform.stage }}</span></div>
+      <div class="kv"><span class="k">Commit</span><span class="v mono small">{{ info.platform.commit || '—' }}</span></div>
       <div class="kv"><span class="k">Target</span><span class="v">{{ info.platform.target }}</span></div>
       <div class="kv"><span class="k">Base domain</span><span class="v mono">{{ info.platform.baseDomain || BASE_DOMAIN }}</span></div>
       <div class="kv"><span class="k">Dashboard</span><span class="v mono">{{ info.platform.dashboardDomain || ('systems.' + BASE_DOMAIN) }}</span></div>
@@ -194,7 +205,7 @@ onMounted(load)
 
     <div class="callout warn">
       <div class="co-bar"></div>
-      <div>Caddy and Postgres are configured during V1.2 Windows setup. DNS is set manually in Websupport and can't be checked from here.</div>
+      <div>Caddy routing and Postgres are implemented in the repo; connecting them is a Windows-host step (see docs/WINDOWS_VALIDATION_CHECKLIST.md). DNS is set manually in Websupport and can't be checked from here.</div>
     </div>
   </template>
 </template>
