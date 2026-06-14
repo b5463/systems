@@ -2,7 +2,7 @@
 /**
  * SYSTEMS. — white ASCII chaos art generator.
  *
- * Static counterpart to AsciiChaosField.vue: a De Jong strange attractor is
+ * Static counterpart to AsciiChaosField.vue: the Tinkerbell chaotic map is
  * sampled into a monospace character grid; cell density selects the glyph.
  * The result is an abstract white-on-(transparent|black) ASCII sculpture —
  * orbital and chaotic, NOT a node/edge network diagram. No color, no readable
@@ -24,17 +24,35 @@ mkdirSync(DOCS, { recursive: true })
 
 const RAMP = ['·', '.', ':', ';', '-', '+', '*', 'o'] // light → heavy, XML-safe
 
-// De Jong attractor → density grid → glyph rows.
-function asciiRows({ cols, rows, iters, a, b, c, d }) {
+// Tinkerbell map → density grid → glyph rows (auto-fit to the cell grid).
+//   x' = x² − y² + a·x + b·y ;  y' = 2·x·y + c·x + d·y
+function asciiRows({ cols, rows, iters, a = 0.9, b = -0.6013, c = 2.0, d = 0.5 }) {
   const grid = new Float32Array(cols * rows)
-  let x = 0.1, y = 0.1, max = 1
+  const x0 = -0.72, y0 = -0.64, WARM = 100
+  // pass 1: bounds
+  let x = x0, y = y0, minX = 1e9, maxX = -1e9, minY = 1e9, maxY = -1e9
   for (let i = 0; i < iters; i++) {
-    const nx = Math.sin(a * y) - Math.cos(b * x)
-    const ny = Math.sin(c * x) - Math.cos(d * y)
+    const nx = x * x - y * y + a * x + b * y
+    const ny = 2 * x * y + c * x + d * y
     x = nx; y = ny
-    if (i < 40) continue
-    const gx = ((x + 2) / 4 * cols) | 0
-    const gy = ((y + 2) / 4 * rows) | 0
+    if (!isFinite(x) || Math.abs(x) > 1e3) { x = x0; y = y0; continue }
+    if (i < WARM) continue
+    if (x < minX) minX = x; if (x > maxX) maxX = x
+    if (y < minY) minY = y; if (y > maxY) maxY = y
+  }
+  const px = (maxX - minX) * 0.05 || 0.1, py = (maxY - minY) * 0.05 || 0.1
+  minX -= px; maxX += px; minY -= py; maxY += py
+  const sx = cols / (maxX - minX), sy = rows / (maxY - minY)
+  // pass 2: density
+  x = x0; y = y0; let max = 1
+  for (let i = 0; i < iters; i++) {
+    const nx = x * x - y * y + a * x + b * y
+    const ny = 2 * x * y + c * x + d * y
+    x = nx; y = ny
+    if (!isFinite(x) || Math.abs(x) > 1e3) { x = x0; y = y0; continue }
+    if (i < WARM) continue
+    const gx = ((x - minX) * sx) | 0
+    const gy = ((y - minY) * sy) | 0
     if (gx >= 0 && gx < cols && gy >= 0 && gy < rows) {
       const v = ++grid[gy * cols + gx]
       if (v > max) max = v
@@ -67,7 +85,7 @@ function rowsToSvg(rows, { fontSize = 13, fill = '#e2e4e8', op = 1, lineH = 15, 
 // 1) Ambient transparent field — empty states / faint backdrops.
 {
   const cols = 120, rows = 64
-  const data = asciiRows({ cols, rows, iters: 60000, a: 1.641, b: 1.902, c: 0.316, d: 1.525 })
+  const data = asciiRows({ cols, rows, iters: 60000, a: 0.9 })
   const fontSize = 13, lineH = 15
   const w = cols * 7.8, h = rows * lineH + 8
   const { texts } = rowsToSvg(data, { fontSize, lineH })
@@ -83,7 +101,7 @@ ${texts}
 // 2) Docs/README header — black panel + white ASCII field + quiet caption.
 {
   const cols = 150, rows = 21
-  const data = asciiRows({ cols, rows, iters: 55000, a: 1.4, b: -2.3, c: 2.4, d: -2.1 })
+  const data = asciiRows({ cols, rows, iters: 55000, a: 0.894 })
   const fontSize = 13, lineH = 15
   const w = 1280, h = 320
   const { texts } = rowsToSvg(data, { fontSize, lineH, op: 0.5, padX: 24, padY: 22 })

@@ -1688,8 +1688,8 @@ select:focus {
 }
 
 /* ---------- Review polish ---------- */
-/* System-detail action rows shouldn't sprawl the full content width on desktop. */
-.action-group .btn-row { max-width: 560px; }
+/* Action buttons fill the row evenly — no dead space on the right. */
+.action-group .btn-row { grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); }
 
 /* Quieter, smaller wordmark in the mobile top bar. */
 .mobile-bar .brand-img { height: 12px; }

@@ -1,11 +1,13 @@
 <script setup>
 /**
- * SYSTEMS. — white abstract ASCII chaos field.
+ * SYSTEMS. — white abstract ASCII chaos field (Tinkerbell map).
  *
- * Real monospace characters whose positions are driven by a De Jong strange
- * attractor. Character DENSITY (how many orbit points land in a cell) chooses
- * the glyph and its brightness, producing an evolving white-on-black text
- * sculpture — orbital and chaotic, never a node/edge diagram.
+ * Real monospace characters whose positions trace the Tinkerbell chaotic map:
+ *   x' = x² − y² + a·x + b·y
+ *   y' = 2·x·y + c·x + d·y
+ * Character DENSITY (orbit points per cell) chooses the glyph and brightness,
+ * so the attractor's curved shape is drawn in white-on-black ASCII. The `a`
+ * parameter drifts slowly, which morphs the shape — the "moving" animation.
  *
  * Decorative and inert: aria-hidden, pointer-events:none. Renders a single
  * static frame when the user prefers reduced motion.
@@ -28,8 +30,8 @@ let cols = 0, rows = 0, charW = 0, lineH = 0
 let grid = null
 let t = 0, last = 0, reduced = false
 
-// De Jong attractor base parameters (chosen for an elegant orbital form).
-const P = { a: 1.641, b: 1.902, c: 0.316, d: 1.525 }
+// Tinkerbell map constants (classic values that give the bounded attractor).
+const TB = { b: -0.6013, c: 2.0, d: 0.5, x0: -0.72, y0: -0.64 }
 
 function setupGrid() {
   lineH = props.cell
@@ -57,23 +59,38 @@ function draw() {
   if (!ctx || !grid) return
   grid.fill(0)
 
-  // Slow parameter drift gives barely-alive motion.
-  const a = P.a + Math.sin(t * 0.11) * 0.18
-  const b = P.b + Math.cos(t * 0.09) * 0.18
-  const c = P.c + Math.sin(t * 0.07) * 0.22
-  const d = P.d + Math.cos(t * 0.13) * 0.16
+  // `a` drifts slowly around 0.9 → the attractor morphs (the moving animation).
+  const a = 0.9 + Math.sin(t * 0.12) * 0.009
+  const { b, c, d, x0, y0 } = TB
+  const iters = Math.min(20000, cols * rows * 4)
+  const WARM = 100
 
-  // Iterate the attractor; accumulate orbit-point density per character cell.
-  let x = 0.1, y = 0.1
-  const iters = Math.min(26000, cols * rows * 5)
-  let max = 1
+  // pass 1 — find the attractor's bounds so it always fits the canvas.
+  let x = x0, y = y0, minX = 1e9, maxX = -1e9, minY = 1e9, maxY = -1e9
   for (let i = 0; i < iters; i++) {
-    const nx = Math.sin(a * y) - Math.cos(b * x)
-    const ny = Math.sin(c * x) - Math.cos(d * y)
+    const nx = x * x - y * y + a * x + b * y
+    const ny = 2 * x * y + c * x + d * y
     x = nx; y = ny
-    if (i < 40) continue
-    const gx = ((x + 2) / 4 * cols) | 0
-    const gy = ((y + 2) / 4 * rows) | 0
+    if (!isFinite(x) || !isFinite(y) || Math.abs(x) > 1e3) { x = x0; y = y0; continue } // divergence guard
+    if (i < WARM) continue
+    if (x < minX) minX = x; if (x > maxX) maxX = x
+    if (y < minY) minY = y; if (y > maxY) maxY = y
+  }
+  const padX = (maxX - minX) * 0.06 || 0.1
+  const padY = (maxY - minY) * 0.06 || 0.1
+  minX -= padX; maxX += padX; minY -= padY; maxY += padY
+  const sx = cols / (maxX - minX), sy = rows / (maxY - minY)
+
+  // pass 2 — same orbit, accumulate density per character cell.
+  x = x0; y = y0; let max = 1
+  for (let i = 0; i < iters; i++) {
+    const nx = x * x - y * y + a * x + b * y
+    const ny = 2 * x * y + c * x + d * y
+    x = nx; y = ny
+    if (!isFinite(x) || Math.abs(x) > 1e3) { x = x0; y = y0; continue }
+    if (i < WARM) continue
+    const gx = ((x - minX) * sx) | 0
+    const gy = ((y - minY) * sy) | 0
     if (gx >= 0 && gx < cols && gy >= 0 && gy < rows) {
       const v = ++grid[gy * cols + gx]
       if (v > max) max = v
