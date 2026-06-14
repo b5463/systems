@@ -121,3 +121,7 @@ Risky features are **off by default** and only enable via explicit `.env` flags.
 
 **Default posture:** every high-risk V2 feature is disabled until hardened and
 host-validated. None are claimed working live.
+
+---
+
+See also: [`HARDENING.md`](HARDENING.md) (verification), [`BACKUPS.md`](BACKUPS.md), [`DISASTER_RECOVERY.md`](DISASTER_RECOVERY.md).

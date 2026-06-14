@@ -8,12 +8,17 @@ const { db, auditLog } = require('../db');
 const dockerService = require('../services/docker');
 const proxy = require('../services/proxy');
 const health = require('../services/health');
+const { confirmMatches } = require('../util/thresholds');
+
+// Strip the basic-auth hash before any project row leaves the API. It is not
+// plaintext, but a bcrypt hash should never be exposed to clients.
+function pub(p) { if (p) delete p.basic_hash; return p; }
 
 async function projectsRoutes(fastify, options) {
   fastify.get('/api/projects', {
     preHandler: [fastify.authenticate],
   }, async () => {
-    const projects = db.prepare('SELECT * FROM projects ORDER BY created_at DESC').all();
+    const projects = db.prepare('SELECT * FROM projects ORDER BY created_at DESC').all().map(pub);
     return { projects };
   });
 
@@ -23,7 +28,7 @@ async function projectsRoutes(fastify, options) {
     const { slug } = request.params;
     const project = db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug);
     if (!project) return reply.code(404).send({ error: 'Project not found' });
-    return { project };
+    return { project: pub(project) };
   });
 
   fastify.post('/api/projects/:slug/start', {
@@ -43,7 +48,7 @@ async function projectsRoutes(fastify, options) {
       db.prepare(`UPDATE projects SET status = 'running', updated_at = datetime('now') WHERE slug = ?`).run(slug);
       auditLog({ user_id: request.user.id, action: 'start', target: slug, ip: request.ip });
 
-      return { project: db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug) };
+      return { project: pub(db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug)) };
     } catch (err) {
       request.log.error({ err }, '[projects] Failed to start container');
       return reply.code(500).send({ error: `Failed to start: ${err.message}` });
@@ -65,7 +70,7 @@ async function projectsRoutes(fastify, options) {
       db.prepare(`UPDATE projects SET status = 'stopped', updated_at = datetime('now') WHERE slug = ?`).run(slug);
       auditLog({ user_id: request.user.id, action: 'stop', target: slug, ip: request.ip });
 
-      return { project: db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug) };
+      return { project: pub(db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug)) };
     } catch (err) {
       request.log.error({ err }, '[projects] Failed to stop container');
       return reply.code(500).send({ error: `Failed to stop: ${err.message}` });
@@ -86,7 +91,7 @@ async function projectsRoutes(fastify, options) {
       db.prepare(`UPDATE projects SET status = 'running', updated_at = datetime('now') WHERE slug = ?`).run(slug);
       auditLog({ user_id: request.user.id, action: 'restart', target: slug, ip: request.ip });
 
-      return { project: db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug) };
+      return { project: pub(db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug)) };
     } catch (err) {
       request.log.error({ err }, '[projects] Failed to restart container');
       return reply.code(500).send({ error: `Failed to restart: ${err.message}` });
@@ -122,7 +127,7 @@ async function projectsRoutes(fastify, options) {
     schema: { body: { type: 'object', required: ['confirm'], properties: { confirm: { type: 'string' } } } },
   }, async (request, reply) => {
     const { slug } = request.params;
-    if (request.body.confirm !== slug) {
+    if (!confirmMatches(request.body.confirm, slug)) {
       return reply.code(400).send({ error: 'Confirmation does not match the system slug.' });
     }
     const project = db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug);
@@ -265,7 +270,7 @@ async function projectsRoutes(fastify, options) {
 
       auditLog({ user_id: request.user.id, action: 'rollback', target: slug, ip: request.ip });
 
-      return { project: db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug) };
+      return { project: pub(db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug)) };
     } catch (err) {
       request.log.error({ err }, '[projects] Rollback failed');
       db.prepare(`UPDATE projects SET status = 'error', updated_at = datetime('now') WHERE slug = ?`).run(slug);

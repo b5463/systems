@@ -136,6 +136,9 @@ It is hardened and least-privilege by design — it is **not** "unhackable." See
 - [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) — how a zip becomes a live system
 - [`docs/SECURITY.md`](docs/SECURITY.md) — security model, posture & firewall
 - [`docs/OPERATIONS.md`](docs/OPERATIONS.md) — day-2 operations, backups, limits, disk
+- [`docs/BACKUPS.md`](docs/BACKUPS.md) — what's backed up, how to back up & restore
+- [`docs/RESOURCE_LIMITS.md`](docs/RESOURCE_LIMITS.md) — per-container limits
+- [`docs/HARDENING.md`](docs/HARDENING.md) — hardening verification (repo vs host)
 - [`docs/UPDATE_STRATEGY.md`](docs/UPDATE_STRATEGY.md) — updating SYSTEMS. safely
 - [`docs/DISASTER_RECOVERY.md`](docs/DISASTER_RECOVERY.md) — recovery runbook
 - [`docs/WINDOWS_VALIDATION_CHECKLIST.md`](docs/WINDOWS_VALIDATION_CHECKLIST.md) — host-only validation steps
