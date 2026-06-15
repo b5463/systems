@@ -82,15 +82,28 @@ prompts before the V1.2 engine work.*
 
 ## V2 — what's actually built so far
 
-**Implemented & unit-tested (pure logic):** project classification
-(static/vue/node-api/worker/dockerfile), DB provisioning helpers
-(names/credentials/URL/masking), chunked-upload validation, GitHub webhook
-HMAC verification, feature flags. **Gated in the deploy/exec paths:** Dockerfile
-mode (off by default, never silent), shell console (off by default). **Shown in the UI:** V2 feature flags on the Server screen; `/api/deploy/plan` dry-run.
+**Wired up, off by default (enable after host validation):** chunked/streamed
+2 GB uploads (`ENABLE_LARGE_UPLOADS`), per-system Postgres provisioning
+(`ENABLE_DB_PROVISIONING`), GitHub deploy-on-push (`ENABLE_GITHUB_DEPLOYS` —
+verifies the webhook HMAC, then pulls and builds external code, so it's the
+riskiest flag), and outbound webhook notifications (`ENABLE_NOTIFICATIONS` +
+`NOTIFY_WEBHOOK_URL`). See the per-feature docs for each.
 
-**Requires Windows host validation:** live chunked 2 GB upload endpoint, DB
-provisioning execution, Node-API/worker container runtime + Caddy reachability,
-Dockerfile builds, GitHub deploy-on-push.
+**Wired up:** in-app backups — a manual "Back up now" (online SQLite snapshot +
+optional Caddy routes copy) is always available, with an optional periodic
+scheduler (`ENABLE_BACKUP_SCHEDULER`). Container-state reconciliation runs on
+boot and on an interval so crashes/reboots don't leave stale "running" rows.
+Admin auth supports opt-in TOTP two-factor and JWT session revocation via
+`token_version`. See [`BACKUPS.md`](BACKUPS.md), [`OPERATIONS.md`](OPERATIONS.md),
+[`SECURITY.md`](SECURITY.md).
 
-**Planned only:** notifications, multi-server (per-node Docker/Caddy,
-scheduling, node health, route distribution — docs/architecture notes only).
+**Gated in the deploy/exec paths:** Dockerfile mode (off by default, never
+silent), shell console (off by default). **Shown in the UI:** V2 feature flags on
+the Server screen; `/api/deploy/plan` dry-run.
+
+**Still requires Windows host validation:** Node-API/worker container runtime +
+Caddy reachability, Dockerfile builds, and the risky flags above exercised
+end-to-end on the host.
+
+**Planned only:** multi-server (per-node Docker/Caddy, scheduling, node health,
+route distribution — docs/architecture notes only).
