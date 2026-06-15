@@ -22,6 +22,19 @@ test('password route: includes basic_auth with the bcrypt hash', () => {
   assert.match(out, /reverse_proxy systems-notes:3000/);
 });
 
+test('apex route: primary system also serves the bare base domain', () => {
+  const out = caddy.renderRoute({ slug: 'portfolio', port: 3000, visibility: 'public', apex: true });
+  // both the subdomain and the apex host on the same site block
+  assert.match(out, /^portfolio\.acronym\.sk, acronym\.sk \{/m);
+  assert.match(out, /reverse_proxy systems-portfolio:3000/);
+  assert.match(out, /\(public, apex\)/);
+});
+
+test('non-apex route does not include the bare base domain', () => {
+  const out = caddy.renderRoute({ slug: 'portfolio', port: 3000, visibility: 'public' });
+  assert.doesNotMatch(out, /, acronym\.sk \{/);
+});
+
 test('writeRoute: public writes a file; private writes none', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'caddy-'));
   process.env.CADDY_SYSTEMS_DIR = dir;

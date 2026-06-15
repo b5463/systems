@@ -82,6 +82,10 @@ try { db.exec(`ALTER TABLE users ADD COLUMN totp_enabled INTEGER NOT NULL DEFAUL
 try { db.exec(`ALTER TABLE projects ADD COLUMN repo TEXT`); } catch {}
 try { db.exec(`ALTER TABLE projects ADD COLUMN deploy_branch TEXT NOT NULL DEFAULT 'main'`); } catch {}
 
+// Primary system: the one also served at the bare base domain (apex), e.g.
+// acronym.sk -> portfolio, while the dashboard stays on systems.acronym.sk.
+try { db.exec(`ALTER TABLE projects ADD COLUMN is_primary INTEGER NOT NULL DEFAULT 0`); } catch {}
+
 db.exec(`
   CREATE TABLE IF NOT EXISTS deploy_history (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

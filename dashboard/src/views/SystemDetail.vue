@@ -131,6 +131,23 @@ async function setVisibility(v) {
     visSaving.value = false
   }
 }
+// Primary system: also served at the bare base/apex domain (e.g. acronym.sk).
+const primarySaving = ref(false)
+const primaryMsg = ref('')
+async function setPrimary(val) {
+  primaryMsg.value = ''
+  primarySaving.value = true
+  try {
+    const data = await api.patch(`/projects/${props.slug}/primary`, { primary: val })
+    if (data && data.project) system.value = data.project
+    primaryMsg.value = val ? `Now served at ${BASE_DOMAIN}.` : `No longer served at ${BASE_DOMAIN}.`
+  } catch (e) {
+    primaryMsg.value = e.message || 'Failed to update.'
+  } finally {
+    primarySaving.value = false
+  }
+}
+
 const fileInput = ref(null)
 const rollingBack = ref(false)
 
@@ -599,6 +616,31 @@ onBeforeUnmount(() => {
         <input aria-label="basic-auth username" v-model="visUser" placeholder="basic-auth username" autocapitalize="none" autocorrect="off" />
         <input aria-label="basic-auth password" v-model="visPass" type="password" placeholder="basic-auth password" autocomplete="new-password" />
         <div class="hint">Public: open route. Private: no public route. Password: Caddy basic auth (hashed).</div>
+      </div>
+
+      <!-- Root domain (primary system) -->
+      <div class="card stack">
+        <div class="spread">
+          <div class="section-label">Root domain</div>
+          <span class="chip" :class="system.is_primary ? 'ok' : ''">{{ system.is_primary ? 'On' : 'Off' }}</span>
+        </div>
+        <div class="hint">
+          Also serve this system at <span class="mono">{{ BASE_DOMAIN }}</span> (the bare
+          root domain), alongside <span class="mono">{{ publicHost }}</span>. The dashboard
+          stays on its own subdomain. Only one system can hold the root domain.
+        </div>
+        <div v-if="system.visibility === 'private'" class="hint">Make the system public or password-protected first — a private system has no public route to serve.</div>
+        <button
+          v-else
+          class="btn btn-block"
+          :class="{ 'btn-primary': !system.is_primary }"
+          :disabled="primarySaving"
+          @click="setPrimary(!system.is_primary)"
+        >
+          <span v-if="primarySaving" class="spinner"></span>
+          <span v-else>{{ system.is_primary ? `Stop serving at ${BASE_DOMAIN}` : `Serve at ${BASE_DOMAIN}` }}</span>
+        </button>
+        <div v-if="primaryMsg" class="notice">{{ primaryMsg }}</div>
       </div>
 
       <!-- GitHub deploy-on-push (only when enabled on the server) -->

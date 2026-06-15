@@ -13,7 +13,8 @@ function kind() {
 
 /**
  * Publish (or update) a system's route.
- * @param {object} o - { slug, port, visibility='public', basicUser, basicHash }
+ * @param {object} o - { slug, port, visibility='public', basicUser, basicHash, apex }
+ *   apex (Caddy only): also serve at the bare base domain (primary system).
  * @returns {Promise<{proxy:string, published:boolean, reload:object|undefined}>}
  */
 async function publishRoute(o) {

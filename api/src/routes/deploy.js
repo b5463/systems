@@ -96,7 +96,7 @@ async function runBuildPipeline(slug, zipPath, extractDir, port, userId, ip) {
     appendBuildLog(slug, `[deploy] Publishing ${visibility} route via ${proxy.kind()}...\n`);
     let published = false;
     try {
-      const r = await proxy.publishRoute({ slug, port, visibility, basicUser: project?.basic_user, basicHash: project?.basic_hash });
+      const r = await proxy.publishRoute({ slug, port, visibility, basicUser: project?.basic_user, basicHash: project?.basic_hash, apex: !!project?.is_primary });
       published = r.published;
       if (r.reload && r.reload.ok === false && !['no_route', 'caddy_not_found'].includes(r.reload.reason)) {
         appendBuildLog(slug, `[deploy] WARNING: proxy reload reported: ${r.reload.reason}\n`);

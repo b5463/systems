@@ -39,13 +39,18 @@ function routeFile(slug) {
 
 /**
  * Generate the Caddy route file content for a system.
- * @param {object} opts - { slug, port=3000, visibility, basicUser, basicHash }
+ * @param {object} opts - { slug, port=3000, visibility, basicUser, basicHash, apex }
+ *   apex: also serve this system at the bare base domain (e.g. acronym.sk),
+ *   in addition to {slug}.base — used for the designated primary system.
  */
-function renderRoute({ slug, port = 3000, visibility = 'public', basicUser, basicHash }) {
-  const host = `${slug}.${baseDomain()}`;
+function renderRoute({ slug, port = 3000, visibility = 'public', basicUser, basicHash, apex = false }) {
+  const hosts = [`${slug}.${baseDomain()}`];
+  if (apex) hosts.push(baseDomain());
+  const host = hosts.join(', ');
   const target = `${containerName(slug)}:${port}`;
+  const tag = `${visibility === 'password' ? 'password' : 'public'}${apex ? ', apex' : ''}`;
   if (visibility === 'password' && basicUser && basicHash) {
-    return `# managed by SYSTEMS. — ${slug} (password)
+    return `# managed by SYSTEMS. — ${slug} (${tag})
 ${host} {
 \tbasic_auth {
 \t\t${basicUser} ${basicHash}
@@ -54,7 +59,7 @@ ${host} {
 }
 `;
   }
-  return `# managed by SYSTEMS. — ${slug} (public)
+  return `# managed by SYSTEMS. — ${slug} (${tag})
 ${host} {
 \treverse_proxy ${target}
 }

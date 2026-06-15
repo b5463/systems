@@ -84,6 +84,22 @@ test('notify-test reports disabled when notifications are off', async () => {
   assert.equal(res.statusCode, 409);
 });
 
+test('primary: set/clear apex on a public system; private rejected', async () => {
+  db.prepare(`INSERT INTO projects (name, slug, port, status, visibility) VALUES ('Folio','folio',4400,'running','public')`).run();
+  const on = await app.inject({ method: 'PATCH', url: '/api/projects/folio/primary', headers: auth(), payload: { primary: true } });
+  assert.equal(on.statusCode, 200);
+  assert.equal(on.json().project.is_primary, 1);
+
+  // a private system has no public route, so it can't be primary
+  db.prepare(`INSERT INTO projects (name, slug, port, status, visibility) VALUES ('Hidden','hidden',4401,'running','private')`).run();
+  const bad = await app.inject({ method: 'PATCH', url: '/api/projects/hidden/primary', headers: auth(), payload: { primary: true } });
+  assert.equal(bad.statusCode, 400);
+
+  const off = await app.inject({ method: 'PATCH', url: '/api/projects/folio/primary', headers: auth(), payload: { primary: false } });
+  assert.equal(off.statusCode, 200);
+  assert.equal(off.json().project.is_primary, 0);
+});
+
 test('provision-db is 404 while flag is off', async () => {
   // Need a real system row first so we exercise the flag gate, not the 404.
   db.prepare(`INSERT INTO projects (name, slug, port, status) VALUES ('Prov','prov',4321,'stopped')`).run();

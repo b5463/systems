@@ -186,15 +186,17 @@ async function projectsRoutes(fastify, options) {
     let published = false;
     const errors = [];
     try {
-      const r = await proxy.publishRoute({ slug, port: project.port, visibility, basicUser, basicHash });
+      const r = await proxy.publishRoute({ slug, port: project.port, visibility, basicUser, basicHash, apex: !!project.is_primary });
       published = r.published;
       if (r.reload && r.reload.ok === false && r.reload.reason !== 'no_route' && r.reload.reason !== 'caddy_not_found') {
         errors.push(`Proxy reload: ${r.reload.reason}`);
       }
     } catch (err) { errors.push(`Route: ${err.message}`); }
 
-    db.prepare(`UPDATE projects SET visibility = ?, basic_user = ?, basic_hash = ?, route_published = ?, updated_at = datetime('now') WHERE slug = ?`)
-      .run(visibility, basicUser, basicHash, published ? 1 : 0, slug);
+    // A private system has no public route, so it can't remain the apex/primary.
+    const keepPrimary = visibility === 'private' ? 0 : project.is_primary;
+    db.prepare(`UPDATE projects SET visibility = ?, basic_user = ?, basic_hash = ?, route_published = ?, is_primary = ?, updated_at = datetime('now') WHERE slug = ?`)
+      .run(visibility, basicUser, basicHash, published ? 1 : 0, keepPrimary, slug);
     auditLog({ user_id: request.user.id, action: 'visibility_change', target: slug, detail: visibility, ip: request.ip });
 
     const updated = db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug);
@@ -340,6 +342,48 @@ async function projectsRoutes(fastify, options) {
       .run(repo, branch, slug);
     auditLog({ user_id: request.user.id, action: 'repo_set', target: slug, detail: repo ? `${repo}@${branch}` : 'cleared', ip: request.ip });
     return { project: pub(db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug)) };
+  });
+
+  // Designate (or clear) the PRIMARY system — the one also served at the bare
+  // base/apex domain (e.g. acronym.sk), while the dashboard stays on
+  // systems.acronym.sk. Only one system can be primary; a private system can't
+  // be (it has no public route to serve at the root).
+  fastify.patch('/api/projects/:slug/primary', {
+    preHandler: [fastify.authenticate],
+    schema: { body: { type: 'object', required: ['primary'], properties: { primary: { type: 'boolean' } } } },
+  }, async (request, reply) => {
+    const { slug } = request.params;
+    const { primary } = request.body;
+    const project = db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug);
+    if (!project) return reply.code(404).send({ error: 'Project not found' });
+    if (project.status === 'deleted') return reply.code(409).send({ error: 'System is deleted.' });
+    if (primary && project.visibility === 'private') {
+      return reply.code(400).send({ error: 'A private system has no public route to serve at the root domain. Make it public or password-protected first.' });
+    }
+
+    const errors = [];
+    const republish = async (p, apex) => {
+      try {
+        await proxy.publishRoute({ slug: p.slug, port: p.port, visibility: p.visibility, basicUser: p.basic_user, basicHash: p.basic_hash, apex });
+      } catch (e) { errors.push(`${p.slug}: ${e.message}`); }
+    };
+
+    if (primary) {
+      // Clear any existing primary and drop its apex route first.
+      const current = db.prepare(`SELECT * FROM projects WHERE is_primary = 1 AND slug != ?`).get(slug);
+      if (current) {
+        db.prepare(`UPDATE projects SET is_primary = 0, updated_at = datetime('now') WHERE id = ?`).run(current.id);
+        await republish(current, false);
+      }
+      db.prepare(`UPDATE projects SET is_primary = 1, updated_at = datetime('now') WHERE slug = ?`).run(slug);
+      await republish({ ...project, is_primary: 1 }, true);
+    } else {
+      db.prepare(`UPDATE projects SET is_primary = 0, updated_at = datetime('now') WHERE slug = ?`).run(slug);
+      await republish(project, false);
+    }
+
+    auditLog({ user_id: request.user.id, action: 'primary_set', target: slug, detail: primary ? 'apex (root domain)' : 'cleared', ip: request.ip });
+    return { project: pub(db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug)), warnings: errors.length ? errors : undefined };
   });
 
   // Last 10 deploy-history rows for a project.
