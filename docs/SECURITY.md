@@ -27,7 +27,7 @@ The "not yet" column is the genuinely unbuilt work, not a release timeline.
 | Login rate limiting | **10/min per IP** | lockout/backoff |
 | API rate limiting | **100/min global**, deploy 5/min | per-route tuning |
 | Audit log | All admin actions recorded | export |
-| Destructive actions | Delete requires confirm modal + typed slug | delete vs **purge** split with stronger confirm |
+| Destructive actions | **Delete** keeps history; **purge** needs the typed slug | — |
 | Docker socket | Internal to API container only | — |
 | Docker/Caddy admin API | Never public; Caddy admin bound to localhost | — |
 | Postgres | Wired; not publicly exposed (SQLite is the local dev file) | — |
@@ -96,9 +96,9 @@ Checklist:
 - Every deployed container gets memory/CPU/PIDs limits, a restart policy, and
   log rotation from `DEFAULT_CONTAINER_*` (see OPERATIONS). One project can't
   exhaust the host.
-- Destructive **delete** requires typing the system **slug**. A delete-vs-**purge**
-  split (purge = stronger confirmation) and a DB reset/delete guarded by typing
-  the database name aren't built yet.
+- Destructive actions are split: **delete** stops the container and pulls the
+  public route but keeps history, while **purge** removes everything and requires
+  typing the system **slug** to confirm.
 - Before a destructive action, the UI shows whether a recent backup exists and
   warns when none does.
 
