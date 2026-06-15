@@ -1,4 +1,4 @@
-<p align="center"><img src="assets/header.svg" alt="SYSTEMS. by Acronym" width="100%" /></p>
+<p align="center"><img src="assets/header.svg" alt="SYSTEMS. — deployment engine" width="100%" /></p>
 
 # SYSTEMS. — Architecture
 
@@ -32,8 +32,11 @@
 ```
 
 - **Dashboard** — Vue 3 + Vite PWA, served as static files. Talks only to `/api`.
-- **API** — Node.js + Fastify. The *only* component that touches the Docker
-  socket. Owns deploy pipeline, lifecycle, routing files, logs, metrics, audit.
+- **API** — Node.js + Fastify (built via `buildApp()` in `src/app.js`, so it can
+  be exercised with `app.inject()` in tests). The *only* component that touches
+  the Docker socket. Owns deploy pipeline, lifecycle, routing files, logs,
+  metrics, audit, auth (JWT + `token_version` + optional TOTP), and the gated V2
+  routes (`/api/upload/*`, `/api/webhook/github`, `/api/projects/:slug/provision-db`).
 - **Reverse proxy** — terminates TLS, routes `systems.*` to the dashboard and
   `{slug}.*`/path routes to each system's container.
 - **Deployed systems** — one container per system on an isolated bridge network
@@ -49,8 +52,8 @@ columns the product spec calls for:
 
 | Entity | V1.1 today | V1.2 additions |
 | --- | --- | --- |
-| admins (`users`) | id, username, password_hash | email, role, last_login |
-| systems (`projects`) | name, slug, container_id, image_id, port, status, env_vars (encrypted), prev image/container | `visibility` (public/password/private), `deploy_type`, `route_id`, health fields |
+| admins (`users`) | id, username, password_hash, `token_version` (session revocation), `totp_secret`/`totp_enabled` (opt-in 2FA) | email, role, last_login |
+| systems (`projects`) | name, slug, container_id, image_id, port, status, env_vars (encrypted), prev image/container, `visibility`, `deploy_type`, health fields, `route_published`, `repo`/`deploy_branch` (GitHub deploys) | explicit `route_id` |
 | deployments (`deploy_history`) | image_id, container_id, deployed_at | release number, size, build duration, status |
 | events (`audit_log`) | user_id, action, target, detail, ip, created_at | (unchanged) |
 | metrics (`stats_history`) | cpu, mem, net snapshots | retention policy |
@@ -81,7 +84,31 @@ Visibility drives routing:
 → live`. Redeploys snapshot the previous image for rollback. See
 [`DEPLOYMENT.md`](DEPLOYMENT.md).
 
-## 5. Why SQLite + nginx are still here in V1.1
+## 5. Background services & operations
+
+Beyond request handling, the API runs a few in-process jobs (started in
+`src/index.js`, configurable via `.env`):
+
+- **Reconciliation** (`services/reconcile.js`) — on boot and every
+  `RECONCILE_INTERVAL_SEC` (default 30), it compares each system's stored status
+  against the real Docker container state and corrects drift, so crashes and
+  reboots don't leave stale "running" rows. Pure decision logic is unit-tested.
+- **Backups** (`services/backup.js`) — an online SQLite snapshot (WAL-safe) plus
+  the Caddy routes dir, written to `BACKUP_DIR` with a manifest and retention
+  pruning. Always available on demand (`POST /api/server/backup`, the Server
+  screen's "Back up now"); the periodic scheduler is gated behind
+  `ENABLE_BACKUP_SCHEDULER`. Complements the host-level PowerShell backups.
+- **Notifications** (`services/notify.js`) — best-effort outbound webhook on
+  deploy success/failure, redeploy, and reconcile-to-error. Off unless
+  `ENABLE_NOTIFICATIONS` + `NOTIFY_WEBHOOK_URL` are set.
+
+GitHub deploy-on-push (`routes/webhook.js`) and per-app Postgres provisioning
+(`services/dbprovision-runner.js`, optional `pg`) are wired but stay behind their
+flags — both pull or run external code, so they're host-validated. See
+[`OPERATIONS.md`](OPERATIONS.md), [`GITHUB_DEPLOYS.md`](GITHUB_DEPLOYS.md),
+[`DATABASES.md`](DATABASES.md), and [`NOTIFICATIONS.md`](NOTIFICATIONS.md).
+
+## 6. Why SQLite + nginx are still here in V1.1
 
 The locked decisions target **Postgres** and **Caddy**. V1.1 is a *product
 shell + foundation* pass with an explicit instruction not to rush dangerous
@@ -99,7 +126,7 @@ Postgres and Caddy migrations as dedicated, reviewable V1.2 steps with a
 data-migration script and a route-file generator. The Server screen reports the
 real components in use (nginx, sqlite) — it never claims Caddy/Postgres are live.
 
-## 6. V1.2 migration plan (high level)
+## 7. V1.2 migration plan (high level)
 
 1. **Postgres:** introduce a DB abstraction, add Postgres schema + migrations,
    write a SQLite→Postgres data migration, cut over behind `POSTGRES_*` env.

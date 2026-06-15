@@ -1,12 +1,16 @@
 {
-  "name": "acronym-deploy-dashboard",
-  "version": "1.0.0",
+  "name": "systems-dashboard",
+  "version": "2.0.0-rc.1",
+  "description": "SYSTEMS. dashboard — Vue 3 + Vite PWA",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "gen:art": "node scripts/gen-art.mjs",
+    "gen:ribbon": "node scripts/gen-ribbon.mjs",
+    "shots": "node scripts/shots.mjs"
   },
   "dependencies": {
     "@xterm/addon-fit": "^0.10.0",

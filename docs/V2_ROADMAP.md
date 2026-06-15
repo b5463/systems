@@ -5,7 +5,7 @@ backend/server changes are isolated, never bundled.
 
 ## V1.1 — Foundation / product shell ✅ (this pass)
 
-- Rebrand to **SYSTEMS. by Acronym**; monochrome-first operational design base.
+- Rebrand to **SYSTEMS.**; monochrome-first operational design base.
 - Responsive product shell: desktop sidebar + mobile hamburger/drawer.
 - Five surfaces — Systems, Ship, Events, Server, Admin — plus System detail
   (Overview/Deployments/Logs/Metrics/Console/Settings) with a status truth model

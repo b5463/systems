@@ -1,9 +1,15 @@
 # SYSTEMS. — Disaster Recovery (Windows)
 
 > What to do when something breaks, on Windows. **Don't paste secrets into any command.**
-> Tools: SYSTEMS. **Server** screen, `scripts\check-systems-health-windows.ps1`,
+> Tools: SYSTEMS. **Server** screen (including **Back up now** — an online
+> snapshot of the database + Caddy routes), `scripts\check-systems-health-windows.ps1`,
 > `scripts\check-firewall-windows.ps1`, `scripts\restore-systems-windows.ps1`,
 > Docker Desktop, and PowerShell.
+>
+> Two backup paths exist and complement each other: the in-app online snapshot
+> (quick, consistent DB + routes; one click or `POST /api/server/backup`, and an
+> optional scheduler) and the PowerShell scripts (full-volume / offsite). Restore
+> is via `restore-systems-windows.ps1`.
 
 General first move for almost everything:
 ```powershell
@@ -117,6 +123,9 @@ docker ps -a
 - **Symptoms:** everything offline after reboot.
 - **Recover:** ensure Docker Desktop autostarts; `docker compose up -d`; verify health.
 - **Prevent:** Docker Desktop start-at-login; restart policy `unless-stopped`.
+- **Note:** on boot SYSTEMS. reconciles each system's status against real Docker
+  state (and re-checks every `RECONCILE_INTERVAL_SEC`), so the dashboard
+  self-corrects stale "running"/"stopped" badges rather than showing them frozen.
 
 ### 17. Server migrated to a new machine
 - **Recover:** install prereqs (§ Windows deployment); copy `.env` **securely**; restore newest backup with `restore-systems-windows.ps1`; repoint DNS to the new `SERVER_IP`; verify.
@@ -147,4 +156,5 @@ docker ps -a
 **Before any destructive action** (purge, delete-all-releases, DB reset/delete,
 remove routes, major update/migration, restore): SYSTEMS. shows what will be
 removed, whether a recent backup exists and when, and warns harder if none
-exists. Purge/DB actions require typing the slug or database name.
+exists. Purge/DB actions require typing the slug or database name. Taking a
+fresh snapshot first is one click — **Server → Back up now**.

@@ -17,6 +17,9 @@ there's no public sign-up. It's not a service you'd hand to other people.
 - Gives each app a URL and lets you make it public, password-protected, or private.
 - Shows status, logs, and metrics, and keeps an audit log of everything you do.
 - Lets you start, stop, restart, redeploy, roll back, and delete apps.
+- Keeps the status honest: it reconciles each app against what Docker is
+  actually doing, so a crash or reboot won't leave a stale "running" badge.
+- Takes consistent backups on demand (and on a schedule if you turn it on).
 
 ## Domain model
 
@@ -45,7 +48,7 @@ DNS points the domains at the server; SYSTEMS. handles routing from there.
 | Containers | Docker (isolated bridge network, per-container resource limits) |
 | Reverse proxy | Caddy (it generates the route files; the local dev setup still uses nginx) |
 | Internal DB | SQLite for now; Postgres is supported, you just point it at one |
-| Auth | JWT bearer token, bcrypt password hashes |
+| Auth | JWT bearer token, bcrypt password hashes, optional TOTP two-factor, sign-out-everywhere |
 
 The Caddy and Postgres code is all here — you just connect it on the real
 server. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and the
@@ -57,15 +60,21 @@ server. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and the
 - Two admins maximum. The first comes from `.env` (`ADMIN_USERS`); the second is
   added on the Admin screen.
 - All dashboard, API, and deployment actions require admin auth.
+- Optional two-factor (TOTP) per admin, and a "sign out other sessions" control
+  that invalidates any other tokens (also triggered by a password change/reset).
 
 ## Deployment support
 
 - **Working now:** Vue/Vite source zips and static sites (it figures out the
   build type for you).
-- **Written, but needs a real server to confirm:** Node APIs and background
-  workers, custom Dockerfiles (off by default), Postgres databases per app,
-  big (2 GB) uploads, and GitHub deploys. See [`docs/V2_ROADMAP.md`](docs/V2_ROADMAP.md).
-- The riskier stuff is off until you turn it on in `.env`.
+- **Wired up but off by default:** custom Dockerfiles, an interactive container
+  shell, per-app Postgres provisioning, big (2 GB) chunked uploads, GitHub
+  deploy-on-push, and outbound notifications. The endpoints and UI all exist;
+  each one stays behind its `.env` flag until you enable it.
+- **Still needs a real server to confirm:** Node API/worker runtimes, Caddy
+  routing, Postgres, HTTPS — the parts that only a live host can prove out.
+- See [`docs/V2_ROADMAP.md`](docs/V2_ROADMAP.md). The riskier features pull or
+  run external code, so they're deliberately off until you turn them on.
 
 ## Dashboard
 
@@ -73,9 +82,10 @@ server. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and the
 - **Ship** — build & deploy a zip (desktop workbench; stepped on mobile).
 - **Events** — time-stamped audit log of admin and deploy actions.
 - **Server** — what Docker / Caddy / Postgres / DNS are actually doing, plus how
-  SYSTEMS. itself is holding up.
-- **Admin** — profile, password, second admin, limits & retention.
-- **System detail** — overview, deployments, logs, metrics, console, settings.
+  SYSTEMS. itself is holding up; "back up now" and a notification test.
+- **Admin** — profile, password, two-factor, sessions, second admin, limits.
+- **System detail** — overview, deployments, logs, metrics, console, settings
+  (env vars, visibility, and — when enabled — repo mapping and DB provisioning).
 
 ## Run locally
 
@@ -91,7 +101,7 @@ cd dashboard && npm install && npm run dev   # proxies /api to :3000
 Run the tests:
 
 ```bash
-cd api && npm test               # pure-logic unit tests
+cd api && npm test               # unit + route/integration tests (app.inject)
 ```
 
 ## Production (Windows)

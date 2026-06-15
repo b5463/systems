@@ -1,4 +1,4 @@
-<p align="center"><img src="assets/header.svg" alt="SYSTEMS. by Acronym" width="100%" /></p>
+<p align="center"><img src="assets/header.svg" alt="SYSTEMS. — deployment engine" width="100%" /></p>
 
 # SYSTEMS. — Windows Deployment (canonical)
 
