@@ -1567,11 +1567,11 @@ select:focus {
   /* ASCII art becomes a small, controlled halo around the logo only —
      dimmed, masked tight to the top-centre, and never behind the form. */
   .login-art {
-    height: 34vh;
+    height: 40vh;
     bottom: auto;
-    opacity: 0.5;
-    -webkit-mask-image: radial-gradient(58% 42% at 50% 30%, #000 0%, #000 8%, transparent 56%);
-    mask-image: radial-gradient(58% 42% at 50% 30%, #000 0%, #000 8%, transparent 56%);
+    opacity: 0.82;
+    -webkit-mask-image: radial-gradient(74% 52% at 50% 28%, #000 0%, #000 20%, transparent 66%);
+    mask-image: radial-gradient(74% 52% at 50% 28%, #000 0%, #000 20%, transparent 66%);
   }
   .login-art::after {
     background: linear-gradient(180deg, transparent 36%, rgba(8,8,10,0.7) 70%, var(--bg) 100%);

@@ -36,6 +36,6 @@ const failed = ref(false)
   width: auto;
 }
 .brand-img.lg {
-  height: 20px;
+  height: 36px;
 }
 </style>
