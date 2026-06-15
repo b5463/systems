@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import SystemsLogo from '../components/SystemsLogo.vue'
-import AsciiChaosField from '../components/AsciiChaosField.vue'
+import FlowField from '../components/FlowField.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -46,9 +46,9 @@ async function submit() {
 
 <template>
   <div class="login-page">
-    <!-- White ASCII chaos art (decorative, inert) -->
+    <!-- Organic pastel flowing-ribbon art (decorative, inert) -->
     <div class="login-art">
-      <AsciiChaosField :intensity="1.05" :cell="13" />
+      <FlowField :intensity="1" />
     </div>
 
     <!-- Desktop brand zone -->
