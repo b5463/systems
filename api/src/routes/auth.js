@@ -15,19 +15,8 @@ function signToken(fastify, user) {
 }
 
 async function authRoutes(fastify, options) {
-  fastify.decorate('authenticate', async function (request, reply) {
-    try {
-      await request.jwtVerify();
-    } catch (err) {
-      return reply.code(401).send({ error: 'Unauthorized', message: err.message });
-    }
-    // Enforce token_version: a stale token (after password change / revoke /
-    // deleted user) is rejected even though its signature is still valid.
-    const u = db.prepare('SELECT token_version FROM users WHERE id = ?').get(request.user.id);
-    if (!u || (request.user.tv ?? 0) !== (u.token_version || 0)) {
-      return reply.code(401).send({ error: 'Session expired. Please sign in again.' });
-    }
-  });
+  // `fastify.authenticate` is decorated on the root instance in app.js so all
+  // route plugins share it.
 
   // Rate-limit login aggressively: 10 attempts per minute per IP
   fastify.post('/api/auth/login', {

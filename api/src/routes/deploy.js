@@ -7,6 +7,7 @@ const { db, auditLog } = require('../db');
 const dockerService = require('../services/docker');
 const { extractZip, detectProjectType, generateDockerfile } = require('../services/zip');
 const proxy = require('../services/proxy');
+const notify = require('../services/notify');
 const { slugError } = require('../util/slug');
 const { features } = require('../util/flags');
 
@@ -109,11 +110,13 @@ async function runBuildPipeline(slug, zipPath, extractDir, port, userId, ip) {
 
     appendBuildLog(slug, `[deploy] Deployment complete.\n`);
     auditLog({ user_id: userId, action: 'deploy', target: slug, detail: `port:${port} ${visibility}`, ip });
+    notify.send({ kind: 'deploy', slug, detail: 'deployed' }).catch(() => {});
     finishBuild(slug, 'done');
   } catch (err) {
     appendBuildLog(slug, `[deploy] ERROR: ${err.message}\n`);
     finishBuild(slug, 'error');
     auditLog({ user_id: userId, action: 'deploy_fail', target: slug, detail: err.message, ip });
+    notify.send({ kind: 'deploy_failed', slug, detail: err.message }).catch(() => {});
     try {
       db.prepare(`UPDATE projects SET status = 'error', updated_at = datetime('now') WHERE slug = ?`).run(slug);
     } catch (dbErr) {
@@ -204,11 +207,13 @@ async function runRedeployPipeline(slug, zipPath, extractDir, userId, ip) {
 
     appendBuildLog(slug, `[redeploy] Redeploy complete.\n`);
     auditLog({ user_id: userId, action: 'redeploy', target: slug, ip });
+    notify.send({ kind: 'redeploy', slug, detail: 'redeployed' }).catch(() => {});
     finishBuild(slug, 'done');
   } catch (err) {
     appendBuildLog(slug, `[redeploy] ERROR: ${err.message}\n`);
     finishBuild(slug, 'error');
     auditLog({ user_id: userId, action: 'redeploy_fail', target: slug, detail: err.message, ip });
+    notify.send({ kind: 'deploy_failed', slug, detail: err.message }).catch(() => {});
     try {
       db.prepare(`UPDATE projects SET status = 'error', updated_at = datetime('now') WHERE slug = ?`).run(slug);
     } catch (dbErr) {
@@ -223,6 +228,62 @@ async function runRedeployPipeline(slug, zipPath, extractDir, userId, ip) {
     }
   }
 }
+
+// Validate + create a new project row and kick the build pipeline. Shared by
+// the multipart /api/deploy endpoint and the chunked-upload completion path so
+// every entry point runs identical validation and the same pipeline.
+async function beginDeploy({ name, slug, visibility = 'public', zipPath, userId, ip }) {
+  if (!name || !slug) return { ok: false, code: 400, error: 'Missing required fields: name, slug' };
+  const slugErr = slugError(slug);
+  if (slugErr) return { ok: false, code: 400, error: slugErr };
+  if (!zipPath) return { ok: false, code: 400, error: 'Missing file upload' };
+  if (!['public', 'private'].includes(visibility)) visibility = 'public';
+
+  const existing = db.prepare('SELECT id FROM projects WHERE slug = ? OR name = ?').get(slug, name);
+  if (existing) return { ok: false, code: 409, error: 'A project with this name or slug already exists' };
+
+  const dbPorts = db.prepare('SELECT port FROM projects WHERE port IS NOT NULL').all();
+  const usedPorts = new Set(dbPorts.map((r) => r.port));
+  const port = await dockerService.findFreePort(4000, 5000, usedPorts);
+
+  db.prepare(`INSERT INTO projects (name, slug, port, status, visibility) VALUES (?, ?, ?, 'building', ?)`).run(name, slug, port, visibility);
+  const project = db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug);
+
+  buildLogs.set(slug, []);
+  buildStatus.set(slug, 'building');
+
+  const extractDir = `/tmp/${uuidv4()}`;
+  setImmediate(() => {
+    runBuildPipeline(slug, zipPath, extractDir, port, userId, ip).catch((err) => {
+      console.error('[deploy] Unhandled pipeline error:', err);
+    });
+  });
+  return { ok: true, project: pub(project) };
+}
+
+// Kick a redeploy of an existing system from an already-saved zip. Shared by
+// the multipart redeploy endpoint and the GitHub push handler.
+async function beginRedeploy({ slug, zipPath, userId, ip }) {
+  const project = db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug);
+  if (!project) return { ok: false, code: 404, error: 'Project not found' };
+  if (project.status === 'building') return { ok: false, code: 409, error: 'Build already in progress' };
+  if (!zipPath) return { ok: false, code: 400, error: 'Missing file upload' };
+
+  db.prepare(`UPDATE projects SET status = 'building', updated_at = datetime('now') WHERE slug = ?`).run(slug);
+  buildLogs.set(slug, []);
+  buildStatus.set(slug, 'building');
+
+  const extractDir = `/tmp/${uuidv4()}`;
+  setImmediate(() => {
+    runRedeployPipeline(slug, zipPath, extractDir, userId, ip).catch((err) => {
+      console.error('[redeploy] Unhandled pipeline error:', err);
+    });
+  });
+  return { ok: true, slug };
+}
+
+// Sanitize a project row for client return (drop the basic-auth hash).
+function pub(p) { if (p) delete p.basic_hash; return p; }
 
 async function deployRoutes(fastify, options) {
   // Dry-run plan: validate the slug and show exactly what WOULD happen —
@@ -320,34 +381,12 @@ async function deployRoutes(fastify, options) {
         return reply.code(400).send({ error: 'Missing file upload' });
       }
 
-      const existing = db.prepare('SELECT id FROM projects WHERE slug = ? OR name = ?').get(slug, name);
-      if (existing) {
-        await fsp.rm(zipPath, { force: true });
-        return reply.code(409).send({ error: 'A project with this name or slug already exists' });
+      const result = await beginDeploy({ name, slug, visibility, zipPath, userId: request.user.id, ip: request.ip });
+      if (!result.ok) {
+        if (zipPath) await fsp.rm(zipPath, { force: true }).catch(() => {});
+        return reply.code(result.code).send({ error: result.error });
       }
-
-      const dbPorts = db.prepare('SELECT port FROM projects WHERE port IS NOT NULL').all();
-      const usedPorts = new Set(dbPorts.map((r) => r.port));
-      const port = await dockerService.findFreePort(4000, 5000, usedPorts);
-
-      db.prepare(`INSERT INTO projects (name, slug, port, status, visibility) VALUES (?, ?, ?, 'building', ?)`).run(name, slug, port, visibility);
-      const project = db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug);
-
-      buildLogs.set(slug, []);
-      buildStatus.set(slug, 'building');
-
-      const capturedZip = zipPath;
-      const capturedDir = extractDir;
-      const userId = request.user.id;
-      const ip = request.ip;
-
-      setImmediate(() => {
-        runBuildPipeline(slug, capturedZip, capturedDir, port, userId, ip).catch((err) => {
-          console.error('[deploy] Unhandled pipeline error:', err);
-        });
-      });
-
-      return reply.code(202).send({ project });
+      return reply.code(202).send({ project: result.project });
     } catch (err) {
       if (zipPath) await fsp.rm(zipPath, { force: true }).catch(() => {});
       if (extractDir) await fsp.rm(extractDir, { recursive: true, force: true }).catch(() => {});
@@ -396,26 +435,11 @@ async function deployRoutes(fastify, options) {
         }
       }
 
-      if (!zipPath) {
-        return reply.code(400).send({ error: 'Missing file upload' });
+      const result = await beginRedeploy({ slug, zipPath, userId: request.user.id, ip: request.ip });
+      if (!result.ok) {
+        if (zipPath) await fsp.rm(zipPath, { force: true }).catch(() => {});
+        return reply.code(result.code).send({ error: result.error });
       }
-
-      db.prepare(`UPDATE projects SET status = 'building', updated_at = datetime('now') WHERE slug = ?`).run(slug);
-
-      buildLogs.set(slug, []);
-      buildStatus.set(slug, 'building');
-
-      const capturedZip = zipPath;
-      const capturedDir = extractDir;
-      const userId = request.user.id;
-      const ip = request.ip;
-
-      setImmediate(() => {
-        runRedeployPipeline(slug, capturedZip, capturedDir, userId, ip).catch((err) => {
-          console.error('[redeploy] Unhandled pipeline error:', err);
-        });
-      });
-
       return reply.code(202).send({ message: 'Redeploy started', slug });
     } catch (err) {
       if (zipPath) await fsp.rm(zipPath, { force: true }).catch(() => {});
@@ -470,3 +494,5 @@ async function deployRoutes(fastify, options) {
 }
 
 module.exports = deployRoutes;
+module.exports.beginDeploy = beginDeploy;
+module.exports.beginRedeploy = beginRedeploy;

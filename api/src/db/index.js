@@ -77,6 +77,11 @@ try { db.exec(`ALTER TABLE users ADD COLUMN token_version INTEGER NOT NULL DEFAU
 try { db.exec(`ALTER TABLE users ADD COLUMN totp_secret TEXT`); } catch {}
 try { db.exec(`ALTER TABLE users ADD COLUMN totp_enabled INTEGER NOT NULL DEFAULT 0`); } catch {}
 
+// GitHub deploy-on-push (V2, gated): map a system to a "owner/name" repo and
+// the branch that should trigger a redeploy.
+try { db.exec(`ALTER TABLE projects ADD COLUMN repo TEXT`); } catch {}
+try { db.exec(`ALTER TABLE projects ADD COLUMN deploy_branch TEXT NOT NULL DEFAULT 'main'`); } catch {}
+
 db.exec(`
   CREATE TABLE IF NOT EXISTS deploy_history (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

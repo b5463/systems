@@ -278,6 +278,40 @@ async function projectsRoutes(fastify, options) {
     }
   });
 
+  // Map a system to a GitHub repo + branch for deploy-on-push. Setting the repo
+  // does nothing until ENABLE_GITHUB_DEPLOYS is on and a webhook is configured.
+  fastify.patch('/api/projects/:slug/repo', {
+    preHandler: [fastify.authenticate],
+    schema: {
+      body: {
+        type: 'object',
+        properties: {
+          repo: { type: ['string', 'null'], maxLength: 140 },
+          branch: { type: 'string', maxLength: 100 },
+        },
+      },
+    },
+  }, async (request, reply) => {
+    const { slug } = request.params;
+    const project = db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug);
+    if (!project) return reply.code(404).send({ error: 'Project not found' });
+
+    let repo = request.body.repo;
+    if (repo != null) {
+      repo = String(repo).trim();
+      if (repo && !/^[\w.-]+\/[\w.-]+$/.test(repo)) {
+        return reply.code(400).send({ error: 'Repo must look like "owner/name".' });
+      }
+      if (!repo) repo = null;
+    }
+    const branch = (request.body.branch && String(request.body.branch).trim()) || project.deploy_branch || 'main';
+
+    db.prepare(`UPDATE projects SET repo = ?, deploy_branch = ?, updated_at = datetime('now') WHERE slug = ?`)
+      .run(repo, branch, slug);
+    auditLog({ user_id: request.user.id, action: 'repo_set', target: slug, detail: repo ? `${repo}@${branch}` : 'cleared', ip: request.ip });
+    return { project: pub(db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug)) };
+  });
+
   // Last 10 deploy-history rows for a project.
   fastify.get('/api/projects/:slug/deploy-history', {
     preHandler: [fastify.authenticate],
