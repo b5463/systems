@@ -168,6 +168,24 @@ async function serverRoutes(fastify, options) {
     if (!result.ok) return reply.code(500).send({ error: result.error || 'Backup failed.' });
     return { ok: true, path: result.path, pruned: result.pruned };
   });
+
+  // Send a test notification through the configured webhook.
+  fastify.post('/api/server/notify-test', {
+    preHandler: [fastify.authenticate],
+    config: { rateLimit: { max: 5, timeWindow: '1 minute' } },
+  }, async (request, reply) => {
+    const notify = require('../services/notify');
+    const result = await notify.send({ kind: 'test', detail: 'Test notification from SYSTEMS.' });
+    if (!result.sent) {
+      const disabled = result.reason === 'disabled';
+      return reply.code(disabled ? 409 : 502).send({
+        error: disabled
+          ? 'Notifications are off, or NOTIFY_WEBHOOK_URL is not set.'
+          : `Webhook POST failed: ${result.reason}`,
+      });
+    }
+    return { ok: true };
+  });
 }
 
 module.exports = serverRoutes;

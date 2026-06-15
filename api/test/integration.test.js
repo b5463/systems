@@ -79,6 +79,11 @@ test('webhook + upload endpoints are 404 while flags are off', async () => {
   assert.equal(up.statusCode, 404);
 });
 
+test('notify-test reports disabled when notifications are off', async () => {
+  const res = await app.inject({ method: 'POST', url: '/api/server/notify-test', headers: auth() });
+  assert.equal(res.statusCode, 409);
+});
+
 test('provision-db is 404 while flag is off', async () => {
   // Need a real system row first so we exercise the flag gate, not the 404.
   db.prepare(`INSERT INTO projects (name, slug, port, status) VALUES ('Prov','prov',4321,'stopped')`).run();

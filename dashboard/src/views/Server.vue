@@ -35,6 +35,21 @@ async function runBackup() {
   }
 }
 
+const testingNotify = ref(false)
+const notifyMsg = ref('')
+async function testNotify() {
+  notifyMsg.value = ''
+  testingNotify.value = true
+  try {
+    await api.post('/server/notify-test')
+    notifyMsg.value = 'Test notification sent.'
+  } catch (e) {
+    notifyMsg.value = e.message || 'Could not send.'
+  } finally {
+    testingNotify.value = false
+  }
+}
+
 // Honest status → tone + label. Never invents "online".
 function present(status) {
   switch (status) {
@@ -223,6 +238,23 @@ onMounted(load)
       <div class="kv"><span class="k">Notifications</span><span class="v">{{ info.features.notifications ? 'Enabled' : 'Disabled' }}</span></div>
       <div class="kv"><span class="k">Upload limit</span><span class="v mono">{{ info.features.uploadMaxMb }} MB (V2 target {{ info.features.v2UploadMaxMb }} MB)</span></div>
       <div class="hint">These are wired but off by default; enable each in <span class="mono">.env</span> after validating on the Windows host. Pulling external code (GitHub deploys), running container shells, and provisioning databases are the higher-risk ones.</div>
+    </div>
+
+    <!-- Notifications -->
+    <div v-if="info.features" class="section-label">Notifications</div>
+    <div v-if="info.features" class="card stack" style="margin-bottom: 22px">
+      <div class="kv">
+        <span class="k">Outbound webhook</span>
+        <span class="v">{{ info.features.notifications ? 'Enabled' : 'Disabled' }}</span>
+      </div>
+      <div class="hint">
+        Fires on deploy success/failure, redeploy, and when a system drifts to error.
+        Configure with <span class="mono">ENABLE_NOTIFICATIONS</span> + <span class="mono">NOTIFY_WEBHOOK_URL</span>.
+      </div>
+      <button class="btn btn-sm" style="align-self:flex-start" :disabled="testingNotify || !info.features.notifications" @click="testNotify">
+        <span v-if="testingNotify" class="spinner"></span><span v-else>Send test notification</span>
+      </button>
+      <div v-if="notifyMsg" class="notice">{{ notifyMsg }}</div>
     </div>
 
     <div class="callout warn">

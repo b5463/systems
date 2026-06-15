@@ -134,5 +134,42 @@ export const api = {
       xhr.onerror = () => reject(new ApiError('Network error during upload', 0, null))
       xhr.send(form)
     })
+  },
+
+  // Chunked/streamed deploy for large archives. Streams the file to the API in
+  // sequential octet-stream chunks (never buffered whole), then completes the
+  // session which starts the same build pipeline as a normal deploy.
+  // Requires ENABLE_LARGE_UPLOADS on the server.
+  async chunkedDeploy({ fields, file, onProgress, chunkSize = 8 * 1024 * 1024 } = {}) {
+    const auth = useAuthStore()
+    const totalChunks = Math.max(1, Math.ceil(file.size / chunkSize))
+    const init = await this.post('/upload/init', {
+      name: fields.name, slug: fields.slug, visibility: fields.visibility,
+      totalSize: file.size, totalChunks
+    })
+    const id = init.uploadId
+    try {
+      let sent = 0
+      for (let i = 0; i < totalChunks; i++) {
+        const blob = file.slice(i * chunkSize, (i + 1) * chunkSize)
+        const buf = await blob.arrayBuffer()
+        const res = await fetch(`${BASE}/upload/${id}/chunk?index=${i}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/octet-stream', ...authHeader() },
+          body: buf
+        })
+        if (!res.ok) {
+          let body = null
+          try { body = JSON.parse(await res.text()) } catch { /* ignore */ }
+          throw new ApiError((body && body.error) || `Chunk ${i} failed (${res.status})`, res.status, body)
+        }
+        sent += blob.size
+        if (onProgress) onProgress(Math.round((sent / file.size) * 100))
+      }
+      return await this.post(`/upload/${id}/complete`)
+    } catch (e) {
+      try { await this.del(`/upload/${id}`) } catch { /* best-effort cancel */ }
+      throw e
+    }
   }
 }

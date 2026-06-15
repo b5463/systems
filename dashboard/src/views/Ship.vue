@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, computed } from 'vue'
+import { ref, watch, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '../api/client'
 import LogConsole from '../components/LogConsole.vue'
@@ -34,6 +34,25 @@ const error = ref('')
 const deployedSlug = ref('')
 const phase = ref('form') // form | building
 const buildResult = ref('')
+
+// Upload limits/capabilities (from the server). When large uploads are enabled
+// and a file is bigger than the standard limit, we stream it in chunks.
+const largeUploads = ref(false)
+const uploadMaxMb = ref(100)
+const v2UploadMaxMb = ref(2048)
+onMounted(async () => {
+  try {
+    const info = await api.get('/server/info')
+    if (info && info.features) {
+      largeUploads.value = !!info.features.largeUploads
+      uploadMaxMb.value = info.features.uploadMaxMb || 100
+      v2UploadMaxMb.value = info.features.v2UploadMaxMb || 2048
+    }
+  } catch { /* non-fatal — fall back to standard upload */ }
+})
+const willChunk = computed(() =>
+  !!file.value && largeUploads.value && file.value.size > uploadMaxMb.value * 1024 * 1024
+)
 
 function onBuildFinished(status) { buildResult.value = status }
 
@@ -77,13 +96,16 @@ async function submit() {
   if (!name.value.trim()) return (error.value = 'Enter a system name.')
   if (!slugValid.value) return (error.value = 'Slug must be 2–50 chars: a–z, 0–9 and hyphens.')
   if (!file.value) return (error.value = 'Choose a .zip archive to ship.')
+  // Reject oversized archives early unless large uploads are enabled.
+  if (!largeUploads.value && file.value.size > uploadMaxMb.value * 1024 * 1024) {
+    return (error.value = `Archive exceeds the ${uploadMaxMb.value} MB limit. Enable large uploads (ENABLE_LARGE_UPLOADS) to ship bigger archives.`)
+  }
   uploading.value = true; progress.value = 0
   try {
-    const data = await api.upload('/deploy', {
-      fields: { name: name.value.trim(), slug: slug.value, visibility: visibility.value },
-      files: { file: file.value },
-      onProgress: (p) => (progress.value = p)
-    })
+    const fields = { name: name.value.trim(), slug: slug.value, visibility: visibility.value }
+    const data = willChunk.value
+      ? await api.chunkedDeploy({ fields, file: file.value, onProgress: (p) => (progress.value = p) })
+      : await api.upload('/deploy', { fields, files: { file: file.value }, onProgress: (p) => (progress.value = p) })
     deployedSlug.value = (data && data.project && data.project.slug) || slug.value
     phase.value = 'building'
   } catch (e) {
@@ -192,6 +214,8 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
           <div v-else><strong>Drop a .zip to ship</strong><div class="small dim">or click to choose a file</div></div>
           <input ref="fileInput" type="file" accept=".zip,application/zip" style="display:none" @change="onPick" />
         </div>
+        <div v-if="willChunk" class="hint">Large archive — streaming in chunks (up to {{ v2UploadMaxMb }} MB).</div>
+        <div v-else-if="largeUploads" class="hint">Archives over {{ uploadMaxMb }} MB stream in chunks (up to {{ v2UploadMaxMb }} MB).</div>
       </div>
 
       <div class="card stack">
@@ -221,7 +245,7 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
         <div v-if="error" class="error-box">{{ error }}</div>
         <div v-if="uploading" class="stack">
           <div class="progress"><span :style="{ width: progress + '%' }"></span></div>
-          <div class="small muted center">Uploading… {{ progress }}%</div>
+          <div class="small muted center">{{ willChunk ? 'Streaming' : 'Uploading' }}… {{ progress }}%</div>
         </div>
         <button class="btn btn-primary btn-block" type="submit" :disabled="uploading">
           <span v-if="uploading" class="spinner"></span><span v-else>Ship it live</span>

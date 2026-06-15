@@ -37,6 +37,44 @@ const envVars = ref([{ key: '', value: '' }])
 const envSaving = ref(false)
 const envMsg = ref('')
 
+/* Gated features (GitHub deploys, DB provisioning) */
+const features = ref({})
+const repoInput = ref('')
+const branchInput = ref('main')
+const repoSaving = ref(false)
+const repoMsg = ref('')
+const provisioning = ref(false)
+const provisionMsg = ref('')
+const provisionedUrl = ref('')
+
+async function loadFeatures() {
+  try { const info = await api.get('/server/info'); features.value = info.features || {} }
+  catch { /* non-fatal — panels stay hidden */ }
+}
+async function saveRepo() {
+  repoMsg.value = ''
+  repoSaving.value = true
+  try {
+    const data = await api.patch(`/projects/${props.slug}/repo`, {
+      repo: repoInput.value.trim() || null,
+      branch: branchInput.value.trim() || 'main'
+    })
+    system.value = data.project
+    repoMsg.value = 'Saved.'
+  } catch (e) { repoMsg.value = e.message || 'Could not save.' }
+  finally { repoSaving.value = false }
+}
+async function provisionDb() {
+  provisionMsg.value = ''; provisionedUrl.value = ''
+  provisioning.value = true
+  try {
+    const data = await api.post(`/projects/${props.slug}/provision-db`)
+    provisionedUrl.value = data.databaseUrl
+    provisionMsg.value = `Provisioned ${data.database}. DATABASE_URL stored for next deploy.`
+  } catch (e) { provisionMsg.value = e.message || 'Could not provision.' }
+  finally { provisioning.value = false }
+}
+
 /* Redeploy / delete / rollback */
 const redeployFile = ref(null)
 const redeploying = ref(false)
@@ -327,6 +365,11 @@ function onKeydown(e) {
 
 onMounted(async () => {
   await loadSystem()
+  if (system.value) {
+    repoInput.value = system.value.repo || ''
+    branchInput.value = system.value.deploy_branch || 'main'
+  }
+  loadFeatures()
   fetchOverviewStat()
   document.addEventListener('visibilitychange', onVisibility)
   document.addEventListener('keydown', onKeydown)
@@ -556,6 +599,35 @@ onBeforeUnmount(() => {
         <input aria-label="basic-auth username" v-model="visUser" placeholder="basic-auth username" autocapitalize="none" autocorrect="off" />
         <input aria-label="basic-auth password" v-model="visPass" type="password" placeholder="basic-auth password" autocomplete="new-password" />
         <div class="hint">Public: open route. Private: no public route. Password: Caddy basic auth (hashed).</div>
+      </div>
+
+      <!-- GitHub deploy-on-push (only when enabled on the server) -->
+      <div v-if="features.githubDeploys" class="card stack">
+        <div class="section-label">GitHub deploy-on-push</div>
+        <div class="hint">Map this system to a repo. A push to the branch triggers a redeploy (requires the webhook configured in GitHub).</div>
+        <div class="field" style="margin:0">
+          <label class="label" for="repo">Repository</label>
+          <input id="repo" aria-label="Repository (owner/name)" v-model="repoInput" placeholder="owner/name" autocapitalize="none" autocorrect="off" />
+        </div>
+        <div class="field" style="margin:0">
+          <label class="label" for="branch">Branch</label>
+          <input id="branch" aria-label="Branch" v-model="branchInput" placeholder="main" autocapitalize="none" autocorrect="off" />
+        </div>
+        <div v-if="repoMsg" class="notice">{{ repoMsg }}</div>
+        <button class="btn btn-primary btn-block" :disabled="repoSaving" @click="saveRepo">
+          <span v-if="repoSaving" class="spinner"></span><span v-else>Save repo mapping</span>
+        </button>
+      </div>
+
+      <!-- Database provisioning (only when enabled on the server) -->
+      <div v-if="features.dbProvisioning" class="card stack">
+        <div class="section-label">Database</div>
+        <div class="hint">Provision a dedicated Postgres database + role. The <span class="mono">DATABASE_URL</span> is stored (encrypted) and injected on the next deploy.</div>
+        <div v-if="provisionedUrl" class="kv"><span class="k">DATABASE_URL</span><span class="v mono small">{{ provisionedUrl }}</span></div>
+        <div v-if="provisionMsg" class="notice">{{ provisionMsg }}</div>
+        <button class="btn btn-block" :disabled="provisioning" @click="provisionDb">
+          <span v-if="provisioning" class="spinner"></span><span v-else>Provision database</span>
+        </button>
       </div>
 
       <div class="card stack">
