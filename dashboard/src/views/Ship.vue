@@ -128,7 +128,7 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
   <!-- BUILDING -->
   <div v-if="phase === 'building'" class="stack" style="max-width: 860px">
     <div class="brand-panel" :class="{ live: buildResult === 'done' }">
-      <FlowField :density="0.7" :alpha="0.5" :width-factor="0.026" />
+      <FlowField />
       <div class="brand-panel-fade" aria-hidden="true"></div>
       <div class="spread">
         <div>

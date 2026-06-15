@@ -15,12 +15,13 @@ import { ref, onMounted, onBeforeUnmount } from 'vue'
 const props = defineProps({
   animate: { type: Boolean, default: true },
   intensity: { type: Number, default: 1 },          // opacity multiplier
-  density: { type: Number, default: 1 },            // ribbon-count multiplier
-  alpha: { type: Number, default: 0.55 },           // base stroke opacity
-  widthFactor: { type: Number, default: 0.02 },     // ribbon thickness vs min(w,h)
-  glowFactor: { type: Number, default: 0.9 },       // soft glow vs line width
-  speed: { type: Number, default: 0.012 },          // undulation speed
-  palette: { type: Array, default: () => ['#e7b6c6', '#b7c4ec', '#bfe6d3', '#ecd6c0', '#e6d4ef'] }
+  density: { type: Number, default: 0.75 },         // ribbon-count multiplier
+  alpha: { type: Number, default: 0.5 },            // base stroke opacity
+  widthFactor: { type: Number, default: 0.03 },     // ribbon thickness vs min(w,h)
+  glowFactor: { type: Number, default: 0.4 },       // soft glow vs line width
+  speed: { type: Number, default: 0.008 },          // undulation speed
+  // Muted, dusty pastels — soft on near-black.
+  palette: { type: Array, default: () => ['#d6b3c0', '#aab6d2', '#b0cdbf', '#d6cab2', '#c8bcd2'] }
 })
 
 const canvas = ref(null)
