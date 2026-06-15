@@ -1,15 +1,29 @@
 # SYSTEMS. — Notifications (V2)
 
-> This isn't built yet — it's a plan. Off by default
-> (`ENABLE_NOTIFICATIONS=false`). Nothing sends alerts right now.
+> Wired up, but off by default. A best-effort outbound webhook POST fires on
+> deploy success/failure, redeploy, and when reconciliation flips a system to
+> error. Nothing sends unless `ENABLE_NOTIFICATIONS=true` **and**
+> `NOTIFY_WEBHOOK_URL` is set.
 
-## Planned triggers
-deploy failed · health check failed · health recovered · disk low · DB backup
-failed · SYSTEMS. backup failed.
+## Triggers
+deploy succeeded · deploy failed · redeploy · reconciliation flipped a system to
+error.
 
-## Planned channels
-email / generic webhook first; Discord/Slack later.
+## Payload
+A small JSON body is POSTed to `NOTIFY_WEBHOOK_URL`:
 
-## Security (when built)
-Admin-only config; secrets masked; a "send test notification" action; failure
-logging; rate limiting. Kept intentionally small.
+```json
+{ "source": "SYSTEMS.", "site": "...", "kind": "...", "slug": "...", "detail": "...", "at": "..." }
+```
+
+Sending is best-effort — a failed POST is logged and never blocks a deploy.
+
+## Channels
+Generic webhook only for now (point it at your own receiver, Discord/Slack
+relay, etc.). More channels can come later.
+
+## Security
+Admin-controlled via `.env`; the webhook URL is treated as config; failures are
+logged, not retried aggressively. Kept intentionally small.
+
+Code: `api/src/services/notify.js`, `api/src/util/notify.js`.

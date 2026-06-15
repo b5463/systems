@@ -42,6 +42,13 @@
 3. **Crash toast appears** → a previously-live system stopped unexpectedly;
    investigate via its logs.
 
+## Container-state reconciliation
+
+On boot and every `RECONCILE_INTERVAL_SEC` (default 30; `0` disables), SYSTEMS.
+checks each system's stored status against the real Docker state and corrects
+it, so a crash or host reboot doesn't leave a stale "running" row. Corrections
+are recorded in the audit log as action `reconcile`.
+
 ## Backups (V1.1)
 
 - Internal DB: back up the API `data/` directory (SQLite file + WAL).
@@ -79,11 +86,17 @@ backup age / count, "overdue" after 7 days). Anything unmeasurable shows
 *not measured yet* — never a fake green.
 
 ## Backups
-- Schedule `backup-systems-windows.ps1` (Task Scheduler) at least daily.
-- Backs up the database (pg_dump or SQLite copy), Caddy routes + `Caddyfile`,
-  and releases; optionally logs/uploads (`BACKUP_INCLUDE_*`).
-- Retention: `BACKUP_RETENTION_DAYS` (default 14). Secrets are never archived
-  in the manifest or logged.
+- For a quick consistent DB snapshot, use the in-app backup: **Server → Back up
+  now** (or `POST /api/server/backup`). It takes an online SQLite snapshot, copies
+  Caddy routes if `CADDY_ROUTES_DIR` is set, and prunes beyond `BACKUP_RETENTION`
+  (default 14). A periodic run is available via `BACKUP_INTERVAL_HOURS` when
+  `ENABLE_BACKUP_SCHEDULER=true`. See [`BACKUPS.md`](BACKUPS.md).
+- For full-volume/offsite backups, schedule `backup-systems-windows.ps1` (Task
+  Scheduler) at least daily.
+- The script backs up the database (pg_dump or SQLite copy), Caddy routes +
+  `Caddyfile`, and releases; optionally logs/uploads (`BACKUP_INCLUDE_*`).
+- Script retention: `BACKUP_RETENTION_DAYS` (default 14). Secrets are never
+  archived in the manifest or logged.
 - **Before destructive actions** (purge, delete-all-releases, DB reset/delete,
   remove routes, major update, restore): the UI/script shows what's removed and
   whether a recent backup exists; purge/DB actions require typing the slug/name.

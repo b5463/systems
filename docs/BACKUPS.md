@@ -1,9 +1,26 @@
 # SYSTEMS. — Backups & Restore
 
-> The backup and restore scripts are written and have a `-DryRun` mode, but the
-> real Postgres dump, Caddy reload and service restart only happen on the actual
-> server. A backup that only lives on the same disk won't save you if the disk
-> dies — keep a copy somewhere else.
+> There are now two backup paths: an in-app backup for quick, consistent DB
+> snapshots, and the PowerShell scripts for full-volume/offsite backups. A
+> backup that only lives on the same disk won't save you if the disk dies —
+> keep a copy somewhere else.
+
+## In-app backup
+A Node-native backup runs inside SYSTEMS. itself. It takes an online SQLite
+snapshot (`better-sqlite3` `.backup()`, safe under WAL), optionally copies the
+Caddy routes (`CADDY_ROUTES_DIR`), writes them into a timestamped folder under
+`BACKUP_DIR`, writes a `manifest.json`, and prunes beyond `BACKUP_RETENTION`
+(default 14).
+
+- **Manual** — always available from the dashboard **Server** page via the
+  **Back up now** button → `POST /api/server/backup`.
+- **Scheduled** — a periodic run every `BACKUP_INTERVAL_HOURS` (default 24),
+  only when `ENABLE_BACKUP_SCHEDULER=true`.
+
+It's meant for quick, consistent DB snapshots; the PowerShell scripts below
+remain the way to capture full volumes and ship them offsite.
+
+Code: `api/src/services/backup.js`, `api/src/util/backup.js`.
 
 ## Scripts
 - `scripts\backup-systems-windows.ps1` — `[-IncludeLogs] [-IncludeUploads] [-DryRun]`

@@ -1,8 +1,9 @@
 # SYSTEMS. — Databases (V2)
 
-> The naming and credential helpers are written and tested, but actually
-> creating databases hasn't been run on a real server yet. Off by default
-> (`ENABLE_DB_PROVISIONING=false`).
+> There is now a runner that provisions a per-system Postgres database. Off by
+> default — requires `ENABLE_DB_PROVISIONING=true`, the optional `pg` npm
+> package installed on the host, and `POSTGRES_ADMIN_URL` (an admin/superuser
+> connection string).
 
 ## Architecture (recommended)
 **One shared Postgres** with a **per-system database + least-privilege role**
@@ -10,16 +11,19 @@
 A container-per-project (`DB_MODE=per-project`) is heavier and only justified
 for strong isolation needs.
 
-## Naming & credentials (implemented, pure, tested)
-- DB name: `sys_<slug_with_underscores>` · role: `sys_<slug>_app`
-- Password: random url-safe (24 bytes); `DATABASE_URL` built and injected as a
-  **secret env var**. Secrets are **masked** in the UI and never returned after save.
+## How it works
+`POST /api/projects/:slug/provision-db`:
 
-## How it would work (not run on a real server yet)
-create DB + role → grant least privilege → build `DATABASE_URL` → inject as
-secret env → redeploy. The parameterized SQL plan is generated in code
-(`util/dbprovision.provisionPlan`); actually running it against Postgres is
-the part you do on the server.
+- creates a per-system Postgres database and a least-privilege role,
+- builds the resulting `DATABASE_URL` and stores it into the system's
+  **encrypted** env (picked up on the **next deploy**).
+
+Identifiers are validated/allowlisted before use; the SQL is parameterized, not
+concatenated.
+
+- DB name: `sys_<slug_with_underscores>` · role: `sys_<slug>_app`
+- Password: random url-safe (24 bytes); `DATABASE_URL` is stored as an encrypted
+  env var, **masked** in the UI and never returned after save.
 
 ## Controls (planned UI)
 Database section in Ship + System detail; status/disk card; backup/export;
@@ -32,3 +36,5 @@ database_reset · database_deleted`.
 ## Repo tests
 `dbName/dbUser` reject unsafe slugs; password randomness/url-safety; URL build +
 masking — see `api/test/v2.test.js`.
+
+Code: `api/src/services/dbprovision-runner.js`, `api/src/util/dbprovision.js`.

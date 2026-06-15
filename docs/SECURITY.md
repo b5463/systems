@@ -15,7 +15,9 @@ The dashboard and API must be inaccessible unless authenticated as an admin.
 | --- | --- | --- |
 | Public signup | **Disabled** (none exists) | unchanged |
 | Dashboard access | Admin-only | unchanged |
-| API auth | JWT bearer token (7d), verified per route | HTTP-only, Secure, SameSite cookie sessions |
+| API auth | JWT bearer token (7d), verified per route, with **per-user `token_version`** so old tokens can be revoked | HTTP-only, Secure, SameSite cookie sessions |
+| Two-factor (admin) | **Opt-in TOTP** (set up on the Admin page) | unchanged |
+| Session revocation | Password change, admin reset, and "sign out other sessions" bump `token_version`, invalidating old tokens | unchanged |
 | CSRF | N/A (bearer token, not cookies) | **Required** once cookie-based |
 | Password hashing | **bcrypt** (cost 12) | bcrypt/Argon2 |
 | Plaintext passwords | None stored | unchanged |
@@ -110,14 +112,14 @@ Risky features are **off by default** and only enable via explicit `.env` flags.
 
 | Feature | Key risks | Mitigations | Status | Safe to enable by default? |
 | --- | --- | --- | --- | --- |
-| 2 GB uploads | OOM, disk exhaustion, zip-slip, abandoned temp files | stream to disk (no buffering), server-side cap, disk-fit check, traversal-safe temp path, admin-only, rate-limit, cleanup on cancel | validation **logic implemented + tested**; endpoint host-validated | No — keep V1 100 MB until validated |
-| DB provisioning | credential leak, privilege escalation, SQL injection | per-system DB + **least-privilege** role, random secret, **masked** + never returned, **parameterized** SQL (no concatenation), typed-confirm destructive | helpers **implemented + tested**; execution host-validated | No (`ENABLE_DB_PROVISIONING=false`) |
+| 2 GB uploads | OOM, disk exhaustion, zip-slip, abandoned temp files | stream to disk (no buffering), server-side cap, disk-fit check, traversal-safe temp path, admin-only, rate-limit, cleanup on cancel | **implemented, off by default, enable after host validation** | No — keep V1 100 MB until validated |
+| DB provisioning | credential leak, privilege escalation, SQL injection | per-system DB + **least-privilege** role, random secret, **masked** + never returned, **parameterized** SQL (no concatenation), allowlisted identifiers, typed-confirm destructive | **implemented, off by default, enable after host validation** | No (`ENABLE_DB_PROVISIONING=false`) |
 | Dockerfile builds | arbitrary build instructions | **disabled by default**, explicit opt-in, admin-only, build timeout, resource/PIDs limits, no secrets in logs, audited, rejected silently-never | gate **implemented + tested**; build host-validated | No (`ENABLE_DOCKERFILE_MODE=false`) |
 | Node API execution | runs uploaded code | hardened container (CapDrop ALL, no-new-privileges), limits, sanitized names/slugs, no shell concatenation, private mode = no route | classification/plan **implemented + tested**; runtime host-validated | Yes (same trust model as static/Vue) |
 | Workers/Bots | long-running uploaded code | no public route by default, limits, logs, restart policy | no-route plan **implemented + tested**; runtime host-validated | Yes |
 | Shell console | container code-exec | **disabled by default**, admin-only, audited; honest disabled state (no fake terminal) | gate **implemented + tested**; live use host-validated | No (`ENABLE_SHELL_CONSOLE=false`) |
-| GitHub webhooks | forged payloads, token leak | **HMAC-SHA256 constant-time verify**, branch filter, admin-only, secret stored masked, rate-limit | verify **implemented + tested**; deploy wiring planned | No (`ENABLE_GITHUB_DEPLOYS=false`) |
-| Notifications | secret leak, spam | admin-only, masked secrets, rate-limit, test action | **planned** | No (`ENABLE_NOTIFICATIONS=false`) |
+| GitHub webhooks | forged payloads, token leak, **builds external code** | **HMAC-SHA256 constant-time verify** over raw body, branch filter, admin-only, secret in `.env`, rate-limit | **implemented, off by default, enable after host validation** — riskiest flag (pulls + builds external code) | No (`ENABLE_GITHUB_DEPLOYS=false`) |
+| Notifications | secret leak, spam | admin-only config, best-effort POST (won't block deploys), failures logged | **implemented, off by default** (needs `NOTIFY_WEBHOOK_URL`) | Yes once a webhook URL is configured |
 
 **Default posture:** every high-risk V2 feature is disabled until hardened and
 host-validated. None are claimed working live.
