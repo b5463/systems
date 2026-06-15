@@ -106,7 +106,8 @@ async function adminRoutes(fastify, options) {
     if (!user) return reply.code(404).send({ error: 'User not found.' });
 
     const password_hash = await bcrypt.hash(newPassword, 12);
-    db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(password_hash, id);
+    // Bump token_version so the reset signs out the target user's sessions.
+    db.prepare('UPDATE users SET password_hash = ?, token_version = token_version + 1 WHERE id = ?').run(password_hash, id);
 
     auditLog({ user_id: request.user.id, action: 'password_reset', target: user.username, ip: request.ip });
     return { message: 'Password reset.' };

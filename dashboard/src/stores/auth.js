@@ -26,10 +26,24 @@ export const useAuthStore = defineStore('auth', {
       localStorage.removeItem(TOKEN_KEY)
     },
 
-    async login(username, password) {
-      // Import lazily to avoid a circular import at module load time.
-      const { api } = await import('../api/client')
-      const data = await api.post('/auth/login', { username, password })
+    async login(username, password, code) {
+      // Direct fetch (not the shared client) so we can read the response body
+      // on a 401 — the login endpoint signals twoFactorRequired that way, and
+      // the shared client otherwise drops the body + redirects on any 401.
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password, ...(code ? { code } : {}) })
+      })
+      let data = null
+      const text = await res.text()
+      if (text) { try { data = JSON.parse(text) } catch { data = text } }
+      if (!res.ok) {
+        const err = new Error((data && data.error) || 'Sign in failed.')
+        err.status = res.status
+        err.twoFactorRequired = !!(data && data.twoFactorRequired)
+        throw err
+      }
       this.setToken(data.token)
       await this.fetchMe()
       return data

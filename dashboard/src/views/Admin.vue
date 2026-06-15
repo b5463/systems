@@ -45,6 +45,70 @@ async function changePassword() {
   }
 }
 
+/* ---------- Two-factor (TOTP) ---------- */
+const twoFAEnabled = computed(() => !!auth.user?.twoFactorEnabled)
+const tfaSecret = ref('')
+const tfaOtpauth = ref('')
+const tfaCode = ref('')
+const tfaPassword = ref('')
+const tfaBusy = ref(false)
+const tfaMsg = ref('')
+const tfaError = ref('')
+
+async function startSetup2FA() {
+  tfaMsg.value = ''; tfaError.value = ''; tfaBusy.value = true
+  try {
+    const data = await api.post('/auth/2fa/setup')
+    tfaSecret.value = data.secret
+    tfaOtpauth.value = data.otpauth
+  } catch (e) {
+    tfaError.value = e.message || 'Could not start 2FA setup.'
+  } finally { tfaBusy.value = false }
+}
+
+async function enable2FA() {
+  tfaMsg.value = ''; tfaError.value = ''
+  if (!tfaCode.value) return (tfaError.value = 'Enter the 6-digit code.')
+  tfaBusy.value = true
+  try {
+    await api.post('/auth/2fa/enable', { code: tfaCode.value })
+    tfaSecret.value = ''; tfaOtpauth.value = ''; tfaCode.value = ''
+    tfaMsg.value = 'Two-factor enabled.'
+    await auth.fetchMe()
+  } catch (e) {
+    tfaError.value = e.message || 'Could not enable 2FA.'
+  } finally { tfaBusy.value = false }
+}
+
+async function disable2FA() {
+  tfaMsg.value = ''; tfaError.value = ''
+  if (!tfaPassword.value || !tfaCode.value) return (tfaError.value = 'Password and a current code are required.')
+  tfaBusy.value = true
+  try {
+    await api.post('/auth/2fa/disable', { password: tfaPassword.value, code: tfaCode.value })
+    tfaPassword.value = ''; tfaCode.value = ''
+    tfaMsg.value = 'Two-factor disabled.'
+    await auth.fetchMe()
+  } catch (e) {
+    tfaError.value = e.message || 'Could not disable 2FA.'
+  } finally { tfaBusy.value = false }
+}
+
+/* ---------- Sessions ---------- */
+const revoking = ref(false)
+const revokeMsg = ref('')
+async function revokeSessions() {
+  revokeMsg.value = ''
+  revoking.value = true
+  try {
+    const data = await api.post('/auth/revoke-sessions')
+    if (data && data.token) auth.setToken(data.token)
+    revokeMsg.value = 'Other sessions signed out.'
+  } catch (e) {
+    revokeMsg.value = e.message || 'Could not revoke sessions.'
+  } finally { revoking.value = false }
+}
+
 /* ---------- Admins ---------- */
 const users = ref([])
 const usersLoading = ref(true)
@@ -146,9 +210,52 @@ onMounted(loadUsers)
         </button>
       </div>
 
+      <!-- Two-factor -->
+      <div class="card stack">
+        <div class="spread">
+          <div class="section-label">Two-factor authentication</div>
+          <span class="chip" :class="twoFAEnabled ? 'ok' : ''">{{ twoFAEnabled ? 'On' : 'Off' }}</span>
+        </div>
+
+        <template v-if="!twoFAEnabled">
+          <p class="small muted" style="margin:0" v-if="!tfaOtpauth">
+            Add a time-based code from an authenticator app as a second step at sign-in.
+          </p>
+          <button v-if="!tfaOtpauth" class="btn btn-block" :disabled="tfaBusy" @click="startSetup2FA">
+            <span v-if="tfaBusy" class="spinner"></span><span v-else>Set up two-factor</span>
+          </button>
+
+          <template v-else>
+            <p class="small muted" style="margin:0">Add this secret to your authenticator, then enter a code to confirm.</p>
+            <div class="kv"><span class="k">Secret</span><span class="v mono small">{{ tfaSecret }}</span></div>
+            <div class="hint mono small" style="word-break:break-all">{{ tfaOtpauth }}</div>
+            <input aria-label="Six-digit code" v-model="tfaCode" inputmode="numeric" autocomplete="one-time-code" placeholder="123456" />
+            <button class="btn btn-primary btn-block" :disabled="tfaBusy" @click="enable2FA">
+              <span v-if="tfaBusy" class="spinner"></span><span v-else>Confirm &amp; enable</span>
+            </button>
+          </template>
+        </template>
+
+        <template v-else>
+          <p class="small muted" style="margin:0">Enter your password and a current code to turn two-factor off.</p>
+          <input aria-label="Current password" v-model="tfaPassword" type="password" autocomplete="current-password" placeholder="Current password" />
+          <input aria-label="Six-digit code" v-model="tfaCode" inputmode="numeric" autocomplete="one-time-code" placeholder="123456" />
+          <button class="btn btn-danger btn-block" :disabled="tfaBusy" @click="disable2FA">
+            <span v-if="tfaBusy" class="spinner"></span><span v-else>Disable two-factor</span>
+          </button>
+        </template>
+
+        <div v-if="tfaError" class="error-box">{{ tfaError }}</div>
+        <div v-else-if="tfaMsg" class="notice">{{ tfaMsg }}</div>
+      </div>
+
       <!-- Session -->
       <div class="card stack">
         <div class="section-label">Session</div>
+        <button class="btn btn-block" :disabled="revoking" @click="revokeSessions">
+          <span v-if="revoking" class="spinner"></span><span v-else>Sign out other sessions</span>
+        </button>
+        <div v-if="revokeMsg" class="notice">{{ revokeMsg }}</div>
         <button class="btn btn-danger btn-block" :disabled="loggingOut" @click="logout">
           <span v-if="loggingOut" class="spinner"></span><span v-else>Sign out</span>
         </button>

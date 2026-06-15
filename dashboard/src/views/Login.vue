@@ -11,6 +11,8 @@ const route = useRoute()
 
 const username = ref('')
 const password = ref('')
+const code = ref('')
+const needCode = ref(false)
 const loading = ref(false)
 const error = ref('')
 
@@ -20,13 +22,22 @@ async function submit() {
     error.value = 'Enter your administrator credentials.'
     return
   }
+  if (needCode.value && !code.value) {
+    error.value = 'Enter your two-factor code.'
+    return
+  }
   loading.value = true
   try {
-    await auth.login(username.value, password.value)
+    await auth.login(username.value, password.value, code.value || undefined)
     const redirect = route.query.redirect
     router.replace(typeof redirect === 'string' ? redirect : { name: 'systems' })
   } catch (e) {
-    error.value = e.status === 401 ? 'Invalid credentials.' : e.message || 'Sign in failed.'
+    if (e.twoFactorRequired) {
+      needCode.value = true
+      error.value = code.value ? 'Invalid two-factor code.' : 'Enter the 6-digit code from your authenticator.'
+    } else {
+      error.value = e.status === 401 ? 'Invalid credentials.' : e.message || 'Sign in failed.'
+    }
   } finally {
     loading.value = false
   }
@@ -60,7 +71,12 @@ async function submit() {
           </div>
           <div class="field" style="margin:0">
             <label class="label" for="p">Password</label>
-            <input aria-label="••••••••" id="p" v-model="password" type="password" autocomplete="current-password" placeholder="••••••••" />
+            <input aria-label="Password" id="p" v-model="password" type="password" autocomplete="current-password" placeholder="••••••••" />
+          </div>
+
+          <div v-if="needCode" class="field" style="margin:0">
+            <label class="label" for="c">Two-factor code</label>
+            <input aria-label="Two-factor code" id="c" v-model="code" inputmode="numeric" autocomplete="one-time-code" autofocus placeholder="123456" />
           </div>
 
           <div v-if="error" class="error-box">{{ error }}</div>

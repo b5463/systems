@@ -71,6 +71,12 @@ try { db.exec(`ALTER TABLE projects ADD COLUMN health_response_ms INTEGER`); } c
 try { db.exec(`ALTER TABLE projects ADD COLUMN health_checked_at TEXT`); } catch {}
 try { db.exec(`ALTER TABLE projects ADD COLUMN route_published INTEGER NOT NULL DEFAULT 0`); } catch {}
 
+// Auth: token_version invalidates outstanding JWTs (sign-out-everywhere on
+// password change / admin reset / explicit revoke). TOTP two-factor (opt-in).
+try { db.exec(`ALTER TABLE users ADD COLUMN token_version INTEGER NOT NULL DEFAULT 0`); } catch {}
+try { db.exec(`ALTER TABLE users ADD COLUMN totp_secret TEXT`); } catch {}
+try { db.exec(`ALTER TABLE users ADD COLUMN totp_enabled INTEGER NOT NULL DEFAULT 0`); } catch {}
+
 db.exec(`
   CREATE TABLE IF NOT EXISTS deploy_history (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

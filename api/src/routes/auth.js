@@ -2,13 +2,30 @@
 
 const bcrypt = require('bcrypt');
 const { db, auditLog } = require('../db');
+const totp = require('../util/totp');
+
+// Issue a token carrying the user's current token_version. Bumping
+// token_version (password change, admin reset, explicit revoke) invalidates
+// every previously issued token for that user.
+function signToken(fastify, user) {
+  return fastify.jwt.sign(
+    { id: user.id, username: user.username, tv: user.token_version || 0 },
+    { expiresIn: '7d' }
+  );
+}
 
 async function authRoutes(fastify, options) {
   fastify.decorate('authenticate', async function (request, reply) {
     try {
       await request.jwtVerify();
     } catch (err) {
-      reply.code(401).send({ error: 'Unauthorized', message: err.message });
+      return reply.code(401).send({ error: 'Unauthorized', message: err.message });
+    }
+    // Enforce token_version: a stale token (after password change / revoke /
+    // deleted user) is rejected even though its signature is still valid.
+    const u = db.prepare('SELECT token_version FROM users WHERE id = ?').get(request.user.id);
+    if (!u || (request.user.tv ?? 0) !== (u.token_version || 0)) {
+      return reply.code(401).send({ error: 'Session expired. Please sign in again.' });
     }
   });
 
@@ -27,15 +44,16 @@ async function authRoutes(fastify, options) {
         properties: {
           username: { type: 'string', minLength: 1, maxLength: 100 },
           password: { type: 'string', minLength: 1, maxLength: 200 },
+          code: { type: 'string', maxLength: 16 },
         },
       },
     },
   }, async (request, reply) => {
-    const { username, password } = request.body;
+    const { username, password, code } = request.body;
     const ip = request.ip;
 
     const user = db
-      .prepare('SELECT id, username, password_hash FROM users WHERE username = ?')
+      .prepare('SELECT id, username, password_hash, token_version, totp_enabled, totp_secret FROM users WHERE username = ?')
       .get(username);
 
     if (!user) {
@@ -49,11 +67,18 @@ async function authRoutes(fastify, options) {
       return reply.code(401).send({ error: 'Invalid credentials' });
     }
 
-    const token = fastify.jwt.sign(
-      { id: user.id, username: user.username },
-      { expiresIn: '7d' }
-    );
+    // Two-factor: if enabled, a valid TOTP code is required to complete login.
+    if (user.totp_enabled) {
+      if (!code) {
+        return reply.code(401).send({ error: 'Two-factor code required.', twoFactorRequired: true });
+      }
+      if (!totp.verify(code, user.totp_secret)) {
+        auditLog({ user_id: user.id, action: 'login_fail', target: username, detail: '2fa code invalid', ip });
+        return reply.code(401).send({ error: 'Invalid two-factor code.', twoFactorRequired: true });
+      }
+    }
 
+    const token = signToken(fastify, user);
     auditLog({ user_id: user.id, action: 'login', target: username, ip });
     return { token };
   });
@@ -62,7 +87,8 @@ async function authRoutes(fastify, options) {
     preHandler: [fastify.authenticate],
   }, async (request) => {
     const { id, username } = request.user;
-    return { id, username };
+    const row = db.prepare('SELECT totp_enabled FROM users WHERE id = ?').get(id);
+    return { id, username, twoFactorEnabled: !!(row && row.totp_enabled) };
   });
 
   fastify.post('/api/auth/logout', {
@@ -72,7 +98,7 @@ async function authRoutes(fastify, options) {
     return { message: 'Logged out successfully' };
   });
 
-  // Change own password
+  // Change own password — also bumps token_version (signs out other sessions).
   fastify.post('/api/auth/change-password', {
     preHandler: [fastify.authenticate],
     schema: {
@@ -96,7 +122,7 @@ async function authRoutes(fastify, options) {
     }
 
     const user = db
-      .prepare('SELECT id, username, password_hash FROM users WHERE id = ?')
+      .prepare('SELECT id, username, password_hash, token_version FROM users WHERE id = ?')
       .get(request.user.id);
     if (!user) return reply.code(401).send({ error: 'Unauthorized' });
 
@@ -106,19 +132,82 @@ async function authRoutes(fastify, options) {
     }
 
     const password_hash = await bcrypt.hash(newPassword, 12);
-    db.prepare(`UPDATE users SET password_hash = ? WHERE id = ?`).run(password_hash, user.id);
+    db.prepare(`UPDATE users SET password_hash = ?, token_version = token_version + 1 WHERE id = ?`).run(password_hash, user.id);
 
     auditLog({ user_id: user.id, action: 'password_change', target: user.username, ip: request.ip });
-    return { message: 'Password updated.' };
+    // Re-issue a fresh token so the current session stays signed in.
+    const updated = db.prepare('SELECT id, username, token_version FROM users WHERE id = ?').get(user.id);
+    return { message: 'Password updated.', token: signToken(fastify, updated) };
   });
 
-  // Refresh token if valid and within 24h of expiry
+  // Sign out everywhere: bump token_version and hand back a fresh token.
+  fastify.post('/api/auth/revoke-sessions', {
+    preHandler: [fastify.authenticate],
+  }, async (request) => {
+    db.prepare(`UPDATE users SET token_version = token_version + 1 WHERE id = ?`).run(request.user.id);
+    auditLog({ user_id: request.user.id, action: 'sessions_revoked', ip: request.ip });
+    const updated = db.prepare('SELECT id, username, token_version FROM users WHERE id = ?').get(request.user.id);
+    return { message: 'Other sessions signed out.', token: signToken(fastify, updated) };
+  });
+
+  // Refresh token (carries token_version forward).
   fastify.post('/api/auth/refresh', {
     preHandler: [fastify.authenticate],
   }, async (request) => {
-    const { id, username } = request.user;
-    const token = fastify.jwt.sign({ id, username }, { expiresIn: '7d' });
-    return { token };
+    const user = db.prepare('SELECT id, username, token_version FROM users WHERE id = ?').get(request.user.id);
+    return { token: signToken(fastify, user) };
+  });
+
+  // ─── Two-factor (TOTP) ─────────────────────────────────────────────────────
+
+  // Begin setup: generate a pending secret, return the otpauth URL + secret.
+  // Not active until confirmed via /enable with a valid code.
+  fastify.post('/api/auth/2fa/setup', {
+    preHandler: [fastify.authenticate],
+  }, async (request, reply) => {
+    const user = db.prepare('SELECT id, username, totp_enabled FROM users WHERE id = ?').get(request.user.id);
+    if (user.totp_enabled) return reply.code(409).send({ error: 'Two-factor is already enabled.' });
+    const secret = totp.generateSecret();
+    db.prepare('UPDATE users SET totp_secret = ?, totp_enabled = 0 WHERE id = ?').run(secret, user.id);
+    return { secret, otpauth: totp.otpauthURL(secret, { label: user.username }) };
+  });
+
+  // Confirm + enable with a code from the authenticator app.
+  fastify.post('/api/auth/2fa/enable', {
+    preHandler: [fastify.authenticate],
+    schema: { body: { type: 'object', required: ['code'], properties: { code: { type: 'string', maxLength: 16 } } } },
+  }, async (request, reply) => {
+    const user = db.prepare('SELECT id, username, totp_secret, totp_enabled FROM users WHERE id = ?').get(request.user.id);
+    if (user.totp_enabled) return reply.code(409).send({ error: 'Two-factor is already enabled.' });
+    if (!user.totp_secret) return reply.code(400).send({ error: 'Start setup first.' });
+    if (!totp.verify(request.body.code, user.totp_secret)) {
+      return reply.code(400).send({ error: 'Code did not verify. Check the time on your device and try again.' });
+    }
+    db.prepare('UPDATE users SET totp_enabled = 1 WHERE id = ?').run(user.id);
+    auditLog({ user_id: user.id, action: '2fa_enabled', target: user.username, ip: request.ip });
+    return { message: 'Two-factor enabled.' };
+  });
+
+  // Disable 2FA (requires current password + a valid code).
+  fastify.post('/api/auth/2fa/disable', {
+    preHandler: [fastify.authenticate],
+    schema: {
+      body: {
+        type: 'object', required: ['password'],
+        properties: { password: { type: 'string', maxLength: 200 }, code: { type: 'string', maxLength: 16 } },
+      },
+    },
+  }, async (request, reply) => {
+    const user = db.prepare('SELECT id, username, password_hash, totp_secret, totp_enabled FROM users WHERE id = ?').get(request.user.id);
+    if (!user.totp_enabled) return reply.code(400).send({ error: 'Two-factor is not enabled.' });
+    const okPass = await bcrypt.compare(request.body.password || '', user.password_hash);
+    if (!okPass) return reply.code(401).send({ error: 'Password is incorrect.' });
+    if (!totp.verify(request.body.code, user.totp_secret)) {
+      return reply.code(400).send({ error: 'Code did not verify.' });
+    }
+    db.prepare('UPDATE users SET totp_enabled = 0, totp_secret = NULL WHERE id = ?').run(user.id);
+    auditLog({ user_id: user.id, action: '2fa_disabled', target: user.username, ip: request.ip });
+    return { message: 'Two-factor disabled.' };
   });
 }
 
