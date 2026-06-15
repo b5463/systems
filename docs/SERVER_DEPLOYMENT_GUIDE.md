@@ -41,10 +41,12 @@ cd dashboard && npm install && npm run dev
 Postgres production stack is finalized in V1.2.
 
 ## Security gate before exposing
-- `JWT_SECRET` / `ENV_SECRET` strong and unique; default admin password changed.
+- `JWT_SECRET` / `ENV_SECRET` strong and unique; default admin password changed;
+  enable **two-factor** on each admin.
 - Only `80`/`443` public. Postgres, Docker API, Caddy admin **not** public.
 - CORS locked to `systems.acronym.sk`.
 - Run `check-firewall-windows.ps1 -PublicIp <SERVER_IP>`.
+- Take a first backup (**Server → Back up now**); confirm restore on test data.
 
 See [`SECURITY.md`](SECURITY.md), [`OPERATIONS.md`](OPERATIONS.md),
 [`UPDATE_STRATEGY.md`](UPDATE_STRATEGY.md), [`DISASTER_RECOVERY.md`](DISASTER_RECOVERY.md).

@@ -20,7 +20,10 @@
 | View live logs | System detail → **Logs** |
 | Shell into a container | System detail → **Console** (running only) |
 | Set env vars | System detail → **Settings** (restarts container) |
+| Serve a system at the root domain | System detail → **Settings → Root domain** |
 | Add the second admin | **Admin → Administrators** |
+| Two-factor / sign out other sessions | **Admin** (Two-factor, Session) |
+| Back up now | **Server → Back up now** |
 | Review activity | **Events** (filter by type / system / admin) |
 
 ## Lifecycle states
@@ -49,13 +52,13 @@ checks each system's stored status against the real Docker state and corrects
 it, so a crash or host reboot doesn't leave a stale "running" row. Corrections
 are recorded in the audit log as action `reconcile`.
 
-## Backups (V1.1)
+## Backups (quick note)
 
-- Internal DB: back up the API `data/` directory (SQLite file + WAL).
+- Easiest: **Server → Back up now** takes an online, consistent snapshot of the
+  database (+ Caddy routes). Full details under [Backups](#backups) below.
 - Per-system env vars are encrypted with `ENV_SECRET` — **back up `ENV_SECRET`
-  separately and securely**, or encrypted env data is unrecoverable.
-
-> V2 adds first-class backups/restores. See [`V2_ROADMAP.md`](V2_ROADMAP.md).
+  separately and securely**, or encrypted env data is unrecoverable. (It's a
+  secret, so it's never included in any backup archive.)
 
 ## Retention
 

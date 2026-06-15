@@ -55,16 +55,24 @@ upload (multipart, size-capped)
 - **V1.2 (Caddy):** the API will write a per-system route file into `systems.d/`
   which the main `Caddyfile` imports, then reload via the Caddy admin API
   (localhost-only). HTTPS becomes automatic per host.
+- **Apex / primary (Caddy):** one system can be flagged primary (Settings →
+  Root domain) so its route also matches the bare base domain (e.g.
+  `acronym.sk`) alongside `{slug}.acronym.sk`. The dashboard always stays on
+  `systems.acronym.sk`. See [`ARCHITECTURE.md`](ARCHITECTURE.md#3-routing-model).
 
 ## Limits (configurable)
 
 | Setting | Default | Env |
 | --- | --- | --- |
 | Max upload | 100 MB (hard cap 500 MB in transport) | `UPLOAD_MAX_MB` |
+| Large (chunked) upload cap | 2048 MB, off unless enabled | `ENABLE_LARGE_UPLOADS` / `V2_UPLOAD_MAX_MB` |
 | Build timeout | 600s (planned enforcement) | `BUILD_TIMEOUT_SECONDS` |
 | Release retention | 3 (planned pruning) | `RELEASE_RETENTION_DEFAULT` |
 
-## Not yet (V2)
+## Beyond the defaults
 
-2 GB chunked/streaming uploads, databases, workers, GitHub deploys,
-backups/restores. See [`V2_ROADMAP.md`](V2_ROADMAP.md).
+Chunked 2 GB uploads, per-app Postgres provisioning, custom Dockerfiles, an
+in-container shell, GitHub deploy-on-push, and notifications are all **wired but
+off by default** — enable each in `.env`. Backups are built in (Server → Back up
+now, plus an optional scheduler). See [`V2_ROADMAP.md`](V2_ROADMAP.md) and the
+per-feature guides.

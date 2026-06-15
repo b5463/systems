@@ -67,6 +67,9 @@ Configure in Websupport (SYSTEMS. does **not** automate DNS):
 A   acronym.sk     → SERVER_IP
 A   *.acronym.sk   → SERVER_IP
 ```
+The wildcard covers `systems.acronym.sk` (dashboard) and every `{slug}.acronym.sk`.
+The root `acronym.sk` record is what lets you serve a chosen **primary** system
+at the bare domain (step 10); keep it even if you don't set a primary yet.
 
 ## 8. Windows Firewall
 Open **only** what must be public; keep everything else private. See
@@ -82,11 +85,17 @@ Copy-Item .env.example .env      # then edit secrets/paths
 ## 10. Verify & bootstrap admins
 1. Open `https://systems.acronym.sk` → SYSTEMS. login.
 2. Sign in with the first admin (`ADMIN_USERS`, later `ADMIN_EMAIL`).
-3. **Admin → Administrators →** add the **second admin**.
+3. **Admin → Administrators →** add the **second admin**; enable **two-factor**
+   on each admin while you're there.
 4. **Ship** a small Vue/Vite or static `.zip`; confirm it goes live at
    `slug.acronym.sk`.
-5. Check Docker logs, Caddy reload, and (V1.2) Postgres.
-6. `scripts\check-systems-health-windows.ps1`.
+5. (Optional) Make one system **primary** (System detail → Settings → Root
+   domain) so it serves at `acronym.sk`; the dashboard stays on
+   `systems.acronym.sk`.
+6. Take a first backup: **Server → Back up now** (and consider enabling the
+   scheduler, `ENABLE_BACKUP_SCHEDULER`).
+7. Check Docker logs, Caddy reload, and (V1.2) Postgres.
+8. `scripts\check-systems-health-windows.ps1`.
 
 ---
 
