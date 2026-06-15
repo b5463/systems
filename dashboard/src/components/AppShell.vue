@@ -23,7 +23,8 @@ const drawerOpen = ref(false)
 const currentTitle = computed(() => {
   const match = nav.find((n) => n.name === route.name)
   if (match) return match.label
-  if (route.name === 'system-detail') return 'System'
+  // Identify which system on the detail page rather than a generic "System".
+  if (route.name === 'system-detail') return route.params.slug || 'System'
   return 'SYSTEMS.'
 })
 
