@@ -1,9 +1,8 @@
 # SYSTEMS. — Backups & Restore
 
-> There are now two backup paths: an in-app backup for quick, consistent DB
-> snapshots, and the PowerShell scripts for full-volume/offsite backups. A
-> backup that only lives on the same disk won't save you if the disk dies —
-> keep a copy somewhere else.
+Two backup paths: an in-app backup for quick, consistent DB snapshots, and the
+PowerShell scripts for full-volume/offsite backups. A backup that only lives on
+the same disk won't save you when the disk dies, so keep a copy somewhere else.
 
 ## In-app backup
 A Node-native backup runs inside SYSTEMS. itself. It takes an online SQLite
@@ -29,7 +28,7 @@ Code: `api/src/services/backup.js`, `api/src/util/backup.js`.
 ## What a backup includes
 - **Database** — `pg_dump` of the SYSTEMS Postgres (admins, systems, deployments/
   releases, events/audit, env-var metadata, route records, settings, health/
-  metrics snapshots). On V1.1 SQLite it copies `platform.db` (+WAL/SHM).
+  metrics snapshots). On SQLite it copies `platform.db` (+WAL/SHM).
 - **Caddy** — `C:\ProgramData\SYSTEMS\caddy\Caddyfile` + `systems.d\*.caddy`
 - **Releases** — `C:\ProgramData\SYSTEMS\releases`
 - **Optional** — `logs`, `uploads` (`-IncludeLogs` / `-IncludeUploads` or `BACKUP_INCLUDE_*`)
@@ -62,6 +61,6 @@ where available, then verifies health.
 
 ## Before destructive actions
 Delete keeps history; **purge** and DB reset/delete require typing the slug.
-The UI warns that no automatic pre-action backup is taken — back up first.
+The UI warns that no automatic pre-action backup is taken, so back up first.
 
 See also: [`DISASTER_RECOVERY.md`](DISASTER_RECOVERY.md), [`OPERATIONS.md`](OPERATIONS.md).

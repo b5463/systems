@@ -4,22 +4,29 @@
 
 # SYSTEMS.
 
-SYSTEMS. is a self-hosted tool for deploying your own apps (it calls them
-"systems"). You drop in a zip, it builds the app, runs it in a Docker container,
-and serves it at a subdomain.
+Your own deployment engine. Drop in a zip and SYSTEMS. builds it, runs it in a
+hardened Docker container, and serves it at its own subdomain with automatic
+HTTPS. The push-button deploy flow you'd get from Vercel or Render — on a server
+you actually own.
 
-It runs on your own server and it's just for you — only admins can log in, and
-there's no public sign-up. It's not a service you'd hand to other people.
+No cloud account, no per-seat billing, no shipping your source off to someone
+else's platform. It's self-hosted and admin-only: you deploy, watch, and roll
+back from one dashboard. Every app you ship is a **system** — its own subdomain,
+status, logs, metrics, and one-click rollback.
 
-## What it does
+**Where it's at:** 2.0 release candidate. The code is all here and tested; what's
+left is proving the live pieces (Docker, Caddy, Postgres, HTTPS) on the real
+Windows host.
 
-- Takes a zip (Vue/Vite or a static site), builds it, and runs it in a container.
-- Gives each app a URL and lets you make it public, password-protected, or private.
-- Shows status, logs, and metrics, and keeps an audit log of everything you do.
-- Lets you start, stop, restart, redeploy, roll back, and delete apps.
-- Keeps the status honest: it reconciles each app against what Docker is
-  actually doing, so a crash or reboot won't leave a stale "running" badge.
-- Takes consistent backups on demand (and on a schedule if you turn it on).
+## What you get
+
+- Drop a zip (Vue/Vite or a static site) and it's live — it works out the build for you.
+- Each system gets a URL you can flip between public, password-protected, or private.
+- Status, logs, and metrics on everything, plus an audit log of every action.
+- Start, stop, restart, redeploy, roll back, delete — all one click.
+- Status you can trust: it reconciles against what Docker is actually doing, so a
+  crash or reboot never leaves a stale "running" badge.
+- Backups built in, on demand or on a schedule.
 
 ## Domain model
 
@@ -169,10 +176,10 @@ with PowerShell scripts in [`scripts/`](scripts) (`setup`, `deploy`, `backup`,
 `verify-hardening`). Data lives under `C:\ProgramData\SYSTEMS`. Linux is a
 development path.
 
-> Anything that needs a real running server — Docker, Caddy, Postgres, HTTPS,
-> DNS — is labelled "requires host validation" in the dashboard and docs until
-> you've confirmed it on the actual machine. The
-> [Windows checklist](docs/WINDOWS_VALIDATION_CHECKLIST.md) walks through that.
+A bunch of this only really proves out on a live box — Docker, Caddy, Postgres,
+HTTPS, DNS. Those bits say "requires host validation" in the UI and docs until
+you've run them on the actual machine. The
+[Windows checklist](docs/WINDOWS_VALIDATION_CHECKLIST.md) is the punch list.
 
 ## Security
 
@@ -196,5 +203,5 @@ uploaded code as untrusted. It is built to be hardened and least-privilege — n
 - [`docs/UPDATE_STRATEGY.md`](docs/UPDATE_STRATEGY.md) — updating SYSTEMS.
 - [`docs/DISASTER_RECOVERY.md`](docs/DISASTER_RECOVERY.md) — recovery runbook
 - [`docs/WINDOWS_VALIDATION_CHECKLIST.md`](docs/WINDOWS_VALIDATION_CHECKLIST.md) — host validation steps
-- [`docs/V2_ROADMAP.md`](docs/V2_ROADMAP.md) — roadmap
-- V2 features: [`DATABASES`](docs/DATABASES.md) · [`LARGE_UPLOADS`](docs/LARGE_UPLOADS.md) · [`DOCKERFILE_MODE`](docs/DOCKERFILE_MODE.md) · [`WORKERS`](docs/WORKERS.md) · [`GITHUB_DEPLOYS`](docs/GITHUB_DEPLOYS.md) · [`NOTIFICATIONS`](docs/NOTIFICATIONS.md) · [`SHELL_CONSOLE`](docs/SHELL_CONSOLE.md)
+- [`docs/V2_ROADMAP.md`](docs/V2_ROADMAP.md) — where this came from and where it's going
+- Optional features (off by default): [`DATABASES`](docs/DATABASES.md) · [`LARGE_UPLOADS`](docs/LARGE_UPLOADS.md) · [`DOCKERFILE_MODE`](docs/DOCKERFILE_MODE.md) · [`WORKERS`](docs/WORKERS.md) · [`GITHUB_DEPLOYS`](docs/GITHUB_DEPLOYS.md) · [`NOTIFICATIONS`](docs/NOTIFICATIONS.md) · [`SHELL_CONSOLE`](docs/SHELL_CONSOLE.md)

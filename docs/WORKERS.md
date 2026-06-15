@@ -1,22 +1,28 @@
-# SYSTEMS. — Workers / Bots (V2)
+# SYSTEMS. — Workers / Bots
 
-> Detecting a worker and skipping its public route is written and tested.
-> Actually running one hasn't been tried on a real server yet.
+A worker is a long-running background process (a bot, a queue consumer) with no
+public route. SYSTEMS. detects one when `package.json` has a `start` script but
+no web framework or `server.js` and no build step (`util/projectType.classify`).
+The detection logic is written and tested. Running an actual worker hasn't been
+tried on a real server yet.
 
-## What a worker is
-A long-running background process (bot, queue consumer) with **no public
-route**. Detected when `package.json` has a `start` script, **no** web framework
-/`server.js`, and no build (`util/projectType.classify`).
+There's no public route for a worker, so there's no API endpoint to call here.
+The behaviour falls out of the deploy pipeline.
 
-## Behaviour (implemented logic)
-- `routesByDefault(worker) === false` → **no Caddy route generated**.
-- Health is container/process status (not HTTP).
-- Same lifecycle: start/stop/restart/redeploy/delete; logs are primary;
-  CPU/RAM/uptime/restart count; env vars + optional `DATABASE_URL`.
+## Behaviour
 
-## UI (planned)
-System type "Worker/Bot"; route section reads **"No public route"**; logs front
-and centre.
+- `routesByDefault(worker) === false`, so no Caddy route is generated.
+- Health comes from container/process status, not an HTTP check.
+- It uses the same lifecycle as everything else: start, stop, restart, redeploy,
+  delete. Logs are the primary signal, alongside CPU/RAM/uptime/restart count
+  and env vars plus an optional `DATABASE_URL`.
+
+## UI
+
+System type shows as "Worker/Bot", the route section reads "No public route",
+and logs are front and centre. This part isn't built yet.
 
 ## Events
-`worker_started · worker_stopped · worker_restarted · worker_crashed · worker_redeployed`.
+
+`worker_started`, `worker_stopped`, `worker_restarted`, `worker_crashed`,
+`worker_redeployed`.

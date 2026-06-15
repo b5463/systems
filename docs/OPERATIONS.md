@@ -1,13 +1,13 @@
 # SYSTEMS. — Operations (day 2)
 
-> The day-to-day: running, watching, and looking after SYSTEMS.
+Running, watching, and looking after SYSTEMS. day to day.
 
 ## Daily / at-a-glance
 
 - **Systems** screen — snapshot counts (Live / Building / Stopped / Failed),
   what needs attention, and the latest deploy.
 - **Server** screen — Docker / reverse proxy / database / wildcard status.
-  Anything SYSTEMS. can't actually observe is shown as *not measured yet*.
+  Anything SYSTEMS. can't actually observe shows as *not measured yet*.
 
 ## Common tasks
 
@@ -62,9 +62,9 @@ are recorded in the audit log as action `reconcile`.
 
 ## Retention
 
-- Release retention default is `3` (`RELEASE_RETENTION_DEFAULT`). Automated
-  pruning is planned; until then old images accumulate and can be pruned
-  manually with care (never prune an image a system or its rollback points to).
+- Release retention defaults to `3` (`RELEASE_RETENTION_DEFAULT`). Automated
+  pruning isn't built yet, so old images accumulate. Prune them by hand with
+  care, and never prune an image a system or its rollback points to.
 
 ---
 
@@ -117,7 +117,7 @@ Defaults from `.env` (`DEFAULT_CONTAINER_*`), applied to every container:
 | Disk warn | `DEFAULT_CONTAINER_DISK_WARN_MB` | 1024 MB |
 
 Current defaults are shown on the **Server** screen. Per-system overrides
-(CPU/memory/restart/log/disk/internal port/health path) arrive in V1.2.
+(CPU/memory/restart/log/disk/internal port/health path) aren't wired yet.
 
 ## Disk & cleanup
 Track total disk, `SYSTEMS_DATA_DIR`, releases, uploads, logs, backups, and

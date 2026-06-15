@@ -1,12 +1,12 @@
 # SYSTEMS. — Hardening Verification
 
-> This page splits what's actually checked in the code from what you still need
-> to verify on the real Windows machine.
+What's actually checked in the code, versus what you still need to verify on the
+real Windows machine.
 
 ## Run the checks
 ```bash
 # repo logic (30 tests): slug/reserved, caddy routes, zip-slip, limits,
-# health mapping, proxy, V2 flags/classify/db/upload/webhook
+# health mapping, proxy, optional-feature flags/classify/db/upload/webhook
 cd api && npm test
 ```
 ```powershell
@@ -19,7 +19,7 @@ cd api && npm test
 ## Verified in repo (logic-tested / observed)
 | Control | Evidence |
 | --- | --- |
-| Risky V2 features OFF by default | `flags` test + `features({})` all false |
+| Risky optional features OFF by default | `flags` test + `features({})` all false |
 | Dockerfile builds never run silently | deploy gate (`ENABLE_DOCKERFILE_MODE`) |
 | Shell console refused unless enabled | exec gate (`ENABLE_SHELL_CONSOLE`) |
 | Slug validation + reserved names | `slug` tests |

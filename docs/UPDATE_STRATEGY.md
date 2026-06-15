@@ -1,8 +1,8 @@
 # SYSTEMS. — Update Strategy
 
-> How to update **SYSTEMS. itself** safely on Windows. Never auto-update —
-> updates require explicit admin approval. Script:
-> [`..\scripts\update-systems-windows.ps1`](../scripts/update-systems-windows.ps1).
+Updating SYSTEMS. itself, safely, on Windows. There's no auto-update; every
+update needs explicit admin approval. The script is
+[`..\scripts\update-systems-windows.ps1`](../scripts/update-systems-windows.ps1).
 
 ## Principle
 Back up first, update second, verify third, roll back if anything fails.
@@ -17,13 +17,13 @@ Back up first, update second, verify third, roll back if anything fails.
 3. **Pull/update code** — `git pull --ff-only`.
 4. **Install dependencies** — API (`npm install --production`) + dashboard (`npm install`).
 5. **Build** — `npm run build` (dashboard).
-6. **Run migrations** — V1.2 migration runner; V1.1 SQLite migrations are idempotent on boot.
+6. **Run migrations** — the Postgres migration runner on the production store; SQLite migrations are idempotent on boot.
 7. **Restart services** — `docker compose up -d --build`.
 8. **Reload Caddy** — `caddy reload` (service) or via container.
 9. **Verify:**
    - `https://systems.acronym.sk` reachable
    - admin login works
-   - Postgres connected (V1.2) / SQLite OK
+   - Postgres connected (or SQLite OK)
    - Docker access OK
    - Caddy route generation OK
    - one **existing** deployed system still serves

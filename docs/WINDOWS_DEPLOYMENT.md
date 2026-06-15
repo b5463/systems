@@ -2,39 +2,40 @@
 
 # SYSTEMS. — Windows Deployment (canonical)
 
-> **Production target: Windows.** A Windows machine or Windows VPS running
-> Docker Desktop (Linux containers via WSL2). Linux is dev/secondary only.
-> All paths default to `C:\ProgramData\SYSTEMS` and are configurable in `.env`.
+Run SYSTEMS. in production on Windows: a machine or VPS with Docker Desktop and
+Linux containers via WSL2. Linux is the dev path. Paths default to
+`C:\ProgramData\SYSTEMS` and you can change them in `.env`.
 
-PowerShell scripts referenced here live in [`..\scripts`](../scripts) and print
-`[systems] ...` status lines.
+The PowerShell scripts referenced here live in [`..\scripts`](../scripts) and
+print `[systems] ...` status lines.
 
 ---
 
 ## 1. Install / verify Docker Desktop
 1. Install Docker Desktop for Windows.
-2. **Enable the WSL2 backend** (Settings → General → *Use WSL2 based engine*).
-3. **Use Linux containers** (not Windows containers). Verify:
+2. Enable the WSL2 backend (Settings → General → *Use WSL2 based engine*).
+3. Use Linux containers, not Windows containers. Verify:
    ```powershell
    docker info --format '{{.OSType}}'   # must print: linux
    ```
 
 ## 2. Windows VPS — nested virtualization
-Docker Desktop + WSL2 require hardware virtualization. On a **Windows VPS** the
-provider must enable **nested virtualization / VT-x / AMD-V** for the VM, or
-WSL2 will not start. If `wsl --status` or Docker Desktop reports the VM cannot
-launch, ask the provider to enable nested virtualization.
+Docker Desktop and WSL2 need hardware virtualization. On a Windows VPS the
+provider has to enable nested virtualization (VT-x / AMD-V) for the VM, or WSL2
+won't start. If `wsl --status` or Docker Desktop reports the VM can't launch,
+that's the cause.
 
-## 3. Caddy — service or container
-Either is supported (Caddy lands fully in V1.2; pick one now):
-- **Docker container (recommended for parity):** Caddy runs in the stack,
+## 3. Caddy: service or container
+Caddy is the production proxy and the code is all here. Run it one of two ways:
+
+- **Docker container (recommended for parity):** Caddy runs in the stack and
   mounts `C:\ProgramData\SYSTEMS\caddy`. The API writes per-system route files
-  and reloads via the Caddy admin API bound to **localhost only**.
-- **Windows service:** install Caddy as a service (`caddy.exe`), point it at
-  `CADDY_CONFIG_PATH`. SYSTEMS. writes route files; reload with
+  and reloads via the Caddy admin API, bound to localhost only.
+- **Windows service:** install Caddy as a service (`caddy.exe`) and point it at
+  `CADDY_CONFIG_PATH`. SYSTEMS. writes the route files; reload with
   `caddy reload`.
 
-Main `Caddyfile` imports per-system files:
+The main `Caddyfile` imports the per-system files:
 ```
 import C:\ProgramData\SYSTEMS\caddy\systems.d\*.caddy
 ```
@@ -43,9 +44,11 @@ If Windows Caddy struggles with absolute `import` globs, set the working
 directory to `C:\ProgramData\SYSTEMS\caddy` and use `import systems.d\*.caddy`.
 
 ## 4. Postgres (preferably containerized)
-Run Postgres as a Docker container in the stack, data on a named volume.
-Bind it to **127.0.0.1 only** — never publish 5432 publicly. Configure
-`POSTGRES_*` in `.env`. (V1.1 runs on SQLite; V1.2 cuts over to Postgres.)
+Postgres is the production database; SQLite is the current default. The
+`POSTGRES_*` wiring is already in place, so on the host you run Postgres and
+point SYSTEMS. at it via `POSTGRES_*` in `.env`. Run it as a Docker container in
+the stack with data on a named volume. Bind it to `127.0.0.1` only and never
+publish 5432 publicly.
 
 ## 5. Create the data layout
 `scripts\setup-windows.ps1` creates these (idempotent):
@@ -62,17 +65,17 @@ C:\ProgramData\SYSTEMS\caddy\systems.d
 `setup-windows.ps1` creates the `systems` network (from `DOCKER_NETWORK`).
 
 ## 7. Websupport DNS (manual, wildcard)
-Configure in Websupport (SYSTEMS. does **not** automate DNS):
+Configure this in Websupport. SYSTEMS. does not automate DNS:
 ```
 A   acronym.sk     → SERVER_IP
 A   *.acronym.sk   → SERVER_IP
 ```
 The wildcard covers `systems.acronym.sk` (dashboard) and every `{slug}.acronym.sk`.
-The root `acronym.sk` record is what lets you serve a chosen **primary** system
-at the bare domain (step 10); keep it even if you don't set a primary yet.
+The root `acronym.sk` record is what lets you serve a chosen primary system at
+the bare domain (step 10); keep it even if you don't set a primary yet.
 
 ## 8. Windows Firewall
-Open **only** what must be public; keep everything else private. See
+Open only what must be public; keep everything else private. See
 [§ Firewall](#firewall) below and `scripts\check-firewall-windows.ps1`.
 
 ## 9. Run setup + deploy
@@ -85,28 +88,27 @@ Copy-Item .env.example .env      # then edit secrets/paths
 ## 10. Verify & bootstrap admins
 1. Open `https://systems.acronym.sk` → SYSTEMS. login.
 2. Sign in with the first admin (`ADMIN_USERS`, later `ADMIN_EMAIL`).
-3. **Admin → Administrators →** add the **second admin**; enable **two-factor**
-   on each admin while you're there.
-4. **Ship** a small Vue/Vite or static `.zip`; confirm it goes live at
+3. Admin → Administrators → add the second admin, and enable two-factor on each
+   admin while you're there.
+4. Ship a small Vue/Vite or static `.zip` and confirm it goes live at
    `slug.acronym.sk`.
-5. (Optional) Make one system **primary** (System detail → Settings → Root
-   domain) so it serves at `acronym.sk`; the dashboard stays on
-   `systems.acronym.sk`.
-6. Take a first backup: **Server → Back up now** (and consider enabling the
+5. (Optional) Make one system primary (System detail → Settings → Root domain)
+   so it serves at `acronym.sk`; the dashboard stays on `systems.acronym.sk`.
+6. Take a first backup: Server → Back up now (and consider enabling the
    scheduler, `ENABLE_BACKUP_SCHEDULER`).
-7. Check Docker logs, Caddy reload, and (V1.2) Postgres.
-8. `scripts\check-systems-health-windows.ps1`.
+7. Check Docker logs, the Caddy reload, and Postgres.
+8. Run `scripts\check-systems-health-windows.ps1`.
 
 ---
 
 ## <a id="firewall"></a>Windows Firewall
 
-**Open publicly (inbound):**
+Open publicly (inbound):
 - `80/tcp`
 - `443/tcp`
-- remote admin (RDP/SSH) **only if needed, restricted to your IP**
+- remote admin (RDP/SSH) only if needed, restricted to your IP
 
-**Never expose publicly:**
+Never expose publicly:
 - Postgres `5432`
 - Docker API / socket (`2375/2376`)
 - Caddy admin API (`2019`)
@@ -115,7 +117,7 @@ Copy-Item .env.example .env      # then edit secrets/paths
 - project internal container ports
 - Redis/queues (if added later)
 
-Inspect rules / listeners with PowerShell:
+Inspect rules and listeners with PowerShell:
 ```powershell
 Get-NetFirewallRule -Direction Inbound -Enabled True |
   Get-NetFirewallPortFilter | Sort-Object LocalPort
@@ -124,13 +126,13 @@ Get-NetTCPConnection -State Listen | Sort-Object LocalPort
 ```
 
 Rules of the road:
-- `systems.acronym.sk` is **admin-only** (behind auth).
-- Deployed projects are public **only** when visibility = Public.
-- Password-protected projects use Caddy basic auth/equivalent.
-- Private/internal projects get **no** public Caddy route.
-- Wildcard DNS does **not** mean every subdomain should expose a service.
+- `systems.acronym.sk` is admin-only (behind auth).
+- Deployed projects are public only when visibility = Public.
+- Password-protected projects use Caddy basic auth or equivalent.
+- Private/internal projects get no public Caddy route.
+- Wildcard DNS does not mean every subdomain should expose a service.
 
-Confirm exposure (run from another network or use the script):
+Confirm exposure from another network or with the script:
 - Postgres `5432` not reachable from outside
 - Docker API not listening publicly
 - Caddy admin `2019` not public
@@ -149,7 +151,7 @@ Confirm exposure (run from another network or use the script):
 | Caddy can't read route files | path/permission/glob issue | Use working dir `...\caddy` + `import systems.d\*.caddy`; check ACLs |
 | Volume mount fails | drive not shared with Docker | Docker Desktop → Settings → Resources → File sharing |
 | Container can't reach Caddy/Postgres | wrong network | ensure all on the `systems` Docker network |
-| Wildcard subdomain 404/无解析 | DNS not propagated / wrong A record | verify Websupport `A *.acronym.sk → SERVER_IP` |
+| Wildcard subdomain 404 / no resolution | DNS not propagated / wrong A record | verify Websupport `A *.acronym.sk → SERVER_IP` |
 | HTTPS not issued | port 443 blocked / DNS wrong | open 443, fix DNS, check Caddy logs |
 | Path permission denied | non-elevated shell | run PowerShell as Administrator |
 
@@ -158,39 +160,39 @@ See also: [`SECURITY.md`](SECURITY.md), [`OPERATIONS.md`](OPERATIONS.md),
 
 ---
 
-## V1.2 deploy flow (what the platform does)
+## Deploy flow (what the platform does)
 
 `upload → validate zip (zip-slip guarded, ≤ UPLOAD_MAX_MB) → detect type →
 build (Vue/Vite or static) → run hardened container → publish route per
 visibility → reload Caddy → (optional) health/HTTPS check → mark live`.
 
-- **Slugs** are validated and **reserved names rejected** (`www, api, admin,
+- **Slugs** are validated and reserved names are rejected (`www, api, admin,
   dashboard, server, system(s), auth, login, proxy, docker, caddy, …`).
-- **Visibility:** `public` (route published), `private` (no public route —
-  runs and is monitored only), `password` (Caddy `basic_auth`, bcrypt-hashed;
-  set from the system's **Settings**).
+- **Visibility:** `public` (route published), `private` (no public route — runs
+  and is monitored only), `password` (Caddy `basic_auth`, bcrypt-hashed; set
+  from the system's Settings).
 - **Routes** are written to `CADDY_SYSTEMS_DIR\{slug}.caddy` and Caddy is
-  reloaded. Reload/validate are guarded — a missing Caddy logs a warning
-  instead of crashing the API, and the system is **not** marked live falsely.
-- **Delete vs Purge:** delete stops the container + removes the route but keeps
-  history; **purge** removes container, images, route, release files and all
-  records and **requires typing the slug**.
-- **Health check** runs a real HTTP(S) request and stores status/response time;
-  results are honest (`healthy / unhealthy / timeout / unreachable`).
+  reloaded. Reload and validate are guarded: a missing Caddy logs a warning
+  instead of crashing the API, and the system is not marked live falsely.
+- **Delete vs Purge:** delete stops the container and removes the route but keeps
+  history; purge removes the container, images, route, release files and all
+  records, and requires typing the slug.
+- **Health check** runs a real HTTP(S) request and stores status and response
+  time; results are honest (`healthy / unhealthy / timeout / unreachable`).
 - **Release retention** trims deploy history beyond `RELEASE_RETENTION_DEFAULT`.
 
-### Caddy container networking (required, validate on the host)
+### Caddy container networking
 For Caddy to reach app containers by name, deployed containers must be named
 `systems-{slug}` and share a Docker network with Caddy that permits
 inter-container traffic. The generated route uses
 `reverse_proxy systems-{slug}:3000`. Set `REVERSE_PROXY=caddy` and run Caddy
-(container or service) with `CADDY_SYSTEMS_DIR` mounted/readable. This is the
-one part that must be validated on the Windows host (it cannot be exercised in
-a Docker-less CI/dev box).
+(container or service) with `CADDY_SYSTEMS_DIR` mounted and readable. This is the
+one part that needs the real host to confirm; it can't be exercised in a
+Docker-less CI/dev box.
 
-### Postgres (V1.2)
-The internal DB target is Postgres. The current build runs on SQLite; the
-`POSTGRES_*` settings + a `pg_dump`-based backup are in place, and the Server
-screen reports Postgres **Connected** only when `POSTGRES_HOST` is actually
-reachable. Cutting the internal store over to Postgres is a dedicated, tested
-migration step on the host — do it with a backup taken first.
+### Postgres
+The internal store runs on SQLite today. Postgres is the production database and
+it's already wired: the `POSTGRES_*` settings and a `pg_dump`-based backup are in
+place, and the Server screen reports Postgres Connected only when `POSTGRES_HOST`
+is actually reachable. Cutting the internal store over to Postgres is a
+dedicated, tested migration step on the host. Take a backup first.

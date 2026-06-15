@@ -1,21 +1,22 @@
-# SYSTEMS. — Shell Console (V2)
+# SYSTEMS. — Shell Console
 
-> This works but is off by default (`ENABLE_SHELL_CONSOLE=false`), because a
-> shell into a container is risky. Turn it on deliberately, and try it on a real
-> server before relying on it.
+An interactive container shell. It's wired up and off by default
+(`ENABLE_SHELL_CONSOLE=false`), because a shell into a container is risky. Turn
+it on deliberately, and try it on a real server before you rely on it.
 
-## Behaviour (implemented)
-The interactive container shell (`/api/projects/:slug/exec`, admin-only,
-WebSocket) is **gated**: when the flag is off the endpoint refuses with
-"Shell console is disabled". When on, it attaches `/bin/sh` to the running
-container and audits `exec_open`.
+## Behaviour
+
+The shell lives at `/api/projects/:slug/exec` (admin-only, WebSocket). When the
+flag is off, the endpoint refuses with "Shell console is disabled". When it's
+on, it attaches `/bin/sh` to the running container and audits `exec_open`.
 
 ## Why off by default
-A container shell is effectively code execution on the host's Docker. It must be
-explicit, admin-only, audited, and ideally time-limited (session limits are a
-future hardening step). There is **no fake terminal** — when disabled the UI
-shows the disabled state.
 
-## Future hardening (planned)
-Time-limited sessions, full session/command logging, per-session resource
-limits.
+A container shell is effectively code execution on the host's Docker. It needs
+to be explicit, admin-only, audited, and ideally time-limited. There's no fake
+terminal: when it's disabled, the UI just shows the disabled state.
+
+## Future hardening
+
+Time-limited sessions, full session and command logging, and per-session
+resource limits are still to come.

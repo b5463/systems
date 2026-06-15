@@ -1,20 +1,23 @@
-# SYSTEMS. — Dockerfile Mode (V2, advanced)
+# SYSTEMS. — Dockerfile Mode
 
-> The deploy path already handles (and gates) Dockerfile projects, but actually
-> building one hasn't been tried on a real server. Off by default
-> (`ENABLE_DOCKERFILE_MODE=false`).
+The deploy path handles and gates Dockerfile projects. It's wired up and off by
+default (`ENABLE_DOCKERFILE_MODE=false`). Actually building a Dockerfile still
+needs a real server to confirm.
 
-## Behaviour (implemented)
-If an uploaded archive contains a `Dockerfile` and the flag is **off**, the
-deploy is **rejected** with a clear message — SYSTEMS. **never silently runs a
-project Dockerfile**. With the flag on, the existing build pipeline (hardened
-container, resource limits, build timeout, log rotation) is used.
+## Behaviour
+
+If an uploaded archive contains a `Dockerfile` and the flag is off, the deploy
+is rejected with a clear message. SYSTEMS. never silently runs a project
+Dockerfile. With the flag on, the existing build pipeline takes over: hardened
+container, resource limits, build timeout, log rotation.
 
 ## Risks
-A Dockerfile runs **project-defined build instructions**. Treat as untrusted:
-admin-only, build timeout, resource/PIDs limits, no secrets in build logs,
-audited. Enable only for code you trust.
 
-## Repo tests
-The flag defaults to false, and turning it on via env is covered by a test
-(`api/test/v2.test.js`). Actually building a Dockerfile still needs a real server.
+A Dockerfile runs project-defined build instructions, so treat it as untrusted.
+It's admin-only, has a build timeout, enforces resource and PID limits, keeps
+secrets out of build logs, and is audited. Enable it only for code you trust.
+
+## Tests
+
+`api/test/v2.test.js` covers the flag defaulting to false and turning it on via
+env. Building an actual Dockerfile still needs a real server.

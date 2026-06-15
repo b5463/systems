@@ -2,8 +2,8 @@
 
 # SYSTEMS. — Architecture
 
-> How SYSTEMS. is put together — what's running today and what it's heading
-> toward, side by side.
+The dashboard, the API, the proxy, the database, and the containers each deployed
+system runs in. Here's how they fit together.
 
 ## 1. Components
 
@@ -11,7 +11,7 @@
                         Internet (Websupport wildcard DNS → SERVER_IP)
                                           │
                                   ┌───────▼────────┐
-                                  │  Reverse proxy │   nginx today / Caddy (V1.2)
+                                  │  Reverse proxy │   Caddy (prod) / nginx (dev)
                                   │  systems.* + slug.* routing, TLS
                                   └───┬───────┬────┘
                   systems.acronym.sk  │       │  {slug}.acronym.sk
@@ -27,15 +27,15 @@
                             └──────────┬──────────────────┘
                                        │
                             ┌──────────▼──────────┐
-                            │ Internal DB          │  SQLite today / Postgres (V1.2)
+                            │ Internal DB          │  Postgres (prod) / SQLite (dev)
                             └─────────────────────┘
 ```
 
 - **Dashboard** — Vue 3 + Vite PWA, served as static files. Talks only to `/api`.
-- **API** — Node.js + Fastify (built via `buildApp()` in `src/app.js`, so it can
-  be exercised with `app.inject()` in tests). The *only* component that touches
-  the Docker socket. Owns deploy pipeline, lifecycle, routing files, logs,
-  metrics, audit, auth (JWT + `token_version` + optional TOTP), and the gated V2
+- **API** — Node.js + Fastify, built via `buildApp()` in `src/app.js` so you can
+  exercise it with `app.inject()` in tests. It's the only component that touches
+  the Docker socket. It owns the deploy pipeline, lifecycle, routing files, logs,
+  metrics, audit, auth (JWT + `token_version` + optional TOTP), and the opt-in
   routes (`/api/upload/*`, `/api/webhook/github`, `/api/projects/:slug/provision-db`).
 - **Reverse proxy** — terminates TLS, routes `systems.*` to the dashboard and
   `{slug}.*`/path routes to each system's container.
@@ -46,35 +46,37 @@
 
 ## 2. Internal data model
 
-V1.1 (SQLite) tables: `users`, `projects`, `audit_log`, `deploy_history`,
-`stats_history`. The V1.2 Postgres schema keeps these and adds first-class
-columns the product spec calls for:
+The tables are `users`, `projects`, `audit_log`, `deploy_history`, and
+`stats_history`. The "not yet" column lists columns the spec calls for that
+aren't in the schema yet.
 
-| Entity | V1.1 today | V1.2 additions |
+| Entity | Columns | Not yet |
 | --- | --- | --- |
 | admins (`users`) | id, username, password_hash, `token_version` (session revocation), `totp_secret`/`totp_enabled` (opt-in 2FA) | email, role, last_login |
 | systems (`projects`) | name, slug, container_id, image_id, port, status, env_vars (encrypted), prev image/container, `visibility`, `deploy_type`, health fields, `route_published`, `repo`/`deploy_branch` (GitHub deploys) | explicit `route_id` |
 | deployments (`deploy_history`) | image_id, container_id, deployed_at | release number, size, build duration, status |
-| events (`audit_log`) | user_id, action, target, detail, ip, created_at | (unchanged) |
+| events (`audit_log`) | user_id, action, target, detail, ip, created_at | — |
 | metrics (`stats_history`) | cpu, mem, net snapshots | retention policy |
 | routes | implicit (proxy config files) | explicit `routes` table mirroring proxy state |
 | settings | from `.env` | persisted, editable in Admin |
 
 ## 3. Routing model
 
-- **Today (nginx):** a main `nginx.conf` `include`s per-system files in
+Both proxies are wired up. You pick one with `REVERSE_PROXY`.
+
+- **nginx (dev default):** a main `nginx.conf` `include`s per-system files in
   `nginx/conf.d/*.conf`; the API writes one file per system and reloads nginx.
-- **Target (Caddy, V1.2):** a main `Caddyfile` that `import`s generated
-  per-system route files from a `systems.d/` directory; the API writes one
-  route file per system and reloads Caddy via its admin API (bound to
-  localhost only). HTTPS becomes automatic per-host.
+- **Caddy (production):** a main `Caddyfile` that `import`s generated per-system
+  route files from a `systems.d/` directory; the API writes one route file per
+  system and reloads Caddy via its admin API (bound to localhost only). HTTPS is
+  automatic per-host. This path is pending host validation.
 
 Visibility drives routing:
 
-| Visibility | Route in V1 |
+| Visibility | Route |
 | --- | --- |
 | Public | Public route published |
-| Password protected | Public route + basic auth (V1.2, if safe) |
+| Password protected | Public route + basic auth |
 | Private / internal | **No public route** |
 
 One system can also be flagged **primary**: its Caddy route then matches both
@@ -84,7 +86,7 @@ always stays on `systems.{base}`. Only one system is primary at a time, and a
 private system can't be (no public route to serve). Endpoint:
 `PATCH /api/projects/:slug/primary`.
 
-## 4. Deploy pipeline (today)
+## 4. Deploy pipeline
 
 `upload → zip-slip-safe extract → detect type → generate Dockerfile (if needed)
 → build image → run hardened container on free port → write route → reload proxy
@@ -93,8 +95,8 @@ private system can't be (no public route to serve). Endpoint:
 
 ## 5. Background services & operations
 
-Beyond request handling, the API runs a few in-process jobs (started in
-`src/index.js`, configurable via `.env`):
+Beyond request handling, the API runs a few in-process jobs, started in
+`src/index.js` and configurable via `.env`:
 
 - **Reconciliation** (`services/reconcile.js`) — on boot and every
   `RECONCILE_INTERVAL_SEC` (default 30), it compares each system's stored status
@@ -110,36 +112,18 @@ Beyond request handling, the API runs a few in-process jobs (started in
   `ENABLE_NOTIFICATIONS` + `NOTIFY_WEBHOOK_URL` are set.
 
 GitHub deploy-on-push (`routes/webhook.js`) and per-app Postgres provisioning
-(`services/dbprovision-runner.js`, optional `pg`) are wired but stay behind their
-flags — both pull or run external code, so they're host-validated. See
+(`services/dbprovision-runner.js`, optional `pg`) are built and stay off behind
+their flags, since both pull or run external code. See
 [`OPERATIONS.md`](OPERATIONS.md), [`GITHUB_DEPLOYS.md`](GITHUB_DEPLOYS.md),
 [`DATABASES.md`](DATABASES.md), and [`NOTIFICATIONS.md`](NOTIFICATIONS.md).
 
-## 6. Why SQLite + nginx are still here in V1.1
+## 6. SQLite + nginx vs Postgres + Caddy
 
-The locked decisions target **Postgres** and **Caddy**. V1.1 is a *product
-shell + foundation* pass with an explicit instruction not to rush dangerous
-backend/server changes. The existing SQLite + nginx backend is fully working and
-load-bearing. Swapping the live database and reverse proxy at the same time as
-restructuring the entire UI would:
+SQLite and nginx are the current dev defaults; Postgres and Caddy are the
+production targets, both wired and pending host validation. Each was built as its
+own reviewable cutover rather than swapped in alongside everything else. The
+Server screen reports whichever components are actually in use, and never claims
+Caddy or Postgres are live when they aren't.
 
-- risk data loss / downtime with no incremental safety net,
-- couple two large migrations into one un-reviewable change,
-- precede the V1.2 deploy-engine work that actually consumes the new schema
-  (visibility, routes table) and Caddy route files.
-
-**Decision:** keep SQLite + nginx running in V1.1; do the
-Postgres and Caddy migrations as dedicated, reviewable V1.2 steps with a
-data-migration script and a route-file generator. The Server screen reports the
-real components in use (nginx, sqlite) — it never claims Caddy/Postgres are live.
-
-## 7. V1.2 migration plan (high level)
-
-1. **Postgres:** introduce a DB abstraction, add Postgres schema + migrations,
-   write a SQLite→Postgres data migration, cut over behind `POSTGRES_*` env.
-2. **Caddy:** add a `Caddyfile` + `systems.d/` generator, port the route
-   service from nginx-config writing to Caddy route files, switch the
-   compose service, keep nginx removable in one step.
-3. **Schema:** add `visibility`, `deploy_type`, explicit `routes` table.
-4. **Auth:** migrate from localStorage JWT to HTTP-only cookie sessions + CSRF
-   (see [`SECURITY.md`](SECURITY.md)).
+Still not done: migrating auth from a localStorage JWT to HTTP-only cookie
+sessions + CSRF (see [`SECURITY.md`](SECURITY.md)).

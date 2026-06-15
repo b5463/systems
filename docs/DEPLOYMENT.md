@@ -1,13 +1,14 @@
 # SYSTEMS. — Deployment (how a zip becomes a live system)
 
-> How a zip turns into a running container. Notes where the Caddy version
-> differs from the current nginx setup as it comes up.
+A zip turns into a running container through the pipeline below. The routing
+notes call out where the production Caddy proxy differs from the dev nginx setup.
 
-## Supported sources (V1 / V1.1)
+## Supported sources
 
 - Vue/Vite source zip (built to static, served from a static container)
 - Static-site zip
-- (Detected, gated for later) Node API, custom Dockerfile
+- Node API and custom Dockerfile are detected too, but stay behind their `.env`
+  flags until you enable them
 
 The build type is **auto-detected** from the archive contents:
 
@@ -50,11 +51,12 @@ upload (multipart, size-capped)
 
 ## Routing
 
-- **Today (nginx):** the API writes `nginx/conf.d/{slug}.conf` and runs
+- **Dev (nginx):** the API writes `nginx/conf.d/{slug}.conf` and runs
   `nginx -s reload` inside the proxy container.
-- **V1.2 (Caddy):** the API will write a per-system route file into `systems.d/`
-  which the main `Caddyfile` imports, then reload via the Caddy admin API
-  (localhost-only). HTTPS becomes automatic per host.
+- **Production (Caddy):** the API writes a per-system route file into
+  `systems.d/`, which the main `Caddyfile` imports, then reloads via the Caddy
+  admin API (localhost-only). HTTPS is automatic per host. This path is already
+  wired and needs the real host to confirm.
 - **Apex / primary (Caddy):** one system can be flagged primary (Settings →
   Root domain) so its route also matches the bare base domain (e.g.
   `acronym.sk`) alongside `{slug}.acronym.sk`. The dashboard always stays on
@@ -66,13 +68,13 @@ upload (multipart, size-capped)
 | --- | --- | --- |
 | Max upload | 100 MB (hard cap 500 MB in transport) | `UPLOAD_MAX_MB` |
 | Large (chunked) upload cap | 2048 MB, off unless enabled | `ENABLE_LARGE_UPLOADS` / `V2_UPLOAD_MAX_MB` |
-| Build timeout | 600s (planned enforcement) | `BUILD_TIMEOUT_SECONDS` |
-| Release retention | 3 (planned pruning) | `RELEASE_RETENTION_DEFAULT` |
+| Build timeout | 600s (enforcement not implemented yet) | `BUILD_TIMEOUT_SECONDS` |
+| Release retention | 3 (automatic pruning not implemented yet) | `RELEASE_RETENTION_DEFAULT` |
 
 ## Beyond the defaults
 
 Chunked 2 GB uploads, per-app Postgres provisioning, custom Dockerfiles, an
-in-container shell, GitHub deploy-on-push, and notifications are all **wired but
-off by default** — enable each in `.env`. Backups are built in (Server → Back up
-now, plus an optional scheduler). See [`V2_ROADMAP.md`](V2_ROADMAP.md) and the
-per-feature guides.
+in-container shell, GitHub deploy-on-push, and notifications are all built and
+wired. Each is off by default behind its `.env` flag, so turn on the ones you
+want. Backups are built in and on (Server → Back up now, plus an optional
+scheduler). See [`V2_ROADMAP.md`](V2_ROADMAP.md) and the per-feature guides.

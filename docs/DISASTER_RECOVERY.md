@@ -1,15 +1,16 @@
 # SYSTEMS. — Disaster Recovery (Windows)
 
-> What to do when something breaks, on Windows. **Don't paste secrets into any command.**
-> Tools: SYSTEMS. **Server** screen (including **Back up now** — an online
-> snapshot of the database + Caddy routes), `scripts\check-systems-health-windows.ps1`,
-> `scripts\check-firewall-windows.ps1`, `scripts\restore-systems-windows.ps1`,
-> Docker Desktop, and PowerShell.
->
-> Two backup paths exist and complement each other: the in-app online snapshot
-> (quick, consistent DB + routes; one click or `POST /api/server/backup`, and an
-> optional scheduler) and the PowerShell scripts (full-volume / offsite). Restore
-> is via `restore-systems-windows.ps1`.
+What to do when something breaks on Windows. Don't paste secrets into any command.
+
+The tools you'll reach for: the SYSTEMS. **Server** screen (including **Back up
+now**, an online snapshot of the database + Caddy routes),
+`scripts\check-systems-health-windows.ps1`, `scripts\check-firewall-windows.ps1`,
+`scripts\restore-systems-windows.ps1`, Docker Desktop, and PowerShell.
+
+Two backup paths complement each other: the in-app online snapshot (quick,
+consistent DB + routes; one click or `POST /api/server/backup`, plus an optional
+scheduler) and the PowerShell scripts (full-volume / offsite). Restore runs
+through `restore-systems-windows.ps1`.
 
 General first move for almost everything:
 ```powershell
@@ -38,7 +39,7 @@ docker ps -a
 - **Cause:** malformed generated route file.
 - **Check:** `caddy validate --config <Caddyfile>`; inspect newest `systems.d\*.caddy`.
 - **Recover:** remove/fix the offending route file; reload; restore routes from backup if needed.
-- **Prevent:** SYSTEMS. validates before reload (V1.2).
+- **Prevent:** SYSTEMS. validates the config before it reloads.
 
 ### 4. HTTPS certificates fail / not issued
 - **Symptoms:** browser TLS warning; Caddy ACME errors.
@@ -68,7 +69,7 @@ docker ps -a
 - **Recover:** Stop, fix, Redeploy or **Roll back**; raise limits if OOM.
 - **Prevent:** resource defaults + health checks.
 
-### 8. Postgres down (V1.2)
+### 8. Postgres down
 - **Symptoms:** Server DB **Not connected**; event `postgres_unavailable`.
 - **Cause:** container stopped / volume issue.
 - **Check:** `docker ps | findstr postgres`; `docker logs <pg>`.
@@ -96,7 +97,7 @@ docker ps -a
 - **Prevent:** verify after redeploy; keep ≥1 prior release.
 
 ### 12. Health check fails
-- **Symptoms:** Health not green (V1.2 health probes).
+- **Symptoms:** Health not green.
 - **Check:** system **Logs**; health path/port config.
 - **Recover:** fix app or health path; restart.
 - **Prevent:** correct health path per system.
@@ -149,7 +150,7 @@ docker ps -a
 ### 21. Accidental purge / delete
 - **Symptoms:** a system is gone.
 - **Recover:** restore from the most recent backup that still contains it.
-- **Prevent:** delete requires typing the **slug**; take a backup before destructive actions; V1.2 separates delete vs **purge** with stronger confirmation.
+- **Prevent:** delete requires typing the **slug**; take a backup before destructive actions. A separate delete-vs-**purge** split with stronger confirmation isn't built yet.
 
 ---
 

@@ -1,7 +1,7 @@
 # SYSTEMS. — Resource Limits
 
-> The limits are written and tested, and applied to every container. Docker is
-> what actually enforces them, so confirm it once on a real server.
+The limits are written, tested, and applied to every container. Docker is what
+actually enforces them, so confirm that once on a real server.
 
 ## Defaults (`.env`, applied to every system)
 | Setting | Env | Default | Docker field |
@@ -18,9 +18,9 @@ network. So one project cannot exhaust the Windows host.
 
 ## Where shown
 The **Server** screen shows the active defaults. Per-system overrides
-(CPU/memory/restart/log/disk/internal port/health path) are **planned for a
-follow-up** — the mapping accepts overrides today (`util/limits.js`) but the
-per-system UI/store is not wired.
+(CPU/memory/restart/log/disk/internal port/health path) aren't wired yet: the
+mapping already accepts overrides (`util/limits.js`), but the per-system UI and
+store don't exist.
 
 ## Verify
 `cd api && npm test` (limits: defaults, env values, per-system override).

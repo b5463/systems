@@ -1,9 +1,9 @@
 # SYSTEMS. — Windows Host Validation Checklist
 
-> Everything below **requires the real Windows machine** — it cannot be
-> validated from the repo/CI (no Docker/WSL2/Caddy/Postgres/DNS here). Repo
-> logic is unit-tested (`cd api && npm test`); dry-runs are available before any
-> mutating step.
+Everything below needs the real Windows machine to confirm. You can't validate it
+from the repo or CI: there's no Docker, WSL2, Caddy, Postgres, or DNS here. The
+repo logic is unit-tested (`cd api && npm test`), and you can dry-run any mutating
+step first.
 
 ## Dry-runs to try first (safe, change nothing)
 ```powershell
@@ -48,8 +48,8 @@ generated Caddy route (dry-run, via `POST /api/deploy/plan`) before you upload.
 - [ ] Take an in-app backup (Server → **Back up now**); confirm a timestamped
       folder appears under `BACKUP_DIR`
 - [ ] Enable two-factor on an admin, sign out, and sign back in with the code
-- [ ] Confirm gated V2 features read **Disabled** on the Server screen unless you
-      intentionally enabled them in `.env`
+- [ ] Confirm the optional features read **Disabled** on the Server screen unless
+      you intentionally enabled them in `.env`
 - [ ] Test delete (route gone, history kept)
 - [ ] Test purge (typed slug; everything removed)
 - [ ] Test backup (`backup-systems-windows.ps1`)

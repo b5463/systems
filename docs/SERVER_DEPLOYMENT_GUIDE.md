@@ -1,11 +1,10 @@
 # SYSTEMS. — Server Deployment Guide
 
-> **Production target is Windows.** The canonical, step-by-step guide is
-> **[`WINDOWS_DEPLOYMENT.md`](WINDOWS_DEPLOYMENT.md)** — start there.
->
-> This page summarizes the deployment surface and the Linux dev path.
+Production runs on Windows. The full step-by-step guide is
+[`WINDOWS_DEPLOYMENT.md`](WINDOWS_DEPLOYMENT.md); start there. This page is a
+quick map of the deployment surface plus the Linux dev path.
 
-## Windows (production) — see the canonical guide
+## Windows (production): see the canonical guide
 [`WINDOWS_DEPLOYMENT.md`](WINDOWS_DEPLOYMENT.md) covers, in order:
 Docker Desktop + WSL2 + Linux containers · nested virtualization (VPS) ·
 Caddy (service or container) · Postgres (containerized) ·
@@ -25,10 +24,10 @@ PowerShell scripts (in [`../scripts`](../scripts)):
 | `check-firewall-windows.ps1` | verify exposed/blocked ports |
 
 ## Configuration
-Copy `.env.example` → `.env`. It is **Windows-first** (paths under
-`C:\ProgramData\SYSTEMS`, Caddy/Postgres, container resource defaults, backup
-settings). Required V1.1 secrets: `JWT_SECRET`, `ENV_SECRET`, `ADMIN_USERS`,
-`CORS_ORIGIN`.
+Copy `.env.example` → `.env`. It's Windows-first: paths under
+`C:\ProgramData\SYSTEMS`, Caddy and Postgres settings, container resource
+defaults, backup settings. The secrets you must set: `JWT_SECRET`, `ENV_SECRET`,
+`ADMIN_USERS`, `CORS_ORIGIN`.
 
 ## Linux (development/secondary)
 For local dev only:
@@ -37,16 +36,17 @@ cp .env.example .env   # override Windows paths with POSIX paths
 cd api && npm install && npm run dev
 cd dashboard && npm install && npm run dev
 ```
-`docker-compose.yml` brings up the current (nginx + API) stack. The Caddy +
-Postgres production stack is finalized in V1.2.
+`docker-compose.yml` brings up the dev stack (nginx + API). nginx is the dev
+proxy. Caddy is the production proxy and is already wired; you switch to it with
+`REVERSE_PROXY=caddy` on the host.
 
 ## Security gate before exposing
 - `JWT_SECRET` / `ENV_SECRET` strong and unique; default admin password changed;
-  enable **two-factor** on each admin.
-- Only `80`/`443` public. Postgres, Docker API, Caddy admin **not** public.
+  two-factor enabled on each admin.
+- Only `80`/`443` public. Postgres, Docker API, and Caddy admin not public.
 - CORS locked to `systems.acronym.sk`.
 - Run `check-firewall-windows.ps1 -PublicIp <SERVER_IP>`.
-- Take a first backup (**Server → Back up now**); confirm restore on test data.
+- Take a first backup (Server → Back up now); confirm restore on test data.
 
 See [`SECURITY.md`](SECURITY.md), [`OPERATIONS.md`](OPERATIONS.md),
 [`UPDATE_STRATEGY.md`](UPDATE_STRATEGY.md), [`DISASTER_RECOVERY.md`](DISASTER_RECOVERY.md).
