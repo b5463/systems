@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, computed, onMounted } from 'vue'
+import { ref, watch, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '../api/client'
 import LogConsole from '../components/LogConsole.vue'
@@ -77,6 +77,7 @@ function refreshPlan() {
   }, 350)
 }
 watch([slug, visibility], refreshPlan)
+onBeforeUnmount(() => clearTimeout(planTimer))
 
 function setFile(f) {
   if (!f) return

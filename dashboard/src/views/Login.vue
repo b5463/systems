@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import SystemsLogo from '../components/SystemsLogo.vue'
@@ -9,6 +9,7 @@ const auth = useAuthStore()
 const router = useRouter()
 const route = useRoute()
 
+const codeInput = ref(null)
 const username = ref('')
 const password = ref('')
 const code = ref('')
@@ -35,6 +36,7 @@ async function submit() {
     if (e.twoFactorRequired) {
       needCode.value = true
       error.value = code.value ? 'Invalid two-factor code.' : 'Enter the 6-digit code from your authenticator.'
+      nextTick(() => codeInput.value && codeInput.value.focus())
     } else {
       error.value = e.status === 401 ? 'Invalid credentials.' : e.message || 'Sign in failed.'
     }
@@ -76,7 +78,7 @@ async function submit() {
 
           <div v-if="needCode" class="field" style="margin:0">
             <label class="label" for="c">Two-factor code</label>
-            <input aria-label="Two-factor code" id="c" v-model="code" inputmode="numeric" autocomplete="one-time-code" autofocus placeholder="123456" />
+            <input ref="codeInput" aria-label="Two-factor code" id="c" v-model="code" inputmode="numeric" autocomplete="one-time-code" placeholder="123456" />
           </div>
 
           <div v-if="error" class="error-box">{{ error }}</div>

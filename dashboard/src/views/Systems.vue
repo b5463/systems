@@ -18,8 +18,12 @@ const stats = ref({})
 const server = ref(null)
 const prevStatuses = ref({})
 let timer = null
+let loading_inflight = false
 
 async function load(silent = false) {
+  // Skip overlapping runs: a slow stats fan-out shouldn't let 5s ticks stack up.
+  if (loading_inflight) return
+  loading_inflight = true
   if (!silent) error.value = ''
   try {
     const data = await api.get('/projects')
@@ -38,6 +42,7 @@ async function load(silent = false) {
   } catch (e) {
     if (e.status !== 401) error.value = e.message || 'Failed to load systems.'
   } finally {
+    loading_inflight = false
     loading.value = false
   }
 }

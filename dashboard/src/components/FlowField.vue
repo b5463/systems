@@ -120,6 +120,8 @@ function draw() {
 }
 
 function loop(ts) {
+  // Pause when the tab is hidden — no point animating an off-screen canvas.
+  if (document.hidden) { raf = requestAnimationFrame(loop); return }
   if (ts - last > 60) { // ~16fps, calm
     t += props.speed
     draw()
@@ -128,9 +130,18 @@ function loop(ts) {
   raf = requestAnimationFrame(loop)
 }
 
+let mq = null
+function onReducedChange(e) {
+  reduced = e.matches
+  if (reduced) { if (raf) { cancelAnimationFrame(raf); raf = null } draw() }
+  else if (props.animate && !raf) raf = requestAnimationFrame(loop)
+}
+
 onMounted(() => {
   ctx = canvas.value.getContext('2d')
-  reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  mq = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)')
+  reduced = !!(mq && mq.matches)
+  if (mq && mq.addEventListener) mq.addEventListener('change', onReducedChange)
   resize() // sizes the canvas, seeds (aspect-aware), and draws
   ro = new ResizeObserver(resize)
   ro.observe(canvas.value)
@@ -140,6 +151,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   if (raf) cancelAnimationFrame(raf)
   if (ro) ro.disconnect()
+  if (mq && mq.removeEventListener) mq.removeEventListener('change', onReducedChange)
 })
 </script>
 

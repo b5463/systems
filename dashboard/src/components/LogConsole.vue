@@ -92,15 +92,23 @@ function doFit() {
   }
 }
 
-function downloadLogs() {
-  const token = encodeURIComponent(auth.token || '')
-  const url = `/api/projects/${props.slug}/logs/download?token=${token}`
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `${props.slug}-logs.txt`
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
+async function downloadLogs() {
+  // Fetch with the bearer header (not a ?token= URL) so the token never lands in
+  // browser history or server access logs, then save the blob.
+  try {
+    const res = await fetch(`/api/projects/${props.slug}/logs/download`, {
+      headers: auth.token ? { Authorization: `Bearer ${auth.token}` } : {}
+    })
+    if (!res.ok) return
+    const url = URL.createObjectURL(await res.blob())
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${props.slug}-logs.txt`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  } catch { /* ignore */ }
 }
 
 onMounted(() => {
@@ -127,7 +135,15 @@ onMounted(() => {
 watch(
   () => props.slug,
   () => {
-    if (ws) ws.close()
+    // Detach the old socket's handlers before closing so its late onclose/onerror
+    // can't flip the freshly-connecting stream's status to "ended".
+    if (ws) {
+      ws.onmessage = null
+      ws.onclose = null
+      ws.onerror = null
+      ws.close()
+      ws = null
+    }
     if (term) term.clear()
     connect()
   }
@@ -136,6 +152,8 @@ watch(
 onBeforeUnmount(() => {
   if (ws) {
     ws.onmessage = null
+    ws.onclose = null
+    ws.onerror = null
     ws.close()
     ws = null
   }

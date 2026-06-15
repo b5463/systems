@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { api } from '../api/client'
 
 const entries = ref([])
@@ -126,6 +126,7 @@ watch([filterTarget, filterUser], () => {
 })
 
 onMounted(load)
+onBeforeUnmount(() => clearTimeout(textDebounce))
 </script>
 
 <template>

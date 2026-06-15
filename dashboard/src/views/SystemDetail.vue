@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '../api/client'
 import StatusBadge from '../components/StatusBadge.vue'
@@ -83,6 +83,11 @@ const confirmDelete = ref(false)
 const deleteConfirmText = ref('')
 const deleting = ref(false)
 
+// Modal focus management refs (watchers set up after both modals are declared).
+const delInput = ref(null)
+const purgeInput = ref(null)
+let lastFocused = null
+
 function openDelete() {
   deleteConfirmText.value = ''
   confirmDelete.value = true
@@ -93,6 +98,16 @@ const confirmPurge = ref(false)
 const purgeText = ref('')
 const purging = ref(false)
 function openPurge() { purgeText.value = ''; confirmPurge.value = true }
+
+// Move focus into a dialog on open; restore to the trigger on close.
+watch(confirmDelete, (v) => {
+  if (v) { lastFocused = document.activeElement; nextTick(() => delInput.value && delInput.value.focus()) }
+  else if (lastFocused) { lastFocused.focus && lastFocused.focus(); lastFocused = null }
+})
+watch(confirmPurge, (v) => {
+  if (v) { lastFocused = document.activeElement; nextTick(() => purgeInput.value && purgeInput.value.focus()) }
+  else if (lastFocused) { lastFocused.focus && lastFocused.focus(); lastFocused = null }
+})
 async function doPurge() {
   purging.value = true; error.value = ''
   try {
@@ -700,7 +715,7 @@ onBeforeUnmount(() => {
             <div>No backup is taken automatically. Back up first if you might need this system again.</div>
           </div>
           <label class="label" style="margin:0">Type <span class="mono" style="color:var(--text)">{{ system?.slug }}</span> to confirm</label>
-          <input aria-label="Type the system slug to confirm deletion" v-model="deleteConfirmText" :placeholder="system?.slug" autocapitalize="none" autocorrect="off" />
+          <input ref="delInput" aria-label="Type the system slug to confirm deletion" v-model="deleteConfirmText" :placeholder="system?.slug" autocapitalize="none" autocorrect="off" />
           <div class="btn-row">
             <button class="btn" :disabled="deleting" @click="confirmDelete = false">Cancel</button>
             <button class="btn btn-danger" :disabled="deleting || deleteConfirmText !== system?.slug" @click="doDelete">
@@ -725,7 +740,7 @@ onBeforeUnmount(() => {
             <div>No backup is taken automatically. Back up first (see docs/DISASTER_RECOVERY.md).</div>
           </div>
           <label class="label" style="margin:0">Type <span class="mono" style="color:var(--text)">{{ system?.slug }}</span> to confirm</label>
-          <input aria-label="Type the system slug to confirm purge" v-model="purgeText" :placeholder="system?.slug" autocapitalize="none" autocorrect="off" />
+          <input ref="purgeInput" aria-label="Type the system slug to confirm purge" v-model="purgeText" :placeholder="system?.slug" autocapitalize="none" autocorrect="off" />
           <div class="btn-row">
             <button class="btn" :disabled="purging" @click="confirmPurge = false">Cancel</button>
             <button class="btn btn-danger" :disabled="purging || purgeText !== system?.slug" @click="doPurge">

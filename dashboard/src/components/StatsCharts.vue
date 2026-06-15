@@ -44,25 +44,31 @@ function fmtBytes(n) {
 
 const labels = computed(() => props.history.map((p) => p.label))
 
-const baseOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
-  animation: false,
-  interaction: { intersect: false, mode: 'index' },
-  plugins: {
-    legend: { display: false },
-    tooltip: { enabled: true }
-  },
-  scales: {
-    x: { display: false, grid: { display: false } },
-    y: {
-      beginAtZero: true,
-      grid: { color: 'rgba(255,255,255,0.06)' },
-      ticks: { color: '#8b949e', maxTicksLimit: 4 }
-    }
-  },
-  elements: { point: { radius: 0 } }
+// Each chart gets its own options object — Chart.js mutates options internally,
+// so sharing one instance across both charts causes scale/tooltip cross-talk.
+function makeOptions() {
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: false,
+    interaction: { intersect: false, mode: 'index' },
+    plugins: {
+      legend: { display: false },
+      tooltip: { enabled: true }
+    },
+    scales: {
+      x: { display: false, grid: { display: false } },
+      y: {
+        beginAtZero: true,
+        grid: { color: 'rgba(255,255,255,0.06)' },
+        ticks: { color: '#8b949e', maxTicksLimit: 4 }
+      }
+    },
+    elements: { point: { radius: 0 } }
+  }
 }
+const cpuOptions = makeOptions()
+const memOptions = makeOptions()
 
 const cpuData = computed(() => ({
   labels: labels.value,
@@ -116,7 +122,7 @@ const txVal = computed(() => (props.latest ? fmtBytes(props.latest.tx_bytes) : '
         <strong class="mono" style="color: var(--accent)">{{ cpuVal }}</strong>
       </div>
       <div style="height: 140px">
-        <Line :data="cpuData" :options="baseOptions" />
+        <Line :data="cpuData" :options="cpuOptions" />
       </div>
     </div>
 
@@ -126,7 +132,7 @@ const txVal = computed(() => (props.latest ? fmtBytes(props.latest.tx_bytes) : '
         <strong class="mono">{{ memVal }}</strong>
       </div>
       <div style="height: 140px">
-        <Line :data="memData" :options="baseOptions" />
+        <Line :data="memData" :options="memOptions" />
       </div>
     </div>
 

@@ -1,13 +1,12 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import SystemsLogo from './SystemsLogo.vue'
 import NavIcon from './NavIcon.vue'
 
 const auth = useAuthStore()
 const route = useRoute()
-const router = useRouter()
 
 // Primary navigation — the five operational surfaces.
 const nav = [
@@ -32,11 +31,6 @@ const initial = computed(() => (auth.user?.username || '?').slice(0, 1).toUpperC
 
 // Close the mobile drawer on any navigation.
 watch(() => route.fullPath, () => { drawerOpen.value = false })
-
-function go(name) {
-  if (route.name !== name) router.push({ name })
-  drawerOpen.value = false
-}
 </script>
 
 <template>
@@ -105,16 +99,16 @@ function go(name) {
             </button>
           </div>
           <nav class="sidebar-nav">
-            <a
+            <RouterLink
               v-for="item in nav"
               :key="item.name"
               class="nav-link"
-              :class="{ 'router-link-active': route.name === item.name }"
-              @click="go(item.name)"
+              :to="{ name: item.name }"
+              @click="drawerOpen = false"
             >
               <NavIcon :name="item.icon" />
               <span class="nav-label">{{ item.label }}</span>
-            </a>
+            </RouterLink>
           </nav>
           <div class="sidebar-foot">
             <div class="sidebar-user">
