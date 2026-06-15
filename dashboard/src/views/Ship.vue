@@ -3,7 +3,7 @@ import { ref, watch, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '../api/client'
 import LogConsole from '../components/LogConsole.vue'
-import AsciiChaosField from '../components/AsciiChaosField.vue'
+import FlowField from '../components/FlowField.vue'
 
 const router = useRouter()
 
@@ -128,7 +128,7 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
   <!-- BUILDING -->
   <div v-if="phase === 'building'" class="stack" style="max-width: 860px">
     <div class="brand-panel" :class="{ live: buildResult === 'done' }">
-      <AsciiChaosField :intensity="0.7" :cell="12" />
+      <FlowField :density="0.7" :alpha="0.5" :width-factor="0.026" />
       <div class="brand-panel-fade" aria-hidden="true"></div>
       <div class="spread">
         <div>

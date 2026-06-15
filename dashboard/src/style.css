@@ -1623,9 +1623,10 @@ select:focus {
   padding: 30px;
   isolation: isolate;
 }
-.brand-panel > *:not(.ascii-field):not(.brand-panel-fade) { position: relative; z-index: 1; }
-.brand-panel .ascii-field { z-index: 0; opacity: 0.6; }
-/* keep the panel's text crisp over the ASCII field */
+.brand-panel > *:not(.ascii-field):not(.flow-field):not(.brand-panel-fade) { position: relative; z-index: 1; }
+.brand-panel .ascii-field,
+.brand-panel .flow-field { z-index: 0; opacity: 0.6; }
+/* keep the panel's text crisp over the art field */
 .brand-panel-fade {
   position: absolute;
   inset: 0;

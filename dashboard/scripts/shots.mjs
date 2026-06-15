@@ -61,6 +61,7 @@ async function mock(page) {
 
 const pages = [
   { name: 'login', path: '/login', auth: false },
+  { name: 'login-tweak', path: '/login?art=tweak', auth: false },
   { name: 'systems', path: '/', auth: true },
   { name: 'ship', path: '/ship', auth: true },
   { name: 'system-detail', path: '/systems/notes', auth: true },

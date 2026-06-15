@@ -14,12 +14,14 @@ import { ref, onMounted, onBeforeUnmount } from 'vue'
 
 const props = defineProps({
   animate: { type: Boolean, default: true },
-  intensity: { type: Number, default: 1 },   // overall opacity multiplier
-  density: { type: Number, default: 1 }       // ribbon-count multiplier
+  intensity: { type: Number, default: 1 },          // opacity multiplier
+  density: { type: Number, default: 1 },            // ribbon-count multiplier
+  alpha: { type: Number, default: 0.55 },           // base stroke opacity
+  widthFactor: { type: Number, default: 0.02 },     // ribbon thickness vs min(w,h)
+  glowFactor: { type: Number, default: 0.9 },       // soft glow vs line width
+  speed: { type: Number, default: 0.012 },          // undulation speed
+  palette: { type: Array, default: () => ['#e7b6c6', '#b7c4ec', '#bfe6d3', '#ecd6c0', '#e6d4ef'] }
 })
-
-// Soft pastel palette (muted, low-saturation) — reads gentle on near-black.
-const PALETTE = ['#e7b6c6', '#b7c4ec', '#bfe6d3', '#ecd6c0', '#e6d4ef']
 
 const canvas = ref(null)
 let ctx, raf, ro
@@ -48,7 +50,7 @@ function makeSeeds() {
       seeds.push({
         x: (i + 0.5) / cols + jx - 0.09,
         y: (j + 0.5) / rows + jy - 0.09,
-        c: PALETTE[(i * rows + j) % PALETTE.length],
+        c: props.palette[(i * rows + j) % props.palette.length],
       })
     }
   }
@@ -90,7 +92,7 @@ function draw() {
   ctx.clearRect(0, 0, w, h)
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
-  const lw = Math.max(7, Math.min(w, h) * 0.02)
+  const lw = Math.max(7, Math.min(w, h) * props.widthFactor)
 
   for (const seed of seeds) {
     const pts = ribbonPath(seed, t)
@@ -99,9 +101,9 @@ function draw() {
     ctx.moveTo(pts[0][0], pts[0][1])
     for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1])
     ctx.lineWidth = lw
-    ctx.globalAlpha = Math.min(0.85, 0.55 * props.intensity)
+    ctx.globalAlpha = Math.min(0.85, props.alpha * props.intensity)
     ctx.strokeStyle = seed.c
-    ctx.shadowBlur = lw * 0.9          // soft pastel glow
+    ctx.shadowBlur = lw * props.glowFactor          // soft pastel glow
     ctx.shadowColor = seed.c
     ctx.stroke()
   }
@@ -111,7 +113,7 @@ function draw() {
 
 function loop(ts) {
   if (ts - last > 60) { // ~16fps, calm
-    t += 0.012
+    t += props.speed
     draw()
     last = ts
   }

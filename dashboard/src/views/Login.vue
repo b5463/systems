@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import SystemsLogo from '../components/SystemsLogo.vue'
@@ -8,6 +8,12 @@ import FlowField from '../components/FlowField.vue'
 const auth = useAuthStore()
 const router = useRouter()
 const route = useRoute()
+
+// Temporary A/B for art direction: ?art=tweak shows the softer variant.
+const ribbonProps = computed(() => route.query.art === 'tweak'
+  ? { alpha: 0.5, widthFactor: 0.03, glowFactor: 0.4, density: 0.75, speed: 0.008,
+      palette: ['#d6b3c0', '#aab6d2', '#b0cdbf', '#d6cab2', '#c8bcd2'] }
+  : {})
 
 const username = ref('')
 const password = ref('')
@@ -48,7 +54,7 @@ async function submit() {
   <div class="login-page">
     <!-- Organic pastel flowing-ribbon art (decorative, inert) -->
     <div class="login-art">
-      <FlowField :intensity="1" />
+      <FlowField v-bind="ribbonProps" />
     </div>
 
     <!-- Desktop brand zone -->
