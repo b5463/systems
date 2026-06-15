@@ -15,6 +15,8 @@ function features(env = process.env) {
     githubDeploys: bool(env.ENABLE_GITHUB_DEPLOYS, false),
     notifications: bool(env.ENABLE_NOTIFICATIONS, false),
     dbProvisioning: bool(env.ENABLE_DB_PROVISIONING, false),
+    largeUploads: bool(env.ENABLE_LARGE_UPLOADS, false),     // chunked/streamed uploads
+    backupScheduler: bool(env.ENABLE_BACKUP_SCHEDULER, false), // periodic auto-backup
     dbMode: (env.DB_MODE || 'shared').toLowerCase(),         // 'shared' | 'per-project'
     uploadMaxMb: Number(env.UPLOAD_MAX_MB) || 100,
     v2UploadMaxMb: Number(env.V2_UPLOAD_MAX_MB) || 2048,

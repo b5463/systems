@@ -155,6 +155,19 @@ async function serverRoutes(fastify, options) {
 
     return info;
   });
+
+  // Trigger an on-demand backup (online SQLite snapshot + Caddy routes).
+  // Always available to an authenticated admin; the periodic scheduler is
+  // gated separately behind ENABLE_BACKUP_SCHEDULER.
+  fastify.post('/api/server/backup', {
+    preHandler: [fastify.authenticate],
+    config: { rateLimit: { max: 5, timeWindow: '1 minute' } },
+  }, async (request, reply) => {
+    const backup = require('../services/backup');
+    const result = await backup.runBackup();
+    if (!result.ok) return reply.code(500).send({ error: result.error || 'Backup failed.' });
+    return { ok: true, path: result.path, pruned: result.pruned };
+  });
 }
 
 module.exports = serverRoutes;

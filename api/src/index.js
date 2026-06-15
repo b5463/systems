@@ -3,6 +3,8 @@
 const fastify = require('fastify')({ logger: true });
 const { initDefaultUsers } = require('./db');
 const { ensureIsolatedNetwork } = require('./services/docker');
+const reconcile = require('./services/reconcile');
+const backup = require('./services/backup');
 
 async function main() {
   // Register @fastify/jwt.
@@ -71,6 +73,13 @@ async function main() {
 
   // Ensure the isolated Docker network exists before accepting traffic
   await ensureIsolatedNetwork();
+
+  // Reconcile DB status against real container state on boot, then on an
+  // interval, so crashes/reboots don't leave stale "running" rows.
+  reconcile.start();
+
+  // Periodic backups (no-op unless ENABLE_BACKUP_SCHEDULER=true).
+  backup.start();
 
   // Start listening
   await fastify.listen({
