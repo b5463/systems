@@ -278,6 +278,36 @@ async function projectsRoutes(fastify, options) {
     }
   });
 
+  // Provision a dedicated Postgres database + least-privilege role for a system
+  // and stash the DATABASE_URL into its (encrypted) env, picked up on next
+  // deploy. OFF unless ENABLE_DB_PROVISIONING and a Postgres admin URL are set.
+  fastify.post('/api/projects/:slug/provision-db', {
+    preHandler: [fastify.authenticate],
+  }, async (request, reply) => {
+    const { features } = require('../util/flags');
+    if (!features().dbProvisioning) return reply.code(404).send({ error: 'Database provisioning is not enabled.' });
+
+    const { slug } = request.params;
+    const project = db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug);
+    if (!project) return reply.code(404).send({ error: 'Project not found' });
+
+    const runner = require('../services/dbprovision-runner');
+    const result = await runner.provision(slug);
+    if (!result.ok) return reply.code(503).send({ error: result.reason });
+
+    // Merge DATABASE_URL into the system's env (encrypted) for the next deploy.
+    try {
+      const env = require('./env');
+      let vars = {};
+      if (project.env_vars) { try { vars = env.decryptEnvVars(project.env_vars); } catch {} }
+      vars.DATABASE_URL = result.url;
+      db.prepare(`UPDATE projects SET env_vars = ?, updated_at = datetime('now') WHERE slug = ?`).run(env.encryptEnvVars(vars), slug);
+    } catch { /* env storage best-effort (e.g. ENV_SECRET unset) */ }
+
+    auditLog({ user_id: request.user.id, action: 'db_provisioned', target: slug, detail: result.database, ip: request.ip });
+    return { ok: true, database: result.database, user: result.user, databaseUrl: result.masked };
+  });
+
   // Map a system to a GitHub repo + branch for deploy-on-push. Setting the repo
   // does nothing until ENABLE_GITHUB_DEPLOYS is on and a webhook is configured.
   fastify.patch('/api/projects/:slug/repo', {

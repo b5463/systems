@@ -82,6 +82,15 @@ test('upload: disk fit + traversal-safe temp path + progress', () => {
   assert.equal(up.progressState({ received: 100, total: 100 }), 'assembling');
 });
 
+// ---- db provisioning runner (sql identifier safety) ----
+test('dbprovision-runner: quotes safe identifiers, rejects unsafe', () => {
+  const r = require('../src/services/dbprovision-runner');
+  assert.equal(r.quoteIdent('sys_my_app'), '"sys_my_app"');
+  assert.throws(() => r.quoteIdent('drop table users; --'));
+  assert.throws(() => r.quoteIdent('Bad-Name'));
+  assert.equal(r.quoteLiteral("a'b"), "'a''b'");
+});
+
 // ---- github webhook ----
 test('webhook: HMAC sha256 verify (constant-time) + branch filter', () => {
   const crypto = require('node:crypto');

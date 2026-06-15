@@ -23,5 +23,8 @@
     "bcrypt": "^5",
     "unzipper": "^0.12",
     "uuid": "^10"
+  },
+  "optionalDependencies": {
+    "pg": "^8"
   }
 }

@@ -19,6 +19,22 @@ async function load() {
   }
 }
 
+const backingUp = ref(false)
+const backupMsg = ref('')
+async function runBackup() {
+  backupMsg.value = ''
+  backingUp.value = true
+  try {
+    await api.post('/server/backup')
+    backupMsg.value = 'Backup created.'
+    await load()
+  } catch (e) {
+    backupMsg.value = e.message || 'Backup failed.'
+  } finally {
+    backingUp.value = false
+  }
+}
+
 // Honest status → tone + label. Never invents "online".
 function present(status) {
   switch (status) {
@@ -152,8 +168,13 @@ onMounted(load)
         <div class="conn-state"><span class="sdot" :class="disk.tone"></span>{{ disk.label }}</div>
       </div>
       <div class="conn-row">
-        <div style="flex:1"><div class="c-name">Backups</div><div class="c-sub">{{ backup.sub }}</div></div>
-        <div class="conn-state"><span class="sdot" :class="backup.tone"></span>{{ backup.label }}</div>
+        <div style="flex:1"><div class="c-name">Backups</div><div class="c-sub">{{ backupMsg || backup.sub }}</div></div>
+        <div class="row gap-sm" style="align-items:center">
+          <button class="btn btn-sm btn-ghost" :disabled="backingUp" @click="runBackup">
+            <span v-if="backingUp" class="spinner"></span><span v-else>Back up now</span>
+          </button>
+          <div class="conn-state"><span class="sdot" :class="backup.tone"></span>{{ backup.label }}</div>
+        </div>
       </div>
       <div class="conn-row">
         <div style="flex:1"><div class="c-name">Firewall</div><div class="c-sub">check-firewall-windows.ps1</div></div>
@@ -195,12 +216,13 @@ onMounted(load)
     <div v-if="info.features" class="card" style="margin-bottom: 22px">
       <div class="kv"><span class="k">Dockerfile mode</span><span class="v">{{ info.features.dockerfileMode ? 'Enabled' : 'Disabled' }}</span></div>
       <div class="kv"><span class="k">Shell console</span><span class="v">{{ info.features.shellConsole ? 'Enabled' : 'Disabled' }}</span></div>
-      <div class="kv"><span class="k">DB provisioning</span><span class="v">{{ info.features.dbProvisioning ? 'Enabled' : 'Planned' }}</span></div>
+      <div class="kv"><span class="k">DB provisioning</span><span class="v">{{ info.features.dbProvisioning ? 'Enabled' : 'Disabled' }}</span></div>
       <div class="kv"><span class="k">DB mode</span><span class="v mono">{{ info.features.dbMode }}</span></div>
-      <div class="kv"><span class="k">GitHub deploys</span><span class="v">{{ info.features.githubDeploys ? 'Enabled' : 'Planned' }}</span></div>
-      <div class="kv"><span class="k">Notifications</span><span class="v">{{ info.features.notifications ? 'Enabled' : 'Planned' }}</span></div>
+      <div class="kv"><span class="k">GitHub deploys</span><span class="v">{{ info.features.githubDeploys ? 'Enabled' : 'Disabled' }}</span></div>
+      <div class="kv"><span class="k">Large uploads</span><span class="v">{{ info.features.largeUploads ? 'Enabled' : 'Disabled' }}</span></div>
+      <div class="kv"><span class="k">Notifications</span><span class="v">{{ info.features.notifications ? 'Enabled' : 'Disabled' }}</span></div>
       <div class="kv"><span class="k">Upload limit</span><span class="v mono">{{ info.features.uploadMaxMb }} MB (V2 target {{ info.features.v2UploadMaxMb }} MB)</span></div>
-      <div class="hint">Risky features are off by default and enabled via <span class="mono">.env</span>. Large uploads, DB provisioning, GitHub deploys and notifications require Windows host validation.</div>
+      <div class="hint">These are wired but off by default; enable each in <span class="mono">.env</span> after validating on the Windows host. Pulling external code (GitHub deploys), running container shells, and provisioning databases are the higher-risk ones.</div>
     </div>
 
     <div class="callout warn">
