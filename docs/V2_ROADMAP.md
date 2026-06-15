@@ -40,9 +40,10 @@ abstraction with a real Caddy route-file generator (public / password basic-auth
 / private) selected by `REVERSE_PROXY`; the visibility model (schema, endpoint,
 deploy logic, private = no route); the health and HTTPS checker (real request,
 honest states) and its endpoint; delete-vs-purge (purge requires typing the
-slug); release-retention pruning; deploy type recorded; and the UI wiring for
-all of it (Ship visibility, System detail health/visibility/purge, Systems truth
-plus the deleted section).
+slug); deploy-history retention (old history rows trimmed; images kept for
+rollback); deploy type recorded; and the UI wiring for all of it (Ship
+visibility, System detail health/visibility/purge, Systems truth plus the
+deleted section).
 
 Other pieces from this stage:
 
@@ -65,10 +66,12 @@ Still needs the Windows host to confirm (can't be exercised without Docker):
   as a dedicated, backed-up migration).
 - Live Caddy reload/validate plus end-to-end HTTPS issuance.
 
-## V1.5 — More runtimes
+## V1.5 — More runtimes (built, host-validation pending)
 
-- Node API deploys (long-running services).
-- Custom Dockerfile support: advanced, admin-only, explicit opt-in.
+- Node API / worker deploys (long-running services): the build-and-run path is
+  in; proving it end-to-end needs the Windows host.
+- Custom Dockerfile support: built, admin-only, off by default
+  (`ENABLE_DOCKERFILE_MODE`).
 
 ## V2 — Full deployment engine
 
@@ -96,8 +99,14 @@ snapshot plus an optional Caddy routes copy) always available and an optional
 periodic scheduler (`ENABLE_BACKUP_SCHEDULER`). Container-state reconciliation
 runs on boot and on an interval, so crashes and reboots don't leave stale
 "running" rows. Admin auth supports opt-in TOTP two-factor and JWT session
-revocation via `token_version`. See [`BACKUPS.md`](BACKUPS.md),
+revocation via `token_version`. One system can be made **primary** so the bare
+root domain (e.g. `acronym.sk`) serves it while the dashboard stays on its
+subdomain (`PATCH /api/projects/:slug/primary`). See [`BACKUPS.md`](BACKUPS.md),
 [`OPERATIONS.md`](OPERATIONS.md), and [`SECURITY.md`](SECURITY.md).
+
+Engineering and product: the API is assembled by `buildApp()` and covered by
+route-level integration tests (`app.inject`) on top of the pure-logic unit tests.
+The login and empty-state art is a generated pastel ribbon field.
 
 Gated in the deploy and exec paths: Dockerfile mode (off by default, never
 silent) and the shell console (off by default). The V2 feature flags show on the
@@ -107,5 +116,61 @@ Still needs Windows host validation: the Node-API/worker container runtime plus
 Caddy reachability, Dockerfile builds, and the risky flags above run end-to-end
 on the host.
 
-Planned only: multi-server (per-node Docker/Caddy, scheduling, node health,
-route distribution). This is docs and architecture notes for now.
+## Not built yet (the honest backlog)
+
+None of this is wired today:
+
+- Auth: HTTP-only cookie sessions + CSRF (replacing the localStorage bearer
+  token), and login lockout/backoff (today there's rate limiting, not lockout).
+- Build-timeout enforcement (`BUILD_TIMEOUT_SECONDS`) and per-build ceilings.
+- Per-system resource overrides in the UI — `util/limits.js` already accepts
+  them; the store and UI don't exist yet.
+- Automated disk cleanup of old images / release files (kept for rollback today;
+  deploy-history rows are trimmed, the images aren't).
+- Persisted, editable settings in Admin (still `.env`-driven).
+- Advanced metrics history and alerting beyond the current snapshots.
+
+## v2.5 — Finish and harden the single host
+
+Theme: once the Windows host validation is done, take everything that's wired
+into something you'd trust in production on one box. Mostly closing the backlog
+above, in priority order:
+
+- **Auth hardening:** cookie sessions + CSRF, login lockout/backoff. This is the
+  main security debt and should land first.
+- **Build safety:** enforce `BUILD_TIMEOUT_SECONDS`, cap concurrent builds, and
+  add per-build resource ceilings so a bad build can't wedge the host.
+- **Per-system limits in the UI:** wire CPU/memory/PIDs/restart/log/health-path
+  overrides to the existing limits mapping.
+- **Disk hygiene:** safe, scoped pruning of old images and release files
+  (never touching a rollback target), surfaced on the Server screen with the
+  existing disk warnings.
+- **Settings out of `.env`:** DB-backed, editable settings where it's safe to.
+- **Observability:** longer metrics history, threshold alerts (disk, backup
+  overdue, health, resource pressure) routed through the existing notifications.
+- **Polish the gated features:** flip them on after host validation with the UX
+  rough edges sanded — GitHub deploy status in the UI, notification formatting
+  for Slack/Discord/email, large-upload progress.
+
+## v3 — Beyond one box
+
+Theme: from a private single-host engine to something a small team can run at
+scale. These are the real architectural leaps, each big enough to stage on its
+own:
+
+- **Multi-node:** per-node Docker + Caddy, a scheduler/placement layer, node
+  health, and route distribution across hosts.
+- **Zero-downtime deploys:** blue/green or rolling cutover gated on a health
+  check, instead of today's stop-old-then-start-new.
+- **Preview environments:** ephemeral per-branch/PR deploys, building on the
+  GitHub integration.
+- **Roles and SSO:** move past the two-admin cap to scoped roles
+  (owner/admin/viewer) and OIDC/SSO login.
+- **Secrets management:** a real per-system secrets store with rotation, beyond
+  env-var encryption.
+- **Build pipeline:** build cache, selectable runtimes/versions, and a build
+  queue/farm so deploys don't contend for the host.
+- **Backups/DR at scale:** offsite/object-storage targets, scheduled restore
+  drills, and point-in-time recovery for Postgres.
+- **API + CLI:** scoped API tokens and a `systems` CLI so CI can deploy without
+  the dashboard.
