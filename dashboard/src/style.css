@@ -1573,17 +1573,21 @@ select:focus {
     -webkit-mask-image: none;
     mask-image: none;
   }
+  /* Darken the centre band behind the brand + form so they read clearly,
+     while ribbons stay bright top and bottom — a framed composition. */
   .login-art::after {
-    background: radial-gradient(120% 70% at 50% 70%, rgba(8,8,10,0) 0%, rgba(8,8,10,0.45) 70%);
+    background: radial-gradient(125% 42% at 50% 50%,
+      rgba(8,8,10,0.82) 0%, rgba(8,8,10,0.6) 42%, rgba(8,8,10,0) 78%);
   }
 
-  /* generous top breathing room; brand and form clearly separated */
+  /* Brand + form vertically centred; ribbons frame them above and below. */
   .login-formzone {
-    padding: 13vh 24px 48px;
-    align-items: flex-start;
+    padding: 24px;
+    align-items: center;
+    justify-content: center;
     min-height: 100vh;
   }
-  .lf-mobile-brand { margin-bottom: 44px; }
+  .lf-mobile-brand { margin-bottom: 32px; }
 }
 
 /* ---------- Deploy lifecycle rail (Ship) ---------- */

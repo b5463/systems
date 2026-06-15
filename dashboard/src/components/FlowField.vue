@@ -42,8 +42,11 @@ function angleAt(nx, ny, time) {
 function makeSeeds() {
   // Jittered grid of seed points (some off-canvas so ribbons enter/exit).
   seeds = []
-  const cols = Math.round(5 * props.density)
-  const rows = Math.round(4 * props.density)
+  const cols = Math.max(3, Math.round(5 * props.density))
+  let rows = Math.max(3, Math.round(4 * props.density))
+  // Add rows on tall (portrait) canvases so ribbons fill the height instead of
+  // leaving sparse gaps — keeps roughly even coverage regardless of aspect.
+  if (h > w) rows = Math.round(rows * (h / w))
   for (let i = 0; i < cols; i++) {
     for (let j = 0; j < rows; j++) {
       const jx = (Math.sin(i * 12.9 + j * 4.1) * 0.5 + 0.5) * 0.18
@@ -65,6 +68,7 @@ function resize() {
   canvas.value.width = Math.floor(w * dpr)
   canvas.value.height = Math.floor(h * dpr)
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+  makeSeeds()   // seed count depends on the canvas aspect ratio
   draw()
 }
 
@@ -124,8 +128,7 @@ function loop(ts) {
 onMounted(() => {
   ctx = canvas.value.getContext('2d')
   reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  makeSeeds()
-  resize()
+  resize() // sizes the canvas, seeds (aspect-aware), and draws
   ro = new ResizeObserver(resize)
   ro.observe(canvas.value)
   if (props.animate && !reduced) raf = requestAnimationFrame(loop)
