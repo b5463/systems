@@ -1564,17 +1564,17 @@ select:focus {
 @media (max-width: 860px) {
   .login-page { grid-template-columns: 1fr; display: block; }
 
-  /* ASCII art becomes a small, controlled halo around the logo only —
-     dimmed, masked tight to the top-centre, and never behind the form. */
+  /* Ribbons fill the whole page on mobile (the form card is opaque, so it
+     stays readable on top). A soft scrim behind the form keeps contrast. */
   .login-art {
-    height: 40vh;
-    bottom: auto;
-    opacity: 0.82;
-    -webkit-mask-image: radial-gradient(74% 52% at 50% 28%, #000 0%, #000 20%, transparent 66%);
-    mask-image: radial-gradient(74% 52% at 50% 28%, #000 0%, #000 20%, transparent 66%);
+    inset: 0;
+    height: auto;
+    opacity: 0.7;
+    -webkit-mask-image: none;
+    mask-image: none;
   }
   .login-art::after {
-    background: linear-gradient(180deg, transparent 36%, rgba(8,8,10,0.7) 70%, var(--bg) 100%);
+    background: radial-gradient(120% 70% at 50% 70%, rgba(8,8,10,0) 0%, rgba(8,8,10,0.45) 70%);
   }
 
   /* generous top breathing room; brand and form clearly separated */
