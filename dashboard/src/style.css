@@ -1448,33 +1448,6 @@ select:focus {
 .mt { margin-top: 16px; }
 .tnum { font-variant-numeric: tabular-nums; }
 
-/* ============================================================
-   SYSTEMS. — Chaos Signal Field art layer (Art Direction pass)
-   Decorative only. Always behind content, low-opacity, monochrome,
-   pointer-events:none, and gated by prefers-reduced-motion where animated.
-   Functional UI (cards/forms/tables/logs/nav) carries NO art.
-   ============================================================ */
-
-/* Static SVG art layer, faded at the edges so it never competes with text. */
-.art-layer {
-  position: absolute;
-  inset: 0;
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: cover;
-  pointer-events: none;
-  z-index: 0;
-}
-.art-layer.ambient { opacity: 0.5; }
-.art-layer.faint { opacity: 0.32; }
-/* Static white ASCII chaos field (transparent SVG of monospace glyphs). */
-.art-ascii {
-  background-image: url('/art/ascii-field.svg');
-  background-size: cover;
-  -webkit-mask-image: radial-gradient(ellipse at center, #000 30%, transparent 80%);
-  mask-image: radial-gradient(ellipse at center, #000 30%, transparent 80%);
-}
-
 /* ---------- Empty states carry a faint ASCII field ---------- */
 .empty-block {
   position: relative;
