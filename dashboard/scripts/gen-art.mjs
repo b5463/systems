@@ -1,16 +1,14 @@
 #!/usr/bin/env node
 /**
- * SYSTEMS. — white ASCII chaos art generator.
+ * SYSTEMS. — ASCII docs-header generator.
  *
- * Static counterpart to AsciiChaosField.vue: the Tinkerbell chaotic map is
- * sampled into a monospace character grid; cell density selects the glyph.
- * The result is an abstract white-on-(transparent|black) ASCII sculpture —
- * orbital and chaotic, NOT a node/edge network diagram. No color, no readable
- * text, no fake terminal copy.
+ * The Tinkerbell chaotic map is sampled into a monospace character grid; cell
+ * density selects the glyph, producing an abstract white-on-black ASCII
+ * sculpture for the docs/README banner. (The app's own art is the pastel
+ * ribbon field — see components/FlowField.vue and scripts/gen-ribbon.mjs.)
  *
  * Run:  node scripts/gen-art.mjs
- * Emits: public/art/ascii-field.svg            (transparent, ambient/empty states)
- *        ../docs/assets/header.svg             (black panel, docs/README)
+ * Emits: ../docs/assets/header.svg             (black panel, docs/README)
  */
 import { writeFileSync, mkdirSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
@@ -82,23 +80,9 @@ function rowsToSvg(rows, { fontSize = 13, fill = '#e2e4e8', op = 1, lineH = 15, 
   return { texts, lineH }
 }
 
-// 1) Ambient transparent field — empty states / faint backdrops.
-{
-  const cols = 120, rows = 64
-  const data = asciiRows({ cols, rows, iters: 60000, a: 0.9 })
-  const fontSize = 13, lineH = 15
-  const w = cols * 7.8, h = rows * lineH + 8
-  const { texts } = rowsToSvg(data, { fontSize, lineH })
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${Math.round(w)}" height="${Math.round(h)}" viewBox="0 0 ${Math.round(w)} ${Math.round(h)}">
-<g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="${fontSize}" letter-spacing="0.5">
-${texts}
-</g>
-</svg>
-`
-  writeFileSync(resolve(ART, 'ascii-field.svg'), svg)
-}
-
-// 2) Docs/README header — black panel + white ASCII field + quiet caption.
+// Docs/README header — black panel + white ASCII field + quiet caption.
+// (App art is the pastel ribbon field — see components/FlowField.vue and
+// scripts/gen-ribbon.mjs. This ASCII header is kept for the docs banner.)
 {
   const cols = 150, rows = 21
   const data = asciiRows({ cols, rows, iters: 55000, a: 0.894 })
@@ -123,6 +107,5 @@ ${texts}
   writeFileSync(resolve(DOCS, 'header.svg'), svg)
 }
 
-console.log('SYSTEMS. ASCII art generated:')
-console.log('  public/art/ascii-field.svg   (ambient / empty states)')
+console.log('SYSTEMS. docs header generated:')
 console.log('  ../docs/assets/header.svg    (docs / README)')

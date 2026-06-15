@@ -1460,10 +1460,10 @@ select:focus {
   position: absolute;
   inset: 0;
   z-index: 0;
-  background-image: url('/art/ascii-field.svg');
+  background-image: url('/art/ribbon-field.svg');
   background-size: cover;
   background-position: center;
-  opacity: 0.22;
+  opacity: 0.3;
   pointer-events: none;
   -webkit-mask-image: radial-gradient(ellipse at center, #000 14%, transparent 74%);
   mask-image: radial-gradient(ellipse at center, #000 14%, transparent 74%);
@@ -1600,8 +1600,7 @@ select:focus {
   padding: 30px;
   isolation: isolate;
 }
-.brand-panel > *:not(.ascii-field):not(.flow-field):not(.brand-panel-fade) { position: relative; z-index: 1; }
-.brand-panel .ascii-field,
+.brand-panel > *:not(.flow-field):not(.brand-panel-fade) { position: relative; z-index: 1; }
 .brand-panel .flow-field { z-index: 0; opacity: 0.6; }
 /* keep the panel's text crisp over the art field */
 .brand-panel-fade {
