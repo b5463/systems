@@ -1,22 +1,25 @@
-// Generate a static pastel ribbon-field SVG from the same flow-field algorithm
-// as components/FlowField.vue, used as the faint texture behind empty states
-// (so empty states match the login art). Output: public/art/ribbon-field.svg
-import fs from 'fs'
-import path from 'path'
+// Generate the pastel ribbon-field art (matching components/FlowField.vue) as
+// static SVGs:
+//   - public/art/ribbon-field.svg   transparent, faint texture behind empty states
+//   - ../docs/assets/header.svg     black banner for the docs / README header
+import { writeFileSync, mkdirSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
-const W = 1200, H = 600
+const __dirname = dirname(fileURLToPath(import.meta.url))
+const ART = resolve(__dirname, '../public/art')
+const DOCS = resolve(__dirname, '../../docs/assets')
+
 const PALETTE = ['#d6b3c0', '#aab6d2', '#b0cdbf', '#d6cab2', '#c8bcd2']
 
-// Same curl-like field as FlowField.
+// Same curl-like flow field as FlowField.vue.
 function angleAt(nx, ny) {
   const x = nx * 3.0, y = ny * 3.0
-  const a =
-    Math.sin(x * 1.3 + Math.cos(y * 0.7) * 1.5) +
-    Math.sin(y * 1.1 - Math.cos(x * 0.9) * 1.3)
-  return a * Math.PI
+  return (Math.sin(x * 1.3 + Math.cos(y * 0.7) * 1.5) +
+          Math.sin(y * 1.1 - Math.cos(x * 0.9) * 1.3)) * Math.PI
 }
 
-function ribbonPath(sx, sy) {
+function ribbonPath(sx, sy, W, H) {
   const STEP = 0.006, STEPS = 150
   const pts = []
   for (const dir of [1, -1]) {
@@ -35,29 +38,61 @@ function ribbonPath(sx, sy) {
   return pts
 }
 
-const cols = 6, rows = 4
-const paths = []
-for (let i = 0; i < cols; i++) {
-  for (let j = 0; j < rows; j++) {
-    const jx = (Math.sin(i * 12.9 + j * 4.1) * 0.5 + 0.5) * 0.18
-    const jy = (Math.sin(i * 3.7 + j * 7.3) * 0.5 + 0.5) * 0.18
-    const sx = (i + 0.5) / cols + jx - 0.09
-    const sy = (j + 0.5) / rows + jy - 0.09
-    const pts = ribbonPath(sx, sy)
-    if (pts.length < 3) continue
-    const d = 'M' + pts.map((p) => `${p[0]} ${p[1]}`).join(' L')
-    paths.push(`<path d="${d}" stroke="${PALETTE[(i * rows + j) % PALETTE.length]}"/>`)
+function buildPaths(W, H, cols, rows) {
+  const out = []
+  for (let i = 0; i < cols; i++) {
+    for (let j = 0; j < rows; j++) {
+      const jx = (Math.sin(i * 12.9 + j * 4.1) * 0.5 + 0.5) * 0.18
+      const jy = (Math.sin(i * 3.7 + j * 7.3) * 0.5 + 0.5) * 0.18
+      const pts = ribbonPath((i + 0.5) / cols + jx - 0.09, (j + 0.5) / rows + jy - 0.09, W, H)
+      if (pts.length < 3) continue
+      const d = 'M' + pts.map((p) => `${p[0]} ${p[1]}`).join(' L')
+      out.push(`<path d="${d}" stroke="${PALETTE[(i * rows + j) % PALETTE.length]}"/>`)
+    }
   }
+  return out
 }
 
-const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid slice">
+// 1) Transparent ribbon field for empty states.
+{
+  const W = 1200, H = 600
+  const paths = buildPaths(W, H, 6, 4)
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid slice">
 <defs><filter id="soft" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur stdDeviation="2.5"/></filter></defs>
 <g filter="url(#soft)" fill="none" stroke-width="16" stroke-linecap="round" stroke-linejoin="round" opacity="0.85">
 ${paths.join('\n')}
 </g>
 </svg>
 `
+  mkdirSync(ART, { recursive: true })
+  writeFileSync(resolve(ART, 'ribbon-field.svg'), svg)
+}
 
-const out = path.join(process.cwd(), 'public', 'art', 'ribbon-field.svg')
-fs.writeFileSync(out, svg)
-console.log('wrote', out, `(${paths.length} ribbons, ${svg.length} bytes)`)
+// 2) Docs / README header banner — black panel, ribbons, fade, title + caption.
+{
+  const W = 1280, H = 320
+  const paths = buildPaths(W, H, 10, 3)
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+<rect width="${W}" height="${H}" fill="#0a0a0c"/>
+<defs>
+  <filter id="soft" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur stdDeviation="3"/></filter>
+  <linearGradient id="fade" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0.35" stop-color="#0a0a0c" stop-opacity="0"/>
+    <stop offset="1" stop-color="#0a0a0c" stop-opacity="0.82"/>
+  </linearGradient>
+</defs>
+<g filter="url(#soft)" fill="none" stroke-width="18" stroke-linecap="round" stroke-linejoin="round" opacity="0.7">
+${paths.join('\n')}
+</g>
+<rect width="${W}" height="${H}" fill="url(#fade)"/>
+<text x="44" y="250" font-family="-apple-system, system-ui, Segoe UI, sans-serif" font-size="44" font-weight="700" letter-spacing="2" fill="#ececee">SYSTEMS.</text>
+<text x="48" y="282" font-family="-apple-system, system-ui, Segoe UI, sans-serif" font-size="18" fill="#9296a0">Deployment engine</text>
+</svg>
+`
+  mkdirSync(DOCS, { recursive: true })
+  writeFileSync(resolve(DOCS, 'header.svg'), svg)
+}
+
+console.log('SYSTEMS. ribbon art generated:')
+console.log('  public/art/ribbon-field.svg   (empty states)')
+console.log('  ../docs/assets/header.svg     (docs / README)')

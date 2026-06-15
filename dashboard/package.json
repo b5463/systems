@@ -8,8 +8,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "gen:art": "node scripts/gen-art.mjs",
-    "gen:ribbon": "node scripts/gen-ribbon.mjs",
+    "gen:art": "node scripts/gen-ribbon.mjs",
     "shots": "node scripts/shots.mjs"
   },
   "dependencies": {

@@ -77,6 +77,13 @@ Visibility drives routing:
 | Password protected | Public route + basic auth (V1.2, if safe) |
 | Private / internal | **No public route** |
 
+One system can also be flagged **primary**: its Caddy route then matches both
+`{slug}.{base}` and the bare apex `{base}` (e.g. `acronym.sk`) in the same site
+block, so the root domain serves it (typically a portfolio). The dashboard
+always stays on `systems.{base}`. Only one system is primary at a time, and a
+private system can't be (no public route to serve). Endpoint:
+`PATCH /api/projects/:slug/primary`.
+
 ## 4. Deploy pipeline (today)
 
 `upload → zip-slip-safe extract → detect type → generate Dockerfile (if needed)

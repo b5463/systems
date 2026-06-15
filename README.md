@@ -25,9 +25,14 @@ there's no public sign-up. It's not a service you'd hand to other people.
 
 | Domain | Purpose |
 | --- | --- |
-| `acronym.sk` | Public portfolio (separate from SYSTEMS.) |
+| `acronym.sk` | The **primary** system — whichever one you flag to serve the bare root domain (e.g. your portfolio) |
 | `systems.acronym.sk` | The SYSTEMS. dashboard |
-| `{slug}.acronym.sk` | A deployed system (e.g. `notes.acronym.sk`) |
+| `{slug}.acronym.sk` | Each deployed system at its own subdomain (e.g. `notes.acronym.sk`) |
+
+Every system always gets its `{slug}.acronym.sk` subdomain. You can additionally
+mark **one** system as primary (System detail → Settings → Root domain) so it's
+also served at the bare `acronym.sk`. The dashboard always stays on
+`systems.acronym.sk`. A private system can't be primary (it has no public route).
 
 DNS is configured **manually in Websupport** with a wildcard; SYSTEMS. does not
 automate DNS. Assume these records exist:
@@ -85,7 +90,8 @@ server. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and the
   SYSTEMS. itself is holding up; "back up now" and a notification test.
 - **Admin** — profile, password, two-factor, sessions, second admin, limits.
 - **System detail** — overview, deployments, logs, metrics, console, settings
-  (env vars, visibility, and — when enabled — repo mapping and DB provisioning).
+  (env vars, visibility, root-domain toggle, and — when enabled — repo mapping
+  and DB provisioning).
 
 ## Run locally
 
@@ -103,6 +109,56 @@ Run the tests:
 ```bash
 cd api && npm test               # unit + route/integration tests (app.inject)
 ```
+
+## Configuration
+
+Everything is set in `.env` (copy from [`.env.example`](.env.example)). The keys
+you actually need to run:
+
+| Key | What it's for |
+| --- | --- |
+| `JWT_SECRET` | Signs admin session tokens. Long random string. |
+| `ENV_SECRET` | AES-256-GCM key encrypting per-system env vars at rest. |
+| `ADMIN_USERS` | First admin(s), `user:password` (two max, no public signup). |
+| `BASE_DOMAIN` | Root domain (e.g. `acronym.sk`). |
+| `CORS_ORIGIN` | Locked to the dashboard origin. |
+| `REVERSE_PROXY` | `caddy` (production) or `nginx` (dev default). |
+| `RECONCILE_INTERVAL_SEC` | How often status is reconciled against Docker (0 disables). |
+
+Risky/extra capabilities are **off by default** and opt-in per flag:
+
+| Flag | Enables |
+| --- | --- |
+| `ENABLE_LARGE_UPLOADS` | Chunked uploads up to `V2_UPLOAD_MAX_MB`. |
+| `ENABLE_DOCKERFILE_MODE` | Building archives that ship their own Dockerfile. |
+| `ENABLE_SHELL_CONSOLE` | Interactive in-container shell. |
+| `ENABLE_DB_PROVISIONING` | Per-app Postgres database + role (needs `pg` + `POSTGRES_ADMIN_URL`). |
+| `ENABLE_GITHUB_DEPLOYS` | Deploy-on-push webhook (needs `GITHUB_WEBHOOK_SECRET`). |
+| `ENABLE_NOTIFICATIONS` | Outbound webhook alerts (needs `NOTIFY_WEBHOOK_URL`). |
+| `ENABLE_BACKUP_SCHEDULER` | Periodic backups (manual backup is always available). |
+
+## Project layout
+
+```
+api/         Fastify API — auth, deploy pipeline, lifecycle, routing, logs,
+             metrics, audit, reconciliation, backups, gated V2 routes
+  src/app.js   buildApp() — assembles the app (injectable in tests)
+  src/routes/  HTTP/WS endpoints           src/services/  docker, proxy, caddy,
+  src/util/    pure, unit-tested helpers                  nginx, health, backup,
+  test/        node:test unit + integration               notify, reconcile
+dashboard/   Vue 3 + Vite PWA (views, components, stores); scripts/ generates art
+scripts/     Windows PowerShell ops (setup, deploy, backup, restore, update, checks)
+docs/        Architecture, deployment, security, operations, per-feature guides
+```
+
+## Operations
+
+- **Status stays honest** — reconciliation corrects each system against real
+  Docker state on boot and every `RECONCILE_INTERVAL_SEC`.
+- **Backups** — "Back up now" on the Server screen (or `POST /api/server/backup`)
+  takes an online SQLite snapshot + Caddy routes; turn on the scheduler for
+  periodic runs. Full-volume/offsite backups use the PowerShell scripts.
+- **Recovery** — see [`docs/DISASTER_RECOVERY.md`](docs/DISASTER_RECOVERY.md).
 
 ## Production (Windows)
 
