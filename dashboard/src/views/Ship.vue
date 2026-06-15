@@ -187,15 +187,11 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
       <div class="card stack">
         <div class="section-label">Build</div>
         <div class="hint">Auto-detected from the archive — Vue/Vite, static, Node, or Dockerfile.</div>
-        <div class="field" style="margin:0">
-          <label class="label">Build command</label>
-          <input aria-label="auto" value="" placeholder="auto" disabled />
+        <div class="detect-row">
+          <span class="kv"><span class="k">Build command</span><span class="v dim">Auto</span></span>
+          <span class="kv"><span class="k">Output folder</span><span class="v dim">Detected</span></span>
         </div>
-        <div class="field" style="margin:0">
-          <label class="label">Output folder</label>
-          <input aria-label="detected" value="" placeholder="detected" disabled />
-        </div>
-        <div class="hint">Overrides are planned.</div>
+        <div class="hint">Custom build overrides are planned.</div>
       </div>
 
       <div class="card stack">

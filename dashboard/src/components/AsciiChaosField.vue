@@ -62,7 +62,7 @@ function draw() {
   // `a` drifts slowly around 0.9 → the attractor morphs (the moving animation).
   const a = 0.9 + Math.sin(t * 0.12) * 0.009
   const { b, c, d, x0, y0 } = TB
-  const iters = Math.min(20000, cols * rows * 4)
+  const iters = Math.min(48000, cols * rows * 6)
   const WARM = 100
 
   // pass 1 — find the attractor's bounds so it always fits the canvas.
@@ -105,7 +105,7 @@ function draw() {
       if (!v) continue
       const dens = Math.log(v + 1) * norm           // 0..1
       const lvl = Math.min(RAMP.length - 1, Math.floor(dens * RAMP.length))
-      const alpha = Math.min(0.6, 0.1 + dens * 0.62) * props.intensity
+      const alpha = Math.min(0.82, 0.16 + dens * 0.72) * props.intensity
       // near-white, drifting toward cool gray at low density
       const g = 232 + Math.round(dens * 12)
       ctx.fillStyle = `rgba(${g},${g},${g + 2},${alpha.toFixed(3)})`

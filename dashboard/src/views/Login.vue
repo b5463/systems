@@ -48,7 +48,7 @@ async function submit() {
   <div class="login-page">
     <!-- White ASCII chaos art (decorative, inert) -->
     <div class="login-art">
-      <AsciiChaosField :intensity="0.8" :cell="14" />
+      <AsciiChaosField :intensity="1.05" :cell="13" />
     </div>
 
     <!-- Desktop brand zone -->

@@ -194,7 +194,7 @@ onMounted(loadUsers)
           </div>
         </div>
         <div class="kv"><span class="k">Role</span><span class="v">Admin (full access)</span></div>
-        <div class="kv"><span class="k">Platform</span><span class="v mono small">SYSTEMS. · repo-ready</span></div>
+        <div class="kv"><span class="k">Platform</span><span class="v mono small">SYSTEMS. · self-hosted</span></div>
       </div>
 
       <!-- Change password -->
