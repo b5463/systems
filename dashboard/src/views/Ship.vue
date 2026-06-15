@@ -142,11 +142,11 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
         <div class="section-label">System</div>
         <div class="field" style="margin:0">
           <label class="label" for="name">Name</label>
-          <input id="name" v-model="name" placeholder="Notes API" autocorrect="off" />
+          <input aria-label="Notes API" id="name" v-model="name" placeholder="Notes API" autocorrect="off" />
         </div>
         <div class="field" style="margin:0">
           <label class="label" for="slug">Slug</label>
-          <input id="slug" :value="slug" placeholder="notes" autocapitalize="none" autocorrect="off" @input="onSlugInput" />
+          <input aria-label="notes" id="slug" :value="slug" placeholder="notes" autocapitalize="none" autocorrect="off" @input="onSlugInput" />
         </div>
         <div class="field" style="margin:0">
           <label class="label">Public URL</label>
@@ -167,11 +167,11 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
         <div class="hint">Auto-detected from the archive — Vue/Vite, static, Node, or Dockerfile.</div>
         <div class="field" style="margin:0">
           <label class="label">Build command</label>
-          <input value="" placeholder="auto" disabled />
+          <input aria-label="auto" value="" placeholder="auto" disabled />
         </div>
         <div class="field" style="margin:0">
           <label class="label">Output folder</label>
-          <input value="" placeholder="detected" disabled />
+          <input aria-label="detected" value="" placeholder="detected" disabled />
         </div>
         <div class="hint">Overrides are planned.</div>
       </div>

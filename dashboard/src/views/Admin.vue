@@ -136,9 +136,9 @@ onMounted(loadUsers)
       <!-- Change password -->
       <div class="card stack">
         <div class="section-label">Change password</div>
-        <input v-model="currentPassword" type="password" placeholder="Current password" autocomplete="current-password" />
-        <input v-model="newPassword" type="password" placeholder="New password (min 8 chars)" autocomplete="new-password" />
-        <input v-model="confirmPassword" type="password" placeholder="Confirm new password" autocomplete="new-password" />
+        <input aria-label="Current password" v-model="currentPassword" type="password" placeholder="Current password" autocomplete="current-password" />
+        <input aria-label="New password (min 8 chars)" v-model="newPassword" type="password" placeholder="New password (min 8 chars)" autocomplete="new-password" />
+        <input aria-label="Confirm new password" v-model="confirmPassword" type="password" placeholder="Confirm new password" autocomplete="new-password" />
         <div v-if="pwError" class="error-box">{{ pwError }}</div>
         <div v-else-if="pwMsg" class="notice">{{ pwMsg }}</div>
         <button class="btn btn-primary btn-block" :disabled="pwSaving" @click="changePassword">
@@ -195,8 +195,8 @@ onMounted(loadUsers)
           <!-- Add form -->
           <div v-if="showAddForm" class="stack" style="gap:8px; margin-top:6px">
             <div class="label" style="margin:0">New admin</div>
-            <input v-model="newUsername" placeholder="username" autocapitalize="none" autocorrect="off" />
-            <input v-model="newUserPassword" type="password" placeholder="password (min 8 chars)" autocomplete="new-password" />
+            <input aria-label="username" v-model="newUsername" placeholder="username" autocapitalize="none" autocorrect="off" />
+            <input aria-label="password (min 8 chars)" v-model="newUserPassword" type="password" placeholder="password (min 8 chars)" autocomplete="new-password" />
             <div v-if="addUserError" class="error-box">{{ addUserError }}</div>
             <div class="btn-row">
               <button class="btn btn-sm" @click="showAddForm = false">Cancel</button>

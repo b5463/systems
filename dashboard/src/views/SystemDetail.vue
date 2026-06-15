@@ -318,14 +318,23 @@ async function fetchOverviewStat() {
   try { overviewStat.value = await api.get(`/projects/${props.slug}/stats`) } catch { /* best-effort */ }
 }
 
+function onKeydown(e) {
+  if (e.key === 'Escape') {
+    if (confirmDelete.value) confirmDelete.value = false
+    if (confirmPurge.value) confirmPurge.value = false
+  }
+}
+
 onMounted(async () => {
   await loadSystem()
   fetchOverviewStat()
   document.addEventListener('visibilitychange', onVisibility)
+  document.addEventListener('keydown', onKeydown)
 })
 onBeforeUnmount(() => {
   stopStats()
   document.removeEventListener('visibilitychange', onVisibility)
+  document.removeEventListener('keydown', onKeydown)
 })
 </script>
 
@@ -524,8 +533,8 @@ onBeforeUnmount(() => {
       <div class="card stack">
         <div class="section-label">Add / update variables</div>
         <div v-for="(row, i) in envVars" :key="i" class="row">
-          <input v-model="row.key" placeholder="KEY" autocapitalize="characters" autocorrect="off" />
-          <input v-model="row.value" placeholder="value" autocorrect="off" />
+          <input aria-label="KEY" v-model="row.key" placeholder="KEY" autocapitalize="characters" autocorrect="off" />
+          <input aria-label="value" v-model="row.value" placeholder="value" autocorrect="off" />
           <button class="iconbtn" aria-label="Remove" @click="removeEnvRow(i)">✕</button>
         </div>
         <button class="btn btn-sm" @click="addEnvRow">+ Add row</button>
@@ -544,8 +553,8 @@ onBeforeUnmount(() => {
           <button type="button" :class="{ active: system.visibility === 'password' }" :disabled="visSaving" @click="setVisibility('password')">Password</button>
         </div>
         <div v-if="system.visibility === 'password'" class="small muted">Protected. Update the credentials below to rotate.</div>
-        <input v-model="visUser" placeholder="basic-auth username" autocapitalize="none" autocorrect="off" />
-        <input v-model="visPass" type="password" placeholder="basic-auth password" autocomplete="new-password" />
+        <input aria-label="basic-auth username" v-model="visUser" placeholder="basic-auth username" autocapitalize="none" autocorrect="off" />
+        <input aria-label="basic-auth password" v-model="visPass" type="password" placeholder="basic-auth password" autocomplete="new-password" />
         <div class="hint">Public: open route. Private: no public route. Password: Caddy basic auth (hashed).</div>
       </div>
 
@@ -566,8 +575,8 @@ onBeforeUnmount(() => {
   <Teleport to="body">
     <Transition name="fade">
       <div v-if="confirmDelete" class="modal-backdrop" @click.self="confirmDelete = false">
-        <div class="modal stack">
-          <h3>Delete this system?</h3>
+        <div class="modal stack" role="dialog" aria-modal="true" aria-labelledby="del-title">
+          <h3 id="del-title">Delete this system?</h3>
           <p class="muted small" style="margin:0">
             This permanently removes <strong>{{ system?.name }}</strong>, its container, image and
             public route. This cannot be undone.
@@ -577,7 +586,7 @@ onBeforeUnmount(() => {
             <div>No backup is taken automatically. Back up first if you might need this system again.</div>
           </div>
           <label class="label" style="margin:0">Type <span class="mono" style="color:var(--text)">{{ system?.slug }}</span> to confirm</label>
-          <input v-model="deleteConfirmText" :placeholder="system?.slug" autocapitalize="none" autocorrect="off" />
+          <input aria-label="Type the system slug to confirm deletion" v-model="deleteConfirmText" :placeholder="system?.slug" autocapitalize="none" autocorrect="off" />
           <div class="btn-row">
             <button class="btn" :disabled="deleting" @click="confirmDelete = false">Cancel</button>
             <button class="btn btn-danger" :disabled="deleting || deleteConfirmText !== system?.slug" @click="doDelete">
@@ -591,8 +600,8 @@ onBeforeUnmount(() => {
     <!-- Purge confirm -->
     <Transition name="fade">
       <div v-if="confirmPurge" class="modal-backdrop" @click.self="confirmPurge = false">
-        <div class="modal stack">
-          <h3>Purge this system?</h3>
+        <div class="modal stack" role="dialog" aria-modal="true" aria-labelledby="purge-title">
+          <h3 id="purge-title">Purge this system?</h3>
           <p class="muted small" style="margin:0">
             This permanently removes <strong>{{ system?.name }}</strong> — container, images, route,
             release files and all records. This cannot be undone.
@@ -602,7 +611,7 @@ onBeforeUnmount(() => {
             <div>No backup is taken automatically. Back up first (see docs/DISASTER_RECOVERY.md).</div>
           </div>
           <label class="label" style="margin:0">Type <span class="mono" style="color:var(--text)">{{ system?.slug }}</span> to confirm</label>
-          <input v-model="purgeText" :placeholder="system?.slug" autocapitalize="none" autocorrect="off" />
+          <input aria-label="Type the system slug to confirm purge" v-model="purgeText" :placeholder="system?.slug" autocapitalize="none" autocorrect="off" />
           <div class="btn-row">
             <button class="btn" :disabled="purging" @click="confirmPurge = false">Cancel</button>
             <button class="btn btn-danger" :disabled="purging || purgeText !== system?.slug" @click="doPurge">

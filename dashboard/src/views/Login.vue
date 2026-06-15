@@ -56,11 +56,11 @@ async function submit() {
         <form class="card stack login-card" @submit.prevent="submit">
           <div class="field" style="margin:0">
             <label class="label" for="u">Administrator</label>
-            <input id="u" v-model="username" autocomplete="username" autocapitalize="none" autocorrect="off" placeholder="username" />
+            <input aria-label="username" id="u" v-model="username" autocomplete="username" autocapitalize="none" autocorrect="off" placeholder="username" />
           </div>
           <div class="field" style="margin:0">
             <label class="label" for="p">Password</label>
-            <input id="p" v-model="password" type="password" autocomplete="current-password" placeholder="••••••••" />
+            <input aria-label="••••••••" id="p" v-model="password" type="password" autocomplete="current-password" placeholder="••••••••" />
           </div>
 
           <div v-if="error" class="error-box">{{ error }}</div>

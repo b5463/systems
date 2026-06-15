@@ -1696,3 +1696,16 @@ select:focus {
 
 /* Section labels inside a .stack rely on the stack gap (no extra margin). */
 .stack > .section-label { margin-bottom: 0; }
+
+/* ============================================================
+   Accessibility — visible keyboard focus (WCAG 2.4.7)
+   Mouse users see nothing extra; keyboard users get a clear ring.
+   ============================================================ */
+:where(a, button, .btn, .nav-link, .card-tap, .tabs button, .segmented button,
+        .iconbtn, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-xs);
+}
+/* don't double up: inputs already show a focus ring via box-shadow */
+input:focus-visible, textarea:focus-visible, select:focus-visible { outline: none; }

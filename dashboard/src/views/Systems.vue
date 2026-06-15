@@ -153,7 +153,7 @@ onBeforeUnmount(() => clearInterval(timer))
 
     <!-- Latest deploy + server mini-status, side by side on desktop -->
     <div class="grid grid-2" style="margin-bottom: 22px; align-items:stretch">
-      <div v-if="latest" class="card card-tap" @click="open(latest)">
+      <div v-if="latest" class="card card-tap" role="button" tabindex="0" @click="open(latest)" @keydown.enter="open(latest)" @keydown.space.prevent="open(latest)">
         <div class="section-label">Latest deploy</div>
         <div class="spread">
           <div style="min-width:0"><div class="sc-name">{{ latest.name }}</div><div class="mono small dim">{{ hostFor(latest.slug) }}</div></div>
@@ -175,7 +175,7 @@ onBeforeUnmount(() => clearInterval(timer))
     <!-- All systems -->
     <div class="section-label">All systems · {{ active.length }}</div>
     <div class="grid grid-auto">
-      <div v-for="s in active" :key="s.id" class="card card-tap sys-card" @click="open(s)">
+      <div v-for="s in active" :key="s.id" class="card card-tap sys-card" role="button" tabindex="0" :aria-label="`Open ${s.name}`" @click="open(s)" @keydown.enter="open(s)" @keydown.space.prevent="open(s)">
         <div class="sc-top">
           <div style="min-width:0">
             <div class="sc-name">{{ s.name }}</div>
@@ -205,7 +205,7 @@ onBeforeUnmount(() => clearInterval(timer))
     <template v-if="deleted.length">
       <div class="section-label" style="margin-top:22px">Deleted · {{ deleted.length }}</div>
       <div class="card" style="padding:0">
-        <div v-for="s in deleted" :key="s.id" class="conn-row" style="cursor:pointer" @click="open(s)">
+        <div v-for="s in deleted" :key="s.id" class="conn-row" style="cursor:pointer" role="button" tabindex="0" :aria-label="`Open ${s.name}`" @click="open(s)" @keydown.enter="open(s)" @keydown.space.prevent="open(s)">
           <div style="flex:1; min-width:0"><div class="c-name">{{ s.name }}</div><div class="c-sub mono">{{ hostFor(s.slug) }}</div></div>
           <span class="small dim">deleted · purge to remove</span>
         </div>
