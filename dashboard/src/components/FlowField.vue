@@ -97,7 +97,10 @@ function draw() {
   ctx.clearRect(0, 0, w, h)
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
-  const lw = Math.max(7, Math.min(w, h) * props.widthFactor)
+  // On portrait (narrow) screens the min dimension is the width, which makes
+  // ribbons read thin — boost thickness so they stay bold like the reference.
+  const portraitBoost = h > w ? 1.55 : 1
+  const lw = Math.max(9, Math.min(w, h) * props.widthFactor * portraitBoost)
 
   for (const seed of seeds) {
     const pts = ribbonPath(seed, t)
