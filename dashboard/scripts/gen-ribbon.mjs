@@ -93,6 +93,34 @@ ${paths.join('\n')}
   writeFileSync(resolve(DOCS, 'header.svg'), svg)
 }
 
+// 3) GitHub social preview card (1280x640) — ribbons + wordmark + tagline.
+{
+  const W = 1280, H = 640
+  const paths = buildPaths(W, H, 9, 5)
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+<rect width="${W}" height="${H}" fill="#0a0a0c"/>
+<defs>
+  <filter id="soft" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur stdDeviation="3.5"/></filter>
+  <radialGradient id="vig" cx="50%" cy="52%" r="62%">
+    <stop offset="0.35" stop-color="#0a0a0c" stop-opacity="0.78"/>
+    <stop offset="1" stop-color="#0a0a0c" stop-opacity="0.18"/>
+  </radialGradient>
+</defs>
+<g filter="url(#soft)" fill="none" stroke-width="20" stroke-linecap="round" stroke-linejoin="round" opacity="0.7">
+${paths.join('\n')}
+</g>
+<rect width="${W}" height="${H}" fill="url(#vig)"/>
+<g font-family="-apple-system, system-ui, Segoe UI, sans-serif" text-anchor="middle">
+  <text x="640" y="316" font-size="84" font-weight="800" letter-spacing="3" fill="#ececee">SYSTEMS.</text>
+  <text x="640" y="368" font-size="27" fill="#cfd2d8">Your own deployment engine — zip in, live URL out.</text>
+  <text x="640" y="412" font-size="18" letter-spacing="1.5" fill="#9296a0">self-hosted · admin-only · Vue + Fastify · HTTPS</text>
+</g>
+</svg>
+`
+  writeFileSync(resolve(DOCS, 'social-preview.svg'), svg)
+}
+
 console.log('SYSTEMS. ribbon art generated:')
-console.log('  public/art/ribbon-field.svg   (empty states)')
-console.log('  ../docs/assets/header.svg     (docs / README)')
+console.log('  public/art/ribbon-field.svg     (empty states)')
+console.log('  ../docs/assets/header.svg       (docs / README)')
+console.log('  ../docs/assets/social-preview.svg (GitHub social card)')

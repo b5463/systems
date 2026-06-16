@@ -4,6 +4,8 @@
 
 # SYSTEMS.
 
+<p align="center"><em>Your own deployment engine — zip in, live URL out.</em></p>
+
 <p align="center">
   <a href="https://github.com/b5463/systems/actions/workflows/ci.yml"><img src="https://github.com/b5463/systems/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
   <img src="https://img.shields.io/badge/version-2.0.0--rc.1-5fb0d4" alt="version" />
@@ -278,3 +280,17 @@ the production target.
 - [`docs/WINDOWS_VALIDATION_CHECKLIST.md`](docs/WINDOWS_VALIDATION_CHECKLIST.md) — host validation steps
 - [`docs/V2_ROADMAP.md`](docs/V2_ROADMAP.md) — where this came from and where it's going
 - Optional features (off by default): [`DATABASES`](docs/DATABASES.md) · [`LARGE_UPLOADS`](docs/LARGE_UPLOADS.md) · [`DOCKERFILE_MODE`](docs/DOCKERFILE_MODE.md) · [`WORKERS`](docs/WORKERS.md) · [`GITHUB_DEPLOYS`](docs/GITHUB_DEPLOYS.md) · [`NOTIFICATIONS`](docs/NOTIFICATIONS.md) · [`SHELL_CONSOLE`](docs/SHELL_CONSOLE.md)
+
+## License
+
+[MIT](LICENSE) © Acronym ([acronym.sk](https://acronym.sk)). Use it, fork it,
+ship it — it's yours.
+
+---
+
+<p align="center">
+  <strong>⭐ Star this repo</strong> if SYSTEMS. is useful — it helps other
+  self-hosters find it.
+  <br />
+  <sub>Built with Vue 3 + Fastify · MIT licensed · self-hosted, admin-only by design.</sub>
+</p>
