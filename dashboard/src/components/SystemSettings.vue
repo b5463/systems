@@ -54,12 +54,29 @@ async function saveEnv() {
     const data = await api.put(`/projects/${props.slug}/env`, { vars })
     envKeys.value = data.keys || envKeys.value
     envVars.value = [{ key: '', value: '' }]
-    envMsg.value = 'Saved. The container is restarting.'
+    envMsg.value = 'Saved — other variables kept. The container is restarting.'
     emit('reload')
   } catch (e) {
     envMsg.value = e.message || 'Failed to save env.'
   } finally {
     envSaving.value = false
+  }
+}
+
+// Delete an existing variable (confirmed inline — it restarts the container).
+const removingKey = ref(null)
+async function removeKey() {
+  const key = removingKey.value
+  envSaving.value = true; envMsg.value = ''
+  try {
+    const data = await api.put(`/projects/${props.slug}/env`, { remove: [key] })
+    envKeys.value = data.keys || envKeys.value.filter((k) => k !== key)
+    envMsg.value = `Removed ${key}. The container is restarting.`
+    emit('reload')
+  } catch (e) {
+    envMsg.value = e.message || 'Failed to remove variable.'
+  } finally {
+    envSaving.value = false; removingKey.value = null
   }
 }
 
@@ -139,16 +156,32 @@ async function provisionDb() {
   <div class="hint">Saving restarts the container. Stored values are encrypted and aren't shown again.</div>
   <div v-if="error" class="error-box">{{ error }}</div>
 
-  <div class="card">
+  <div class="card stack">
     <div class="section-label">Current env keys</div>
     <div v-if="!envKeys.length" class="muted small">No environment variables set.</div>
     <div v-else class="row flex-wrap" style="gap:8px">
-      <span v-for="k in envKeys" :key="k" class="chip">{{ k }}</span>
+      <span v-for="k in envKeys" :key="k" class="chip">
+        {{ k }}
+        <button class="chip-x" :aria-label="`Remove ${k}`" :disabled="envSaving" @click="removingKey = k">✕</button>
+      </span>
+    </div>
+    <div v-if="removingKey" class="callout warn" style="margin:0">
+      <div class="co-bar"></div>
+      <div class="stack" style="gap:8px">
+        <div>Remove <span class="mono">{{ removingKey }}</span>? This restarts the container.</div>
+        <div class="row gap-sm">
+          <button class="btn btn-sm" :disabled="envSaving" @click="removingKey = null">Cancel</button>
+          <button class="btn btn-sm btn-danger" :disabled="envSaving" @click="removeKey">
+            <span v-if="envSaving" class="spinner"></span><span v-else>Remove</span>
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 
   <div class="card stack">
     <div class="section-label">Add / update variables</div>
+    <div class="hint">Adding or changing a variable keeps the others. Values aren't shown again once saved.</div>
     <div v-for="(row, i) in envVars" :key="i" class="row">
       <input v-model="row.key" aria-label="KEY" placeholder="KEY" autocapitalize="characters" autocorrect="off" />
       <input v-model="row.value" aria-label="value" placeholder="value" autocorrect="off" />
@@ -229,3 +262,17 @@ async function provisionDb() {
     </button>
   </div>
 </template>
+
+<style scoped>
+.chip-x {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 0 0 0 4px;
+  font-size: 10px;
+  line-height: 1;
+}
+.chip-x:hover { color: var(--danger); }
+.chip-x:disabled { opacity: 0.4; cursor: not-allowed; }
+</style>

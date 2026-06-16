@@ -62,18 +62,24 @@ async function envRoutes(fastify, options) {
     schema: {
       body: {
         type: 'object',
-        required: ['vars'],
         properties: {
+          // Keys to set/overwrite (merged over the existing env).
           vars: {
             type: 'object',
             additionalProperties: { type: 'string' },
+          },
+          // Keys to delete from the existing env.
+          remove: {
+            type: 'array',
+            items: { type: 'string' },
           },
         },
       },
     },
   }, async (request, reply) => {
     const { slug } = request.params;
-    const { vars } = request.body;
+    const vars = request.body.vars || {};
+    const remove = request.body.remove || [];
 
     const project = loadOr404(reply, slug);
     if (!project) return;
@@ -97,9 +103,21 @@ async function envRoutes(fastify, options) {
       }
     }
 
+    // Merge over the existing env (so adding one key doesn't wipe the rest);
+    // apply deletions. The API never returns values, so a full replace from the
+    // UI would be a data-loss trap.
+    let merged = {};
+    if (project.env_vars) { try { merged = decryptEnvVars(project.env_vars); } catch { merged = {}; } }
+    merged = { ...merged, ...vars };
+    for (const k of remove) delete merged[k];
+
+    if (!Object.keys(vars).length && !remove.length) {
+      return reply.code(400).send({ error: 'Nothing to change.' });
+    }
+
     let encrypted;
     try {
-      encrypted = encryptEnvVars(vars);
+      encrypted = encryptEnvVars(merged);
     } catch (err) {
       return reply.code(500).send({ error: err.message });
     }
@@ -115,21 +133,22 @@ async function envRoutes(fastify, options) {
       }
       await dockerService.removeContainer(project.container_id, true);
 
-      const newContainerId = await dockerService.runContainer(slug, project.image_id, project.port, vars);
+      const newContainerId = await dockerService.runContainer(slug, project.image_id, project.port, merged);
 
       db.prepare(`
         UPDATE projects SET status = 'running', container_id = ?, updated_at = datetime('now') WHERE slug = ?
       `).run(newContainerId, slug);
 
+      const changed = [...Object.keys(vars), ...remove.map((k) => `-${k}`)];
       auditLog({
         user_id: request.user.id,
         action: 'env_update',
         target: slug,
-        detail: `keys: ${Object.keys(vars).join(', ')}`,
+        detail: `keys: ${changed.join(', ')}`,
         ip: request.ip,
       });
 
-      return { message: 'Env vars updated and container restarted', keys: Object.keys(vars) };
+      return { message: 'Env vars updated and container restarted', keys: Object.keys(merged) };
     } catch (err) {
       request.log.error({ err }, '[env] Failed to recreate container with new env vars');
       // The old container was already removed; null the id so reconcile/lifecycle
