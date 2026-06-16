@@ -15,8 +15,8 @@ back from one dashboard. Every app you ship is a **system** — its own subdomai
 status, logs, metrics, and one-click rollback.
 
 <p align="center">
-  <img src="docs/assets/screenshots/dashboard.png" alt="SYSTEMS. dashboard — the command center" width="100%" />
-  <br /><em>One screen for everything you run — live status, what needs attention, and one-click control.</em>
+  <img src="docs/assets/screenshots/deploy.gif" alt="Ship a zip and watch it go live" width="100%" />
+  <br /><em>Zip in, live URL out — drop an archive, watch it build, and it's serving with HTTPS.</em>
 </p>
 
 **Where it's at:** 2.0 release candidate. The code is all here and tested; what's
@@ -38,6 +38,11 @@ Windows host.
   typed-slug confirmation on destructive actions, and backups built in.
 
 ## A look around
+
+<p align="center">
+  <img src="docs/assets/screenshots/dashboard.png" alt="SYSTEMS. dashboard — the command center" width="100%" />
+  <br /><em>The command center — every system's live status, what needs attention, and one-click control.</em>
+</p>
 
 <table>
   <tr>
