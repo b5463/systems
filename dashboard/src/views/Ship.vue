@@ -142,7 +142,7 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
       </div>
       <div class="lifecycle" style="margin-top: 22px">
         <template v-for="(step, i) in LIFECYCLE" :key="step">
-          <span class="lc-step" :class="{ active: buildResult === 'done' }"><span class="lc-dot"></span>{{ step }}</span>
+          <span class="lc-step" :class="{ active: buildResult === 'done', sweep: buildResult === '' }" :style="{ '--i': i }"><span class="lc-dot"></span>{{ step }}</span>
           <span v-if="i < LIFECYCLE.length - 1" class="lc-link"></span>
         </template>
       </div>
@@ -189,8 +189,8 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
         <div class="section-label">Build</div>
         <div class="hint">Auto-detected from the archive — Vue/Vite, static, Node, or Dockerfile.</div>
         <div class="detect-row">
-          <span class="kv"><span class="k">Build command</span><span class="v dim">Auto</span></span>
-          <span class="kv"><span class="k">Output folder</span><span class="v dim">Detected</span></span>
+          <span class="kv"><span class="k">Build command</span><span class="v dim">Detected during build</span></span>
+          <span class="kv"><span class="k">Output folder</span><span class="v dim">Detected during build</span></span>
         </div>
         <div class="hint">Custom build overrides are planned.</div>
       </div>

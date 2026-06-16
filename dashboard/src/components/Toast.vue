@@ -1,7 +1,7 @@
 <script setup>
 import { useToast } from '../composables/useToast'
 
-const { toasts, dismiss } = useToast()
+const { toasts, dismiss, pause, resume } = useToast()
 </script>
 
 <template>
@@ -12,27 +12,34 @@ const { toasts, dismiss } = useToast()
         :key="t.id"
         class="toast"
         :class="`toast-${t.type}`"
-        @click="dismiss(t.id)"
+        role="status"
+        @mouseenter="pause(t.id)"
+        @mouseleave="resume(t.id)"
       >
         <span class="toast-dot"></span>
         <span class="toast-msg">{{ t.message }}</span>
+        <button class="toast-x" aria-label="Dismiss" @click="dismiss(t.id)">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <path d="M18 6 6 18M6 6l12 12" />
+          </svg>
+        </button>
       </div>
     </transition-group>
   </div>
 </template>
 
 <style scoped>
+/* Bottom-right on desktop (near where work happens); full-width bottom on mobile. */
 .toast-stack {
   position: fixed;
-  top: 0;
-  left: 0;
+  bottom: 0;
   right: 0;
   z-index: 2000;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-end;
   gap: 8px;
-  padding: 12px 12px 0;
+  padding: 0 16px calc(16px + var(--safe-bottom, 0px));
   pointer-events: none;
 }
 .toast {
@@ -40,50 +47,60 @@ const { toasts, dismiss } = useToast()
   display: flex;
   align-items: center;
   gap: 10px;
-  max-width: 460px;
-  width: calc(100% - 8px);
-  padding: 12px 14px;
-  border-radius: 12px;
-  background: #1c2128;
-  color: #e6edf3;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+  max-width: 420px;
+  padding: 11px 12px 11px 14px;
+  border-radius: var(--radius);
+  background: var(--bg-elevated);
+  color: var(--text);
+  border: 1px solid var(--border);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
   font-size: 14px;
-  cursor: pointer;
 }
 .toast-dot {
   width: 9px;
   height: 9px;
   border-radius: 50%;
   flex-shrink: 0;
-  background: #58a6ff;
+  background: var(--accent);
 }
-.toast-msg {
-  min-width: 0;
-  flex: 1;
+.toast-msg { min-width: 0; flex: 1; }
+.toast-x {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: var(--radius-xs);
+  cursor: pointer;
 }
-.toast-error {
-  border-color: rgba(248, 81, 73, 0.4);
-}
-.toast-error .toast-dot {
-  background: #f85149;
-}
-.toast-warn {
-  border-color: rgba(210, 153, 34, 0.4);
-}
-.toast-warn .toast-dot {
-  background: #d29922;
-}
-.toast-info .toast-dot {
-  background: #58a6ff;
-}
+.toast-x:hover { color: var(--text); background: var(--bg-hover); }
+
+.toast-success { border-color: rgba(69, 194, 103, 0.4); }
+.toast-success .toast-dot { background: var(--ok); }
+.toast-error { border-color: rgba(239, 91, 81, 0.45); }
+.toast-error .toast-dot { background: var(--danger); }
+.toast-warn { border-color: rgba(214, 162, 60, 0.45); }
+.toast-warn .toast-dot { background: var(--warn); }
+.toast-info .toast-dot { background: var(--accent); }
+
 .toast-enter-active,
-.toast-leave-active {
-  transition: all 0.25s ease;
-}
+.toast-leave-active { transition: opacity 0.25s ease, transform 0.25s ease; }
 .toast-enter-from,
-.toast-leave-to {
-  opacity: 0;
-  transform: translateY(-12px);
+.toast-leave-to { opacity: 0; transform: translateY(12px); }
+
+@media (max-width: 560px) {
+  .toast-stack { left: 0; align-items: stretch; padding: 0 12px calc(12px + var(--safe-bottom, 0px)); }
+  .toast { max-width: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .toast-enter-active,
+  .toast-leave-active { transition: opacity 0.2s ease; }
+  .toast-enter-from,
+  .toast-leave-to { transform: none; }
 }
 </style>

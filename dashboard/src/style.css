@@ -373,19 +373,6 @@ select:focus {
   }
 }
 
-/* Status hero (large status presentation) */
-.status-hero {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.status-hero .hero-name {
-  font-size: 20px;
-  font-weight: 700;
-  line-height: 1.2;
-}
-
 /* Status summary pills */
 .summary-bar {
   display: flex;
@@ -538,66 +525,6 @@ select:focus {
 
 .iconbtn:active {
   background: var(--bg-hover);
-}
-
-/* ---------- Bottom nav ---------- */
-.bottom-nav {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 30;
-  display: flex;
-  height: calc(var(--nav-height) + var(--safe-bottom));
-  padding-bottom: var(--safe-bottom);
-  background: rgba(13, 17, 23, 0.92);
-  backdrop-filter: saturate(180%) blur(12px);
-  -webkit-backdrop-filter: saturate(180%) blur(12px);
-  border-top: 1px solid var(--border-soft);
-}
-
-.bottom-nav a {
-  position: relative;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  color: var(--text-dim);
-  font-size: 11px;
-  font-weight: 600;
-  text-decoration: none;
-  min-height: 44px;
-  transition: color 0.15s ease;
-}
-
-.bottom-nav a .nav-ico {
-  display: inline-flex;
-}
-
-.bottom-nav a .nav-ico svg {
-  width: 22px;
-  height: 22px;
-  stroke: currentColor;
-  fill: none;
-  stroke-width: 1.75;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.bottom-nav a.router-link-active {
-  color: var(--accent);
-}
-
-.bottom-nav a.router-link-active::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  width: 22px;
-  height: 2px;
-  border-radius: 0 0 3px 3px;
-  background: var(--accent);
 }
 
 /* ---------- Tabs ---------- */
@@ -915,26 +842,6 @@ select:focus {
   padding-bottom: 4px;
 }
 
-/* Pull to refresh */
-.ptr {
-  position: relative;
-  min-height: 100%;
-}
-
-.ptr-indicator {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-muted);
-  font-size: 13px;
-  pointer-events: none;
-  overflow: hidden;
-}
-
 .fade-enter-active,
 .fade-leave-active {
   transition: opacity 0.18s ease;
@@ -952,10 +859,6 @@ select:focus {
 }
 
 /* App card error accent */
-.card-error {
-  border-left: 3px solid var(--danger);
-}
-
 
 /* ============================================================
    SYSTEMS. V1.1 — product shell, navigation & layout
@@ -1425,6 +1328,11 @@ select:focus {
   color: var(--text-muted);
   font-family: var(--mono);
 }
+.chip.ok {
+  color: var(--ok);
+  border-color: rgba(69, 194, 103, 0.4);
+  background: var(--ok-dim);
+}
 
 /* ---------- Empty state (refined) ---------- */
 .empty-block {
@@ -1587,8 +1495,19 @@ select:focus {
 .lc-step.active { color: var(--text); }
 .lc-step.active .lc-dot { background: var(--ok); }
 .lc-step.current .lc-dot { background: var(--warn); animation: pulse 1.4s ease-in-out infinite; }
+/* While building, sweep a warm highlight across the steps (staggered by --i)
+   — atmosphere, not a claim about which substep is live. */
+.lc-step.sweep .lc-dot {
+  background: var(--warn);
+  animation: lcSweep 1.6s ease-in-out infinite;
+  animation-delay: calc(var(--i, 0) * 0.13s);
+}
+@keyframes lcSweep { 0%, 100% { opacity: 0.28; } 50% { opacity: 1; } }
 .lc-link { width: 22px; height: 1px; background: var(--border-soft); margin: 0 8px; flex-shrink: 0; }
-@media (prefers-reduced-motion: reduce) { .lc-step.current .lc-dot { animation: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .lc-step.current .lc-dot,
+  .lc-step.sweep .lc-dot { animation: none; }
+}
 
 /* ---------- Brand panel (deploy success / splash moment) ---------- */
 .brand-panel {
@@ -1686,3 +1605,13 @@ select:focus {
 }
 /* don't double up: inputs already show a focus ring via box-shadow */
 input:focus-visible, textarea:focus-visible, select:focus-visible { outline: none; }
+
+/* ---------- Route transition (snappy fade; reduced-motion safe) ---------- */
+.route-enter-active,
+.route-leave-active { transition: opacity 0.14s ease; }
+.route-enter-from,
+.route-leave-to { opacity: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .route-enter-active,
+  .route-leave-active { transition: none; }
+}

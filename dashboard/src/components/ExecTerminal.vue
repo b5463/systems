@@ -21,8 +21,8 @@ let resizeObserver = null
 const theme = {
   background: '#000000',
   foreground: '#e6edf3',
-  cursor: '#2dd4bf',
-  selectionBackground: 'rgba(45,212,191,0.3)'
+  cursor: '#5fb0d4',
+  selectionBackground: 'rgba(95,176,212,0.3)'
 }
 
 function doFit() {

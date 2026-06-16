@@ -6,7 +6,10 @@ import StatusBadge from '../components/StatusBadge.vue'
 import StatsCharts from '../components/StatsCharts.vue'
 import LogConsole from '../components/LogConsole.vue'
 import ExecTerminal from '../components/ExecTerminal.vue'
+import CopyButton from '../components/CopyButton.vue'
+import { useToast } from '../composables/useToast'
 
+const { showToast } = useToast()
 const props = defineProps({ slug: { type: String, required: true } })
 const router = useRouter()
 
@@ -122,8 +125,12 @@ async function doPurge() {
 const checkingHealth = ref(false)
 async function runHealthCheck() {
   checkingHealth.value = true; error.value = ''
-  try { await api.post(`/projects/${props.slug}/health`); await loadSystem() }
-  catch (e) { error.value = e.message || 'Health check failed.' }
+  try {
+    const r = await api.post(`/projects/${props.slug}/health`); await loadSystem()
+    const st = r && r.health && r.health.state
+    showToast(st === 'healthy' ? 'Health check passed' : `Health: ${st || 'checked'}`, st === 'healthy' ? 'success' : 'warn')
+  }
+  catch (e) { error.value = e.message || 'Health check failed.'; showToast(e.message || 'Health check failed', 'error') }
   finally { checkingHealth.value = false }
 }
 
@@ -219,6 +226,7 @@ async function loadSystem() {
 }
 
 /* ---- Lifecycle ---- */
+const ACTION_DONE = { start: 'started', stop: 'stopped', restart: 'restarted' }
 async function lifecycle(action) {
   acting.value = action
   error.value = ''
@@ -226,8 +234,10 @@ async function lifecycle(action) {
     const data = await api.post(`/projects/${props.slug}/${action}`)
     if (data && data.project) system.value = data.project
     else await loadSystem()
+    showToast(`${system.value?.name || 'System'} ${ACTION_DONE[action] || action}`, 'success')
   } catch (e) {
     error.value = e.message || `Failed to ${action}.`
+    showToast(e.message || `Failed to ${action}`, 'error')
   } finally {
     acting.value = ''
   }
@@ -345,8 +355,10 @@ async function doRollback() {
     if (data && data.project) system.value = data.project
     else await loadSystem()
     await loadDeployHistory()
+    showToast('Rolled back to the previous release', 'success')
   } catch (e) {
     error.value = e.message || 'Rollback failed.'
+    showToast(e.message || 'Rollback failed', 'error')
   } finally {
     rollingBack.value = false
   }
@@ -364,8 +376,14 @@ async function doDelete() {
   }
 }
 
-function copyUrl() {
-  if (navigator.clipboard) navigator.clipboard.writeText(publicUrl.value).catch(() => {})
+async function copyUrl() {
+  try {
+    if (!navigator.clipboard) throw new Error('clipboard unavailable')
+    await navigator.clipboard.writeText(publicUrl.value)
+    showToast('URL copied', 'success')
+  } catch {
+    showToast('Could not copy URL', 'error')
+  }
 }
 
 /* ---- Tab side effects ---- */
@@ -576,6 +594,11 @@ onBeforeUnmount(() => {
       <div v-if="!isRunning" class="empty-block">
         <div class="eb-title">No metrics yet.</div>
         <div class="eb-sub">Metrics appear once the container is running.</div>
+        <div v-if="system.status === 'stopped'" class="eb-actions">
+          <button class="btn btn-sm btn-primary" :disabled="acting === 'start'" @click="lifecycle('start')">
+            <span v-if="acting === 'start'" class="spinner"></span><span v-else>Start system</span>
+          </button>
+        </div>
       </div>
       <template v-else>
         <div v-if="historyMinutes > 0" class="small muted" style="margin-bottom:10px">Showing last {{ historyMinutes }} minutes</div>
@@ -589,6 +612,11 @@ onBeforeUnmount(() => {
       <div v-if="!isRunning" class="empty-block">
         <div class="eb-title">Console unavailable.</div>
         <div class="eb-sub">The shell attaches only while the container is running.</div>
+        <div v-if="system.status === 'stopped'" class="eb-actions">
+          <button class="btn btn-sm btn-primary" :disabled="acting === 'start'" @click="lifecycle('start')">
+            <span v-if="acting === 'start'" class="spinner"></span><span v-else>Start system</span>
+          </button>
+        </div>
       </div>
       <ExecTerminal v-if="tab === 'Console' && isRunning" :slug="system.slug" />
     </div>
@@ -680,7 +708,7 @@ onBeforeUnmount(() => {
       <div v-if="features.dbProvisioning" class="card stack">
         <div class="section-label">Database</div>
         <div class="hint">Provision a dedicated Postgres database + role. The <span class="mono">DATABASE_URL</span> is stored (encrypted) and injected on the next deploy.</div>
-        <div v-if="provisionedUrl" class="kv"><span class="k">DATABASE_URL</span><span class="v mono small">{{ provisionedUrl }}</span></div>
+        <div v-if="provisionedUrl" class="kv"><span class="k">DATABASE_URL</span><span class="v mono small row gap-sm" style="justify-content:flex-end">{{ provisionedUrl }}<CopyButton :text="provisionedUrl" label="DATABASE_URL" /></span></div>
         <div v-if="provisionMsg" class="notice">{{ provisionMsg }}</div>
         <button class="btn btn-block" :disabled="provisioning" @click="provisionDb">
           <span v-if="provisioning" class="spinner"></span><span v-else>Provision database</span>

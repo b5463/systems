@@ -42,9 +42,13 @@ onBeforeUnmount(() => {
 
   <template v-if="auth.ready">
     <AppShell v-if="showShell">
-      <RouterView :key="route.fullPath" />
+      <RouterView v-slot="{ Component }">
+        <Transition name="route" mode="out-in">
+          <component :is="Component" :key="route.fullPath" />
+        </Transition>
+      </RouterView>
     </AppShell>
-    <RouterView v-else :key="route.fullPath" />
+    <RouterView v-else />
   </template>
 
   <div v-else class="center" style="min-height: 100vh">

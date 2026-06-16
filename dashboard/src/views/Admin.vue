@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { api } from '../api/client'
+import CopyButton from '../components/CopyButton.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -229,7 +230,7 @@ onMounted(loadUsers)
 
           <template v-else>
             <p class="small muted" style="margin:0">Add this secret to your authenticator, then enter a code to confirm.</p>
-            <div class="kv"><span class="k">Secret</span><span class="v mono small">{{ tfaSecret }}</span></div>
+            <div class="kv"><span class="k">Secret</span><span class="v mono small row gap-sm" style="justify-content:flex-end">{{ tfaSecret }}<CopyButton :text="tfaSecret" label="Secret" /></span></div>
             <div class="hint mono small" style="word-break:break-all">{{ tfaOtpauth }}</div>
             <input aria-label="Six-digit code" v-model="tfaCode" inputmode="numeric" autocomplete="one-time-code" placeholder="123456" />
             <button class="btn btn-primary btn-block" :disabled="tfaBusy" @click="enable2FA">

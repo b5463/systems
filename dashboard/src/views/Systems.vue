@@ -59,6 +59,21 @@ function urlFor(slug) { return `${SCHEME}://${hostFor(slug)}` }
 const active = computed(() => systems.value.filter((s) => s.status !== 'deleted'))
 const deleted = computed(() => systems.value.filter((s) => s.status === 'deleted'))
 
+// Search + sort for the "All systems" grid (shown once the list grows).
+const query = ref('')
+const sortBy = ref('recent')
+const STATUS_RANK = { error: 0, building: 1, stopped: 2, running: 3 }
+const visibleSystems = computed(() => {
+  const q = query.value.trim().toLowerCase()
+  let list = active.value
+  if (q) list = list.filter((s) => s.name.toLowerCase().includes(q) || s.slug.toLowerCase().includes(q))
+  const arr = [...list]
+  if (sortBy.value === 'name') arr.sort((a, b) => a.name.localeCompare(b.name))
+  else if (sortBy.value === 'status') arr.sort((a, b) => (STATUS_RANK[a.status] ?? 9) - (STATUS_RANK[b.status] ?? 9))
+  else arr.sort((a, b) => new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at))
+  return arr
+})
+
 const counts = computed(() => {
   const c = { live: 0, building: 0, stopped: 0, failed: 0 }
   for (const s of active.value) {
@@ -178,9 +193,20 @@ onBeforeUnmount(() => clearInterval(timer))
     </div>
 
     <!-- All systems -->
-    <div class="section-label">All systems · {{ active.length }}</div>
+    <div class="spread" style="margin-bottom:10px; gap:10px; flex-wrap:wrap">
+      <div class="section-label" style="margin:0">All systems · {{ active.length }}</div>
+      <div v-if="active.length > 4" class="row gap-sm" style="flex-wrap:wrap">
+        <input v-model="query" class="sys-search" type="search" placeholder="Search name or slug" aria-label="Search systems" autocapitalize="none" autocorrect="off" />
+        <select v-model="sortBy" aria-label="Sort systems" style="width:auto">
+          <option value="recent">Recent</option>
+          <option value="name">Name</option>
+          <option value="status">Status</option>
+        </select>
+      </div>
+    </div>
+    <div v-if="!visibleSystems.length" class="muted small" style="margin-bottom:18px">No systems match “{{ query }}”.</div>
     <div class="grid grid-auto">
-      <div v-for="s in active" :key="s.id" class="card card-tap sys-card" role="button" tabindex="0" :aria-label="`Open ${s.name}`" @click="open(s)" @keydown.enter="open(s)" @keydown.space.prevent="open(s)">
+      <div v-for="s in visibleSystems" :key="s.id" class="card card-tap sys-card" role="button" tabindex="0" :aria-label="`Open ${s.name}`" @click="open(s)" @keydown.enter="open(s)" @keydown.space.prevent="open(s)">
         <div class="sc-top">
           <div style="min-width:0">
             <div class="sc-name">{{ s.name }}</div>
@@ -220,6 +246,8 @@ onBeforeUnmount(() => clearInterval(timer))
 </template>
 
 <style scoped>
+.sys-search { width: 200px; min-height: 38px; padding: 8px 12px; font-size: 13px; }
+@media (max-width: 560px) { .sys-search { width: 100%; } }
 .watching { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
 .watching .ok { color: var(--ok); }
 .watching .warn { color: var(--warn); }
