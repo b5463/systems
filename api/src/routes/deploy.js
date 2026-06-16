@@ -9,6 +9,8 @@ const { extractZip, detectProjectType, generateDockerfile } = require('../servic
 const proxy = require('../services/proxy');
 const notify = require('../services/notify');
 const { slugError } = require('../util/slug');
+const { pub } = require('../util/project');
+const { MAX_MULTIPART_BYTES } = require('../util/upload');
 const { features } = require('../util/flags');
 
 // In-memory build log buffers keyed by slug
@@ -298,9 +300,6 @@ async function beginRedeploy({ slug, zipPath, userId, ip }) {
   return { ok: true, slug };
 }
 
-// Sanitize a project row for client return (drop the basic-auth hash).
-function pub(p) { if (p) delete p.basic_hash; return p; }
-
 async function deployRoutes(fastify, options) {
   // Dry-run plan: validate the slug and show exactly what WOULD happen —
   // planned container name, public host, generated Caddy route file and the
@@ -369,7 +368,7 @@ async function deployRoutes(fastify, options) {
           let totalSize = 0;
           for await (const chunk of part.file) {
             totalSize += chunk.length;
-            if (totalSize > 500 * 1024 * 1024) {
+            if (totalSize > MAX_MULTIPART_BYTES) {
               await part.file.resume();
               if (zipPath) await fsp.rm(zipPath, { force: true }).catch(() => {});
               return reply.code(413).send({ error: 'ZIP file exceeds 500MB limit' });
@@ -438,7 +437,7 @@ async function deployRoutes(fastify, options) {
           let totalSize = 0;
           for await (const chunk of part.file) {
             totalSize += chunk.length;
-            if (totalSize > 500 * 1024 * 1024) {
+            if (totalSize > MAX_MULTIPART_BYTES) {
               await part.file.resume();
               if (zipPath) await fsp.rm(zipPath, { force: true }).catch(() => {});
               return reply.code(413).send({ error: 'ZIP file exceeds 500MB limit' });

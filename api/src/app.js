@@ -41,8 +41,9 @@ async function buildApp(opts = {}) {
     keyGenerator: (request) => request.ip,
   });
 
+  const { MAX_MULTIPART_BYTES } = require('./util/upload');
   await fastify.register(require('@fastify/multipart'), {
-    limits: { fileSize: 500 * 1024 * 1024 },
+    limits: { fileSize: MAX_MULTIPART_BYTES },
   });
 
   await fastify.register(require('@fastify/websocket'));

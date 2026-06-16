@@ -9,6 +9,10 @@ const path = require('path');
 
 function mb(n) { return n * 1024 * 1024; }
 
+// Hard transport cap for a single multipart upload (the streamed/chunked path
+// has its own, larger V2 cap). One source of truth for the API + the route.
+const MAX_MULTIPART_BYTES = mb(500);
+
 // Validate a chunk's metadata against the session + configured cap.
 function validateChunk({ index, total, chunkSize, totalSize }, { maxMb = 2048 } = {}) {
   const max = mb(maxMb);
@@ -43,4 +47,4 @@ function progressState({ received, total, cancelled, failed, done }) {
   return pct >= 100 ? 'assembling' : 'uploading';
 }
 
-module.exports = { mb, validateChunk, fitsOnDisk, uploadTempPath, progressState };
+module.exports = { mb, MAX_MULTIPART_BYTES, validateChunk, fitsOnDisk, uploadTempPath, progressState };

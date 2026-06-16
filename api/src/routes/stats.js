@@ -2,6 +2,7 @@
 
 const { db } = require('../db');
 const { getContainerStats } = require('../services/docker');
+const { loadOr404 } = require('../util/project');
 
 /**
  * Stats routes plugin.
@@ -16,10 +17,8 @@ async function statsRoutes(fastify, options) {
   }, async (request, reply) => {
     const { slug } = request.params;
 
-    const project = db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug);
-    if (!project) {
-      return reply.code(404).send({ error: 'Project not found' });
-    }
+    const project = loadOr404(reply, slug);
+    if (!project) return;
 
     if (!project.container_id) {
       return reply.code(400).send({ error: 'Project has no container' });
@@ -82,10 +81,8 @@ async function statsRoutes(fastify, options) {
   }, async (request, reply) => {
     const { slug } = request.params;
 
-    const project = db.prepare('SELECT id FROM projects WHERE slug = ?').get(slug);
-    if (!project) {
-      return reply.code(404).send({ error: 'Project not found' });
-    }
+    const project = loadOr404(reply, slug);
+    if (!project) return;
 
     let hours = Number(request.query.hours);
     if (!Number.isFinite(hours) || hours <= 0) hours = 1;

@@ -3,6 +3,7 @@
 const crypto = require('crypto');
 const { db, auditLog } = require('../db');
 const dockerService = require('../services/docker');
+const { loadOr404 } = require('../util/project');
 
 function getEncryptionKey() {
   const secret = process.env.ENV_SECRET;
@@ -42,8 +43,8 @@ async function envRoutes(fastify, options) {
     preHandler: [fastify.authenticate],
   }, async (request, reply) => {
     const { slug } = request.params;
-    const project = db.prepare('SELECT env_vars FROM projects WHERE slug = ?').get(slug);
-    if (!project) return reply.code(404).send({ error: 'Project not found' });
+    const project = loadOr404(reply, slug);
+    if (!project) return;
 
     if (!project.env_vars) return { keys: [] };
 
@@ -74,8 +75,8 @@ async function envRoutes(fastify, options) {
     const { slug } = request.params;
     const { vars } = request.body;
 
-    const project = db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug);
-    if (!project) return reply.code(404).send({ error: 'Project not found' });
+    const project = loadOr404(reply, slug);
+    if (!project) return;
     if (project.status === 'building') return reply.code(409).send({ error: 'Cannot update env while building' });
 
     if (!project.container_id || !project.image_id) {

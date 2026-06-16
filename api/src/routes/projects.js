@@ -1,6 +1,5 @@
 'use strict';
 
-const Docker = require('dockerode');
 const bcrypt = require('bcrypt');
 const fsp = require('fs/promises');
 const path = require('path');
@@ -9,10 +8,7 @@ const dockerService = require('../services/docker');
 const proxy = require('../services/proxy');
 const health = require('../services/health');
 const { confirmMatches } = require('../util/thresholds');
-
-// Strip the basic-auth hash before any project row leaves the API. It is not
-// plaintext, but a bcrypt hash should never be exposed to clients.
-function pub(p) { if (p) delete p.basic_hash; return p; }
+const { pub, loadOr404 } = require('../util/project');
 
 async function projectsRoutes(fastify, options) {
   fastify.get('/api/projects', {
@@ -26,8 +22,8 @@ async function projectsRoutes(fastify, options) {
     preHandler: [fastify.authenticate],
   }, async (request, reply) => {
     const { slug } = request.params;
-    const project = db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug);
-    if (!project) return reply.code(404).send({ error: 'Project not found' });
+    const project = loadOr404(reply, slug);
+    if (!project) return;
     return { project: pub(project) };
   });
 
@@ -35,15 +31,14 @@ async function projectsRoutes(fastify, options) {
     preHandler: [fastify.authenticate],
   }, async (request, reply) => {
     const { slug } = request.params;
-    const project = db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug);
-    if (!project) return reply.code(404).send({ error: 'Project not found' });
+    const project = loadOr404(reply, slug);
+    if (!project) return;
     if (!project.container_id) return reply.code(400).send({ error: 'Project has no container' });
     if (project.status === 'running') return reply.code(400).send({ error: 'Already running' });
     if (project.status === 'building') return reply.code(400).send({ error: 'Currently building' });
 
     try {
-      const docker = new Docker({ socketPath: '/var/run/docker.sock' });
-      await docker.getContainer(project.container_id).start();
+      await dockerService.startContainer(project.container_id);
 
       db.prepare(`UPDATE projects SET status = 'running', updated_at = datetime('now') WHERE slug = ?`).run(slug);
       auditLog({ user_id: request.user.id, action: 'start', target: slug, ip: request.ip });
@@ -59,8 +54,8 @@ async function projectsRoutes(fastify, options) {
     preHandler: [fastify.authenticate],
   }, async (request, reply) => {
     const { slug } = request.params;
-    const project = db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug);
-    if (!project) return reply.code(404).send({ error: 'Project not found' });
+    const project = loadOr404(reply, slug);
+    if (!project) return;
     if (!project.container_id) return reply.code(400).send({ error: 'Project has no container' });
     if (project.status === 'stopped') return reply.code(400).send({ error: 'Already stopped' });
     if (project.status === 'building') return reply.code(400).send({ error: 'Currently building' });
@@ -81,8 +76,8 @@ async function projectsRoutes(fastify, options) {
     preHandler: [fastify.authenticate],
   }, async (request, reply) => {
     const { slug } = request.params;
-    const project = db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug);
-    if (!project) return reply.code(404).send({ error: 'Project not found' });
+    const project = loadOr404(reply, slug);
+    if (!project) return;
     if (!project.container_id) return reply.code(400).send({ error: 'Project has no container' });
     if (project.status === 'building') return reply.code(400).send({ error: 'Currently building' });
 
@@ -105,8 +100,8 @@ async function projectsRoutes(fastify, options) {
     preHandler: [fastify.authenticate],
   }, async (request, reply) => {
     const { slug } = request.params;
-    const project = db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug);
-    if (!project) return reply.code(404).send({ error: 'Project not found' });
+    const project = loadOr404(reply, slug);
+    if (!project) return;
 
     const errors = [];
     if (project.container_id) {
@@ -130,8 +125,8 @@ async function projectsRoutes(fastify, options) {
     if (!confirmMatches(request.body.confirm, slug)) {
       return reply.code(400).send({ error: 'Confirmation does not match the system slug.' });
     }
-    const project = db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug);
-    if (!project) return reply.code(404).send({ error: 'Project not found' });
+    const project = loadOr404(reply, slug);
+    if (!project) return;
 
     const errors = [];
     if (project.container_id) {
@@ -169,8 +164,8 @@ async function projectsRoutes(fastify, options) {
   }, async (request, reply) => {
     const { slug } = request.params;
     const { visibility, username, password } = request.body;
-    const project = db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug);
-    if (!project) return reply.code(404).send({ error: 'Project not found' });
+    const project = loadOr404(reply, slug);
+    if (!project) return;
     if (project.status === 'deleted') return reply.code(409).send({ error: 'System is deleted.' });
 
     let basicUser = project.basic_user;
@@ -204,9 +199,7 @@ async function projectsRoutes(fastify, options) {
       .run(visibility, basicUser, basicHash, published ? 1 : 0, keepPrimary, slug);
     auditLog({ user_id: request.user.id, action: 'visibility_change', target: slug, detail: visibility, ip: request.ip });
 
-    const updated = db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug);
-    delete updated.basic_hash; // never return the hash
-    return { project: updated, warnings: errors.length ? errors : undefined };
+    return { project: pub(db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug)), warnings: errors.length ? errors : undefined };
   });
 
   // Run a real health + HTTPS check against the public URL and store the result.
@@ -214,8 +207,8 @@ async function projectsRoutes(fastify, options) {
     preHandler: [fastify.authenticate],
   }, async (request, reply) => {
     const { slug } = request.params;
-    const project = db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug);
-    if (!project) return reply.code(404).send({ error: 'Project not found' });
+    const project = loadOr404(reply, slug);
+    if (!project) return;
     if (project.visibility === 'private') {
       return reply.code(400).send({ error: 'Private systems have no public URL to check.' });
     }
@@ -232,8 +225,8 @@ async function projectsRoutes(fastify, options) {
     preHandler: [fastify.authenticate],
   }, async (request, reply) => {
     const { slug } = request.params;
-    const project = db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug);
-    if (!project) return reply.code(404).send({ error: 'Project not found' });
+    const project = loadOr404(reply, slug);
+    if (!project) return;
     if (project.status === 'building') return reply.code(409).send({ error: 'Currently building' });
     if (!project.previous_image_id) {
       return reply.code(400).send({ error: 'No previous deploy to roll back to.' });
@@ -299,8 +292,8 @@ async function projectsRoutes(fastify, options) {
     if (!features().dbProvisioning) return reply.code(404).send({ error: 'Database provisioning is not enabled.' });
 
     const { slug } = request.params;
-    const project = db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug);
-    if (!project) return reply.code(404).send({ error: 'Project not found' });
+    const project = loadOr404(reply, slug);
+    if (!project) return;
 
     const runner = require('../services/dbprovision-runner');
     const result = await runner.provision(slug);
@@ -334,8 +327,8 @@ async function projectsRoutes(fastify, options) {
     },
   }, async (request, reply) => {
     const { slug } = request.params;
-    const project = db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug);
-    if (!project) return reply.code(404).send({ error: 'Project not found' });
+    const project = loadOr404(reply, slug);
+    if (!project) return;
 
     let repo = request.body.repo;
     if (repo != null) {
@@ -363,8 +356,8 @@ async function projectsRoutes(fastify, options) {
   }, async (request, reply) => {
     const { slug } = request.params;
     const { primary } = request.body;
-    const project = db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug);
-    if (!project) return reply.code(404).send({ error: 'Project not found' });
+    const project = loadOr404(reply, slug);
+    if (!project) return;
     if (project.status === 'deleted') return reply.code(409).send({ error: 'System is deleted.' });
     if (primary && project.visibility === 'private') {
       return reply.code(400).send({ error: 'A private system has no public route to serve at the root domain. Make it public or password-protected first.' });

@@ -107,6 +107,18 @@ test('provision-db is 404 while flag is off', async () => {
   assert.equal(res.statusCode, 404);
 });
 
+test('repo mapping: validates owner/name and clears on null', async () => {
+  db.prepare(`INSERT INTO projects (name, slug, port, status) VALUES ('Repo','repo',4330,'running')`).run();
+  const bad = await app.inject({ method: 'PATCH', url: '/api/projects/repo/repo', headers: auth(), payload: { repo: 'not a repo' } });
+  assert.equal(bad.statusCode, 400);
+  const ok = await app.inject({ method: 'PATCH', url: '/api/projects/repo/repo', headers: auth(), payload: { repo: 'acme/site', branch: 'release' } });
+  assert.equal(ok.statusCode, 200);
+  assert.equal(ok.json().project.repo, 'acme/site');
+  assert.equal(ok.json().project.deploy_branch, 'release');
+  const cleared = await app.inject({ method: 'PATCH', url: '/api/projects/repo/repo', headers: auth(), payload: { repo: null } });
+  assert.equal(cleared.json().project.repo, null);
+});
+
 test('visibility: rejects an unsafe basic-auth username (Caddy injection guard)', async () => {
   db.prepare(`INSERT INTO projects (name, slug, port, status, visibility) VALUES ('Vis','vis',4322,'running','public')`).run();
   const res = await app.inject({

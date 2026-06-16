@@ -137,6 +137,13 @@ async function runContainer(projectSlug, imageId, port, envVars = {}, opts = {})
 }
 
 /**
+ * Start an existing (stopped) container.
+ */
+async function startContainer(containerId) {
+  await docker.getContainer(containerId).start();
+}
+
+/**
  * Stop a running container (10s graceful timeout).
  */
 async function stopContainer(containerId) {
@@ -398,6 +405,7 @@ module.exports = {
   containerLimits,
   buildImage,
   runContainer,
+  startContainer,
   stopContainer,
   restartContainer,
   removeContainer,
