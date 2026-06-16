@@ -4,6 +4,14 @@
 
 # SYSTEMS.
 
+<p align="center">
+  <a href="https://github.com/b5463/systems/actions/workflows/ci.yml"><img src="https://github.com/b5463/systems/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <img src="https://img.shields.io/badge/version-2.0.0--rc.1-5fb0d4" alt="version" />
+  <img src="https://img.shields.io/badge/Vue%203%20%C2%B7%20Fastify-1a1c22" alt="stack" />
+  <img src="https://img.shields.io/badge/PWA-installable-45c267" alt="PWA" />
+  <img src="https://img.shields.io/badge/self--hosted-admin--only-585c66" alt="self-hosted" />
+</p>
+
 Your own deployment engine. Drop in a zip and SYSTEMS. builds it, runs it in a
 hardened Docker container, and serves it at its own subdomain with automatic
 HTTPS. The push-button deploy flow you'd get from Vercel or Render — on a server
@@ -54,6 +62,24 @@ Windows host.
     <td width="50%" align="center"><img src="docs/assets/screenshots/mobile.png" alt="Mobile PWA" width="50%" /><br /><em><b>Anywhere.</b> Installable PWA — run your fleet from your phone.</em></td>
   </tr>
 </table>
+
+## Who it's for
+
+- **Indie devs & makers** running a portfolio, a few side projects, and the odd
+  client demo on a single VPS — without paying per-project or per-seat.
+- **Small teams** that want push-button deploys on infrastructure they control,
+  with the source never leaving their box.
+- **Homelab / self-hosting** folks who'd rather own the whole stack than rent it.
+
+### Where it fits
+
+Vercel and Render are great — but they're someone else's cloud, metered and
+multi-tenant. Bigger self-hosted PaaS tools (Coolify, Dokku, CapRover) are
+powerful and general. SYSTEMS. is deliberately **small and opinionated**:
+admin-only with a hard two-admin cap (no public signup, ever), Windows-first,
+and obsessive about *honest* status — it never shows a green light it hasn't
+actually verified. If you want a focused, auditable, single-host deploy engine
+you can read end to end, that's the niche.
 
 ## Domain model
 
@@ -215,6 +241,26 @@ and logs, so it is privileged. Keep it admin-only and private; never expose the
 Docker socket, the proxy admin API, or the database to the internet; treat
 uploaded code as untrusted. It is built to be hardened and least-privilege — not
 "unhackable." See [`docs/SECURITY.md`](docs/SECURITY.md).
+
+## FAQ
+
+**Can other people sign up?** No. There's no public signup and a hard cap of two
+admins — it's your control panel, not a service.
+
+**What can I deploy today?** Vue/Vite and static-site zips, built and served
+automatically. Node APIs, background workers, custom Dockerfiles, per-app
+Postgres, GitHub deploy-on-push, and 2 GB chunked uploads are all built and wired
+— off by default behind `.env` flags until you validate them on the host.
+
+**What does it cost?** Nothing — it's yours. You bring a server (a Windows host
+with Docker Desktop / WSL2) and a wildcard DNS record.
+
+**Is it production-ready?** It's a 2.0 release candidate: the code is here and
+tested, and the live pieces (Caddy, Postgres, HTTPS) are wired pending validation
+on the real host — see the [Windows checklist](docs/WINDOWS_VALIDATION_CHECKLIST.md).
+
+**Linux?** Linux is the dev path (nginx + SQLite); Windows + Caddy + Postgres is
+the production target.
 
 ## Documentation
 
