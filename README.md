@@ -14,19 +14,41 @@ else's platform. It's self-hosted and admin-only: you deploy, watch, and roll
 back from one dashboard. Every app you ship is a **system** — its own subdomain,
 status, logs, metrics, and one-click rollback.
 
+<p align="center">
+  <img src="docs/assets/screenshots/dashboard.png" alt="SYSTEMS. dashboard — the command center" width="100%" />
+  <br /><em>One screen for everything you run — live status, what needs attention, and one-click control.</em>
+</p>
+
 **Where it's at:** 2.0 release candidate. The code is all here and tested; what's
 left is proving the live pieces (Docker, Caddy, Postgres, HTTPS) on the real
 Windows host.
 
 ## What you get
 
-- Drop a zip (Vue/Vite or a static site) and it's live — it works out the build for you.
-- Each system gets a URL you can flip between public, password-protected, or private.
-- Status, logs, and metrics on everything, plus an audit log of every action.
-- Start, stop, restart, redeploy, roll back, delete — all one click.
-- Status you can trust: it reconciles against what Docker is actually doing, so a
-  crash or reboot never leaves a stale "running" badge.
-- Backups built in, on demand or on a schedule.
+- **Zip in, live URL out.** Drop a Vue/Vite or static-site zip — it works out the
+  build, runs it in a hardened container, and serves it at its own subdomain with HTTPS.
+- **Per-system control.** Public, password-protected, or private; start, stop,
+  restart, redeploy, roll back, delete — all one click.
+- **Status you can trust.** It reconciles against what Docker is actually doing,
+  so a crash or reboot never leaves a stale "running" badge — and tells you the
+  difference between a build that failed and a container that crashed.
+- **See everything.** Live logs, an interactive container shell, metrics, and an
+  audit log of every action.
+- **Yours, safely.** Admin-only with optional two-factor, encrypted env vars,
+  typed-slug confirmation on destructive actions, and backups built in.
+
+## A look around
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/assets/screenshots/ship.png" alt="Ship a zip" /><br /><em><b>Ship.</b> Drop a zip; see the container name and route before you commit.</em></td>
+    <td width="50%"><img src="docs/assets/screenshots/system.png" alt="System detail" /><br /><em><b>Control.</b> An honest status grid and one-click actions per system.</em></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/assets/screenshots/server.png" alt="Server health" /><br /><em><b>Watch.</b> Docker, proxy, database, disk, backups — and SYSTEMS. itself.</em></td>
+    <td width="50%" align="center"><img src="docs/assets/screenshots/mobile.png" alt="Mobile PWA" width="50%" /><br /><em><b>Anywhere.</b> Installable PWA — run your fleet from your phone.</em></td>
+  </tr>
+</table>
 
 ## Domain model
 
