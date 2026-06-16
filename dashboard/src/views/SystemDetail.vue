@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '../api/client'
 import StatusBadge from '../components/StatusBadge.vue'
@@ -7,9 +7,11 @@ import StatsCharts from '../components/StatsCharts.vue'
 import LogConsole from '../components/LogConsole.vue'
 import ExecTerminal from '../components/ExecTerminal.vue'
 import CopyButton from '../components/CopyButton.vue'
+import ConfirmDialog from '../components/ConfirmDialog.vue'
 import { useToast } from '../composables/useToast'
 import { BASE_DOMAIN, hostFor, urlFor } from '../config'
 import { fmtDateTime } from '../utils/date'
+import { isCrashed } from '../utils/status'
 
 const { showToast } = useToast()
 const props = defineProps({ slug: { type: String, required: true } })
@@ -77,43 +79,23 @@ async function provisionDb() {
   finally { provisioning.value = false }
 }
 
-/* Redeploy / delete / rollback */
+/* Redeploy / delete / rollback (modals use ConfirmDialog: focus + Esc handled there) */
 const redeployFile = ref(null)
 const redeploying = ref(false)
 const showBuildLog = ref(false)
 const confirmDelete = ref(false)
-const deleteConfirmText = ref('')
 const deleting = ref(false)
-
-// Modal focus management refs (watchers set up after both modals are declared).
-const delInput = ref(null)
-const purgeInput = ref(null)
-let lastFocused = null
-
-function openDelete() {
-  deleteConfirmText.value = ''
-  confirmDelete.value = true
-}
+function openDelete() { confirmDelete.value = true }
 
 /* Purge (typed-slug confirm) */
 const confirmPurge = ref(false)
-const purgeText = ref('')
 const purging = ref(false)
-function openPurge() { purgeText.value = ''; confirmPurge.value = true }
+function openPurge() { confirmPurge.value = true }
 
-// Move focus into a dialog on open; restore to the trigger on close.
-watch(confirmDelete, (v) => {
-  if (v) { lastFocused = document.activeElement; nextTick(() => delInput.value && delInput.value.focus()) }
-  else if (lastFocused) { lastFocused.focus && lastFocused.focus(); lastFocused = null }
-})
-watch(confirmPurge, (v) => {
-  if (v) { lastFocused = document.activeElement; nextTick(() => purgeInput.value && purgeInput.value.focus()) }
-  else if (lastFocused) { lastFocused.focus && lastFocused.focus(); lastFocused = null }
-})
 async function doPurge() {
   purging.value = true; error.value = ''
   try {
-    await api.post(`/projects/${props.slug}/purge`, { confirm: purgeText.value })
+    await api.post(`/projects/${props.slug}/purge`, { confirm: system.value.slug })
     router.replace({ name: 'systems' })
   } catch (e) {
     error.value = e.message || 'Purge failed.'; purging.value = false; confirmPurge.value = false
@@ -183,7 +165,7 @@ const truth = computed(() => {
   const containerTone =
     s.status === 'running' ? 'ok' : s.status === 'error' ? 'error' : s.status === 'building' ? 'warn' : 'idle'
   const containerLabel =
-    s.status === 'running' ? 'Running' : s.status === 'building' ? 'Building' : s.status === 'error' ? 'Crashed' : 'Stopped'
+    s.status === 'running' ? 'Running' : s.status === 'building' ? 'Building' : s.status === 'error' ? (isCrashed(s) ? 'Crashed' : 'Build failed') : 'Stopped'
 
   const routePublished = !!s.route_published
   const vis = s.visibility || 'public'
@@ -220,15 +202,20 @@ async function loadSystem() {
 
 /* ---- Lifecycle ---- */
 const ACTION_DONE = { start: 'started', stop: 'stopped', restart: 'restarted' }
+const OPTIMISTIC = { start: 'running', stop: 'stopped', restart: 'running' }
 async function lifecycle(action) {
   acting.value = action
   error.value = ''
+  // Optimistic: move the badge/truth grid immediately, revert if the call fails.
+  const prevStatus = system.value && system.value.status
+  if (system.value && OPTIMISTIC[action]) system.value = { ...system.value, status: OPTIMISTIC[action] }
   try {
     const data = await api.post(`/projects/${props.slug}/${action}`)
     if (data && data.project) system.value = data.project
     else await loadSystem()
     showToast(`${system.value?.name || 'System'} ${ACTION_DONE[action] || action}`, 'success')
   } catch (e) {
+    if (system.value && prevStatus !== undefined) system.value = { ...system.value, status: prevStatus }
     error.value = e.message || `Failed to ${action}.`
     showToast(e.message || `Failed to ${action}`, 'error')
   } finally {
@@ -315,13 +302,16 @@ async function saveEnv() {
 }
 
 /* ---- Redeploy / rollback / delete ---- */
+const confirmRedeploy = ref(false)
 function pickRedeploy() { fileInput.value && fileInput.value.click() }
-async function onRedeployFile(e) {
+// Picking a file no longer fires immediately — it opens a confirm step, since
+// a redeploy replaces the running container.
+function onRedeployFile(e) {
   const f = e.target.files && e.target.files[0]
+  e.target.value = ''
   if (!f) return
   redeployFile.value = f
-  await doRedeploy()
-  e.target.value = ''
+  confirmRedeploy.value = true
 }
 async function doRedeploy() {
   if (!redeployFile.value) return
@@ -329,11 +319,14 @@ async function doRedeploy() {
   error.value = ''
   try {
     await api.upload(`/deploy/${props.slug}/redeploy`, { files: { file: redeployFile.value } })
+    confirmRedeploy.value = false
     showBuildLog.value = true
     tab.value = 'Overview'
+    showToast('Redeploy started — streaming the build log', 'info')
     await loadSystem()
   } catch (e) {
     error.value = e.message || 'Redeploy failed.'
+    showToast(e.message || 'Redeploy failed', 'error')
   } finally {
     redeploying.value = false
     redeployFile.value = null
@@ -399,13 +392,6 @@ async function fetchOverviewStat() {
   try { overviewStat.value = await api.get(`/projects/${props.slug}/stats`) } catch { /* best-effort */ }
 }
 
-function onKeydown(e) {
-  if (e.key === 'Escape') {
-    if (confirmDelete.value) confirmDelete.value = false
-    if (confirmPurge.value) confirmPurge.value = false
-  }
-}
-
 onMounted(async () => {
   await loadSystem()
   if (system.value) {
@@ -415,12 +401,10 @@ onMounted(async () => {
   loadFeatures()
   fetchOverviewStat()
   document.addEventListener('visibilitychange', onVisibility)
-  document.addEventListener('keydown', onKeydown)
 })
 onBeforeUnmount(() => {
   stopStats()
   document.removeEventListener('visibilitychange', onVisibility)
-  document.removeEventListener('keydown', onKeydown)
 })
 </script>
 
@@ -446,7 +430,7 @@ onBeforeUnmount(() => {
             <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7" /><path d="M19 12H5" /></svg>
             Systems
           </RouterLink>
-          <StatusBadge :status="system.status" />
+          <StatusBadge :status="system.status" :crashed="isCrashed(system)" />
         </div>
         <h1 style="margin-top:10px">{{ system.name }}</h1>
         <a class="mono small" :href="publicUrl" target="_blank" rel="noopener">{{ publicHost }}</a>
@@ -721,57 +705,37 @@ onBeforeUnmount(() => {
 
   <div v-else class="error-box">{{ error || 'System not found.' }}</div>
 
-  <!-- Delete confirm -->
-  <Teleport to="body">
-    <Transition name="fade">
-      <div v-if="confirmDelete" class="modal-backdrop" @click.self="confirmDelete = false">
-        <div class="modal stack" role="dialog" aria-modal="true" aria-labelledby="del-title">
-          <h3 id="del-title">Delete this system?</h3>
-          <p class="muted small" style="margin:0">
-            This permanently removes <strong>{{ system?.name }}</strong>, its container, image and
-            public route. This cannot be undone.
-          </p>
-          <div class="callout warn" style="margin:0">
-            <div class="co-bar"></div>
-            <div>No backup is taken automatically. Back up first if you might need this system again.</div>
-          </div>
-          <label class="label" style="margin:0">Type <span class="mono" style="color:var(--text)">{{ system?.slug }}</span> to confirm</label>
-          <input ref="delInput" aria-label="Type the system slug to confirm deletion" v-model="deleteConfirmText" :placeholder="system?.slug" autocapitalize="none" autocorrect="off" />
-          <div class="btn-row">
-            <button class="btn" :disabled="deleting" @click="confirmDelete = false">Cancel</button>
-            <button class="btn btn-danger" :disabled="deleting || deleteConfirmText !== system?.slug" @click="doDelete">
-              <span v-if="deleting" class="spinner"></span><span v-else>Delete system</span>
-            </button>
-          </div>
-        </div>
-      </div>
-    </Transition>
+  <!-- Redeploy confirm -->
+  <ConfirmDialog v-model:open="confirmRedeploy" title="Redeploy this system?" confirm-text="Deploy release" :busy="redeploying" @confirm="doRedeploy">
+    <p class="muted small" style="margin:0">
+      This builds <strong>{{ redeployFile?.name }}</strong> and replaces the running
+      container for <strong>{{ system?.name }}</strong>. The previous release is kept for rollback.
+    </p>
+  </ConfirmDialog>
 
-    <!-- Purge confirm -->
-    <Transition name="fade">
-      <div v-if="confirmPurge" class="modal-backdrop" @click.self="confirmPurge = false">
-        <div class="modal stack" role="dialog" aria-modal="true" aria-labelledby="purge-title">
-          <h3 id="purge-title">Purge this system?</h3>
-          <p class="muted small" style="margin:0">
-            This permanently removes <strong>{{ system?.name }}</strong> — container, images, route,
-            release files and all records. This cannot be undone.
-          </p>
-          <div class="callout danger" style="margin:0">
-            <div class="co-bar"></div>
-            <div>No backup is taken automatically. Back up first (see docs/DISASTER_RECOVERY.md).</div>
-          </div>
-          <label class="label" style="margin:0">Type <span class="mono" style="color:var(--text)">{{ system?.slug }}</span> to confirm</label>
-          <input ref="purgeInput" aria-label="Type the system slug to confirm purge" v-model="purgeText" :placeholder="system?.slug" autocapitalize="none" autocorrect="off" />
-          <div class="btn-row">
-            <button class="btn" :disabled="purging" @click="confirmPurge = false">Cancel</button>
-            <button class="btn btn-danger" :disabled="purging || purgeText !== system?.slug" @click="doPurge">
-              <span v-if="purging" class="spinner"></span><span v-else>Purge everything</span>
-            </button>
-          </div>
-        </div>
-      </div>
-    </Transition>
-  </Teleport>
+  <!-- Delete confirm -->
+  <ConfirmDialog v-model:open="confirmDelete" title="Delete this system?" tone="danger" confirm-text="Delete system" :busy="deleting" :require-text="system?.slug" @confirm="doDelete">
+    <p class="muted small" style="margin:0">
+      This permanently removes <strong>{{ system?.name }}</strong>, its container, image and
+      public route. This cannot be undone.
+    </p>
+    <div class="callout warn" style="margin:0">
+      <div class="co-bar"></div>
+      <div>No backup is taken automatically. Back up first if you might need this system again.</div>
+    </div>
+  </ConfirmDialog>
+
+  <!-- Purge confirm -->
+  <ConfirmDialog v-model:open="confirmPurge" title="Purge this system?" tone="danger" confirm-text="Purge everything" :busy="purging" :require-text="system?.slug" @confirm="doPurge">
+    <p class="muted small" style="margin:0">
+      This permanently removes <strong>{{ system?.name }}</strong> — container, images, route,
+      release files and all records. This cannot be undone.
+    </p>
+    <div class="callout danger" style="margin:0">
+      <div class="co-bar"></div>
+      <div>No backup is taken automatically. Back up first — recovery steps are in the docs.</div>
+    </div>
+  </ConfirmDialog>
 </template>
 
 <style scoped>

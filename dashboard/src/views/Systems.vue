@@ -6,6 +6,7 @@ import StatusBadge from '../components/StatusBadge.vue'
 import { useToast } from '../composables/useToast'
 import { BASE_DOMAIN, hostFor, urlFor } from '../config'
 import { fmtAgo } from '../utils/date'
+import { isCrashed } from '../utils/status'
 
 const router = useRouter()
 const { showToast } = useToast()
@@ -162,7 +163,7 @@ onBeforeUnmount(() => clearInterval(timer))
         <div class="section-label">Latest deploy</div>
         <div class="spread">
           <div style="min-width:0"><div class="sc-name">{{ latest.name }}</div><div class="mono small dim">{{ hostFor(latest.slug) }}</div></div>
-          <div class="row gap-sm"><span class="small muted">{{ fmtAgo(latest.updated_at || latest.created_at) }}</span><StatusBadge :status="latest.status" /></div>
+          <div class="row gap-sm"><span class="small muted">{{ fmtAgo(latest.updated_at || latest.created_at) }}</span><StatusBadge :status="latest.status" :crashed="isCrashed(latest)" /></div>
         </div>
       </div>
       <div class="card">
@@ -197,7 +198,7 @@ onBeforeUnmount(() => clearInterval(timer))
             <div class="sc-name">{{ s.name }}</div>
             <div class="sc-host mono">{{ hostFor(s.slug) }}</div>
           </div>
-          <StatusBadge :status="s.status" />
+          <StatusBadge :status="s.status" :crashed="isCrashed(s)" />
         </div>
 
         <div class="sc-facts">
@@ -211,7 +212,7 @@ onBeforeUnmount(() => clearInterval(timer))
           <span v-if="s.status === 'running' && stats[s.slug]" class="mono small muted">
             CPU {{ (stats[s.slug].cpu_percent ?? 0).toFixed(1) }}% · RAM {{ (stats[s.slug].memory_mb ?? 0).toFixed(0) }} MB<span v-if="s.port"> · :{{ s.port }}</span>
           </span>
-          <span v-else class="small dim">{{ s.status === 'building' ? 'Building…' : s.status === 'error' ? 'Last deploy failed' : 'Not running' }}</span>
+          <span v-else class="small dim">{{ s.status === 'building' ? 'Building…' : s.status === 'error' ? (isCrashed(s) ? 'Crashed' : 'Build failed') : 'Not running' }}</span>
           <a v-if="s.status === 'running'" class="sc-open small" :href="urlFor(s.slug)" target="_blank" rel="noopener" @click.stop>Open ↗</a>
         </div>
       </div>

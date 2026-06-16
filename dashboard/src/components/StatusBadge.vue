@@ -2,7 +2,9 @@
 import { computed } from 'vue'
 
 const props = defineProps({
-  status: { type: String, default: 'stopped' }
+  status: { type: String, default: 'stopped' },
+  // When status is 'error', distinguish a runtime crash from a build failure.
+  crashed: { type: Boolean, default: false }
 })
 
 const cls = computed(() => {
@@ -17,12 +19,12 @@ const cls = computed(() => {
 const LABELS = {
   running: 'Live',
   building: 'Building',
-  error: 'Failed',
   stopped: 'Stopped'
 }
 
 const label = computed(() => {
   if (!props.status) return 'Unknown'
+  if (props.status === 'error') return props.crashed ? 'Crashed' : 'Failed'
   return LABELS[props.status] || (props.status.charAt(0).toUpperCase() + props.status.slice(1))
 })
 </script>
