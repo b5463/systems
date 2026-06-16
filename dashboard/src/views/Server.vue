@@ -108,7 +108,7 @@ onMounted(load)
   <div class="page-head">
     <h1>Server</h1>
     <div class="head-actions">
-      <button class="btn btn-sm btn-ghost" @click="load">Refresh</button>
+      <button class="btn btn-sm btn-ghost" data-refresh @click="load">Refresh</button>
     </div>
   </div>
 

@@ -121,7 +121,7 @@ onBeforeUnmount(() => clearInterval(timer))
       </div>
     </div>
     <div class="head-actions">
-      <button class="btn btn-sm btn-ghost" @click="load()">Refresh</button>
+      <button class="btn btn-sm btn-ghost" data-refresh @click="load()">Refresh</button>
       <RouterLink class="btn btn-sm btn-primary" :to="{ name: 'ship' }">Ship a system</RouterLink>
     </div>
   </div>

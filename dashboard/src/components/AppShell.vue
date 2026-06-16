@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import SystemsLogo from './SystemsLogo.vue'
 import NavIcon from './NavIcon.vue'
+import KeyboardShortcuts from './KeyboardShortcuts.vue'
 
 const auth = useAuthStore()
 const route = useRoute()
@@ -84,6 +85,8 @@ const initial = computed(() => (auth.user?.username || '?').slice(0, 1).toUpperC
         <span>{{ item.label }}</span>
       </RouterLink>
     </nav>
+
+    <KeyboardShortcuts />
   </div>
 </template>
 
