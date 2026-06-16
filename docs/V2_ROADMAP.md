@@ -6,7 +6,9 @@ the dangerous backend and server changes isolated rather than bundled in.
 
 **Where it's at:** 2.0 release candidate (`2.0.0-rc.1`). The "V2 features" below
 are built and wired, just off by default behind their `.env` flags. Caddy and
-Postgres are wired too, pending validation on the real Windows host.
+Postgres are wired too, pending validation on the real Windows host. Since the
+feature work landed there's also been a hardening, UX, and maintainability pass
+(see "2.0-rc — hardening, UX & maintainability" below).
 
 ## V1.1 — Foundation / product shell (done)
 
@@ -116,6 +118,44 @@ Still needs Windows host validation: the Node-API/worker container runtime plus
 Caddy reachability, Dockerfile builds, and the risky flags above run end-to-end
 on the host.
 
+## 2.0-rc — hardening, UX & maintainability (done)
+
+A pass after the feature work, driven by deep code/UX audits. All shipped:
+
+Reliability & security:
+- Container-state reconciliation also recovers builds left stuck in `building`
+  after a process restart.
+- Env updates **merge** over the existing vars (and support explicit removal)
+  instead of replacing — a full replace was silently wiping un-retyped vars,
+  since the API only ever returns key names. Failed env recreates also clear the
+  dangling `container_id`.
+- Serialized deploy port allocation (no two concurrent deploys grabbing the same
+  port); chunked-upload sessions + temp files get a TTL sweeper.
+- Basic-auth username validated before it's written into a Caddy route
+  (directive-injection guard); equal-time login (no username-enumeration oracle);
+  the API refuses to start with the insecure default `JWT_SECRET` in production.
+- 2FA enable/disable and password change/reset bump `token_version`, so they
+  sign other sessions out. DB indexes for the hot lookups; `stats_history`
+  retention pruning.
+
+UX & feel:
+- Mobile **bottom tab bar** (replaced the hamburger drawer); keyboard shortcuts
+  with a `?` help overlay; optimistic start/stop/restart; success/failure toasts
+  on the actions that change live state; copy buttons on secrets/IDs.
+- Reusable `ConfirmDialog` (delete / purge / redeploy) with focus management;
+  redeploy now has a confirm step; route transitions; Systems search + sort.
+- "Crashed" (ran then died) vs "Failed" (build) vocabulary; richer empty states;
+  an incident-recovery callout with one-click View logs / Restart / Redeploy /
+  Roll back; onboarding empty state; Server screen framed so "Set up on host" /
+  "Not measured yet" don't read as breakage.
+
+Maintainability & tooling:
+- Shared API helpers (`pub`, `loadOr404`) and frontend `config` / `date` /
+  `status` utilities; `readUploadToTmp`; the Settings tab extracted into a
+  `SystemSettings` component.
+- ESLint + Prettier on both packages (lint clean); route-level integration tests
+  via `app.inject` on top of the pure-logic unit tests.
+
 ## Not built yet (the honest backlog)
 
 None of this is wired today:
@@ -129,6 +169,24 @@ None of this is wired today:
   deploy-history rows are trimmed, the images aren't).
 - Persisted, editable settings in Admin (still `.env`-driven).
 - Advanced metrics history and alerting beyond the current snapshots.
+
+## UX polish backlog (nice-to-have)
+
+Low-impact niceties, consciously deferred — worth doing but not worth churning
+working code for right now:
+
+- Drive the Ship deploy-lifecycle rail from real build phases (parse the build
+  log) instead of the current decorative sweep — or visually mark it as a
+  reference legend so it never reads as live progress.
+- Per-cell tooltips / a small legend on the Overview "truth grid" (what
+  "Auto-detected", "Not measured yet", "None (private)" mean).
+- Co-locate Purge next to Delete (Purge currently lives only in Settings, one
+  level deeper than Delete) and note in the Delete dialog that the system stays
+  recoverable until purged.
+- First-run framing on the login screen (where the initial admin comes from),
+  for the genuine first boot.
+- A "what to do next" line paired with the Failed/Crashed states on the Systems
+  cards (the detail-page callout already does this).
 
 ## v2.5 — Finish and harden the single host
 
