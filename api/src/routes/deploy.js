@@ -29,6 +29,34 @@ function withDeployLock(fn) {
   return run;
 }
 
+// Stream a multipart upload to a temp .zip, capturing string fields. Enforces
+// the transport cap. Shared by the deploy + redeploy endpoints.
+// Returns { zipPath, fields, tooLarge }.
+async function readUploadToTmp(request) {
+  const fields = {};
+  let zipPath = null;
+  let tooLarge = false;
+  for await (const part of request.parts()) {
+    if (part.type === 'field') {
+      fields[part.fieldname] = part.value;
+    } else if (part.type === 'file' && part.fieldname === 'file') {
+      zipPath = `/tmp/${uuidv4()}.zip`;
+      const chunks = [];
+      let total = 0;
+      for await (const chunk of part.file) {
+        total += chunk.length;
+        if (total > MAX_MULTIPART_BYTES) { await part.file.resume(); tooLarge = true; break; }
+        chunks.push(chunk);
+      }
+      if (!tooLarge) await fsp.writeFile(zipPath, Buffer.concat(chunks));
+    } else if (part.file) {
+      await part.file.resume();
+    }
+  }
+  if (tooLarge && zipPath) { await fsp.rm(zipPath, { force: true }).catch(() => {}); zipPath = null; }
+  return { zipPath, fields, tooLarge };
+}
+
 // Trim deploy_history rows beyond the retention count (metadata only — the
 // rollback pointer lives on the project row and is never trimmed).
 function pruneReleases(projectId) {
@@ -346,57 +374,16 @@ async function deployRoutes(fastify, options) {
     },
   }, async (request, reply) => {
     let zipPath = null;
-    let extractDir = null;
-
     try {
-      const parts = request.parts();
-      let name = null;
-      let slug = null;
-      let visibility = 'public';
+      const up = await readUploadToTmp(request);
+      zipPath = up.zipPath;
+      if (up.tooLarge) return reply.code(413).send({ error: `ZIP exceeds the ${MAX_MULTIPART_BYTES / 1048576}MB limit` });
 
-      for await (const part of parts) {
-        if (part.type === 'field') {
-          if (part.fieldname === 'name') name = part.value;
-          else if (part.fieldname === 'slug') slug = part.value;
-          else if (part.fieldname === 'visibility' && ['public', 'private'].includes(part.value)) visibility = part.value;
-        } else if (part.type === 'file' && part.fieldname === 'file') {
-          const uuid = uuidv4();
-          zipPath = `/tmp/${uuid}.zip`;
-          extractDir = `/tmp/${uuid}`;
-
-          const chunks = [];
-          let totalSize = 0;
-          for await (const chunk of part.file) {
-            totalSize += chunk.length;
-            if (totalSize > MAX_MULTIPART_BYTES) {
-              await part.file.resume();
-              if (zipPath) await fsp.rm(zipPath, { force: true }).catch(() => {});
-              return reply.code(413).send({ error: 'ZIP file exceeds 500MB limit' });
-            }
-            chunks.push(chunk);
-          }
-          await fsp.writeFile(zipPath, Buffer.concat(chunks));
-        } else if (part.file) {
-          await part.file.resume();
-        }
-      }
-
-      if (!name || !slug) {
-        if (zipPath) await fsp.rm(zipPath, { force: true }).catch(() => {});
-        return reply.code(400).send({ error: 'Missing required fields: name, slug' });
-      }
-
-      const slugErr = slugError(slug);
-      if (slugErr) {
-        if (zipPath) await fsp.rm(zipPath, { force: true }).catch(() => {});
-        return reply.code(400).send({ error: slugErr });
-      }
-
-      if (!zipPath) {
-        return reply.code(400).send({ error: 'Missing file upload' });
-      }
-
-      const result = await beginDeploy({ name, slug, visibility, zipPath, userId: request.user.id, ip: request.ip });
+      const visibility = ['public', 'private'].includes(up.fields.visibility) ? up.fields.visibility : 'public';
+      const result = await beginDeploy({
+        name: up.fields.name, slug: up.fields.slug, visibility, zipPath,
+        userId: request.user.id, ip: request.ip,
+      });
       if (!result.ok) {
         if (zipPath) await fsp.rm(zipPath, { force: true }).catch(() => {});
         return reply.code(result.code).send({ error: result.error });
@@ -404,7 +391,6 @@ async function deployRoutes(fastify, options) {
       return reply.code(202).send({ project: result.project });
     } catch (err) {
       if (zipPath) await fsp.rm(zipPath, { force: true }).catch(() => {});
-      if (extractDir) await fsp.rm(extractDir, { recursive: true, force: true }).catch(() => {});
       throw err;
     }
   });
@@ -422,33 +408,10 @@ async function deployRoutes(fastify, options) {
     if (project.status === 'building') return reply.code(409).send({ error: 'Build already in progress' });
 
     let zipPath = null;
-    let extractDir = null;
-
     try {
-      const parts = request.parts();
-
-      for await (const part of parts) {
-        if (part.type === 'file' && part.fieldname === 'file') {
-          const uuid = uuidv4();
-          zipPath = `/tmp/${uuid}.zip`;
-          extractDir = `/tmp/${uuid}`;
-
-          const chunks = [];
-          let totalSize = 0;
-          for await (const chunk of part.file) {
-            totalSize += chunk.length;
-            if (totalSize > MAX_MULTIPART_BYTES) {
-              await part.file.resume();
-              if (zipPath) await fsp.rm(zipPath, { force: true }).catch(() => {});
-              return reply.code(413).send({ error: 'ZIP file exceeds 500MB limit' });
-            }
-            chunks.push(chunk);
-          }
-          await fsp.writeFile(zipPath, Buffer.concat(chunks));
-        } else if (part.file) {
-          await part.file.resume();
-        }
-      }
+      const up = await readUploadToTmp(request);
+      zipPath = up.zipPath;
+      if (up.tooLarge) return reply.code(413).send({ error: `ZIP exceeds the ${MAX_MULTIPART_BYTES / 1048576}MB limit` });
 
       const result = await beginRedeploy({ slug, zipPath, userId: request.user.id, ip: request.ip });
       if (!result.ok) {
@@ -458,7 +421,6 @@ async function deployRoutes(fastify, options) {
       return reply.code(202).send({ message: 'Redeploy started', slug });
     } catch (err) {
       if (zipPath) await fsp.rm(zipPath, { force: true }).catch(() => {});
-      if (extractDir) await fsp.rm(extractDir, { recursive: true, force: true }).catch(() => {});
       throw err;
     }
   });
