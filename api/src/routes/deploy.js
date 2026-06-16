@@ -18,6 +18,15 @@ const buildListeners = new Map();
 
 const RELEASE_RETENTION = () => Number(process.env.RELEASE_RETENTION_DEFAULT) || 3;
 
+// Serialize the port-allocation + INSERT critical section across concurrent
+// deploys (an in-process promise chain).
+let deployLock = Promise.resolve();
+function withDeployLock(fn) {
+  const run = deployLock.then(fn, fn);
+  deployLock = run.then(() => {}, () => {});
+  return run;
+}
+
 // Trim deploy_history rows beyond the retention count (metadata only — the
 // rollback pointer lives on the project row and is never trimmed).
 function pruneReleases(projectId) {
@@ -242,12 +251,19 @@ async function beginDeploy({ name, slug, visibility = 'public', zipPath, userId,
   const existing = db.prepare('SELECT id FROM projects WHERE slug = ? OR name = ?').get(slug, name);
   if (existing) return { ok: false, code: 409, error: 'A project with this name or slug already exists' };
 
-  const dbPorts = db.prepare('SELECT port FROM projects WHERE port IS NOT NULL').all();
-  const usedPorts = new Set(dbPorts.map((r) => r.port));
-  const port = await dockerService.findFreePort(4000, 5000, usedPorts);
-
-  db.prepare(`INSERT INTO projects (name, slug, port, status, visibility) VALUES (?, ?, ?, 'building', ?)`).run(name, slug, port, visibility);
-  const project = db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug);
+  // Serialize port allocation + INSERT: findFreePort awaits Docker, so two
+  // concurrent deploys could otherwise pick the same port before either row
+  // commits. The lock makes the chosen port visible to the next call's scan.
+  let port, project, conflict;
+  await withDeployLock(async () => {
+    if (db.prepare('SELECT id FROM projects WHERE slug = ? OR name = ?').get(slug, name)) { conflict = true; return; }
+    const dbPorts = db.prepare('SELECT port FROM projects WHERE port IS NOT NULL').all();
+    const usedPorts = new Set(dbPorts.map((r) => r.port));
+    port = await dockerService.findFreePort(4000, 5000, usedPorts);
+    db.prepare(`INSERT INTO projects (name, slug, port, status, visibility) VALUES (?, ?, ?, 'building', ?)`).run(name, slug, port, visibility);
+    project = db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug);
+  });
+  if (conflict) return { ok: false, code: 409, error: 'A project with this name or slug already exists' };
 
   buildLogs.set(slug, []);
   buildStatus.set(slug, 'building');
