@@ -1,8 +1,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { api } from '../api/client'
-
-const BASE_DOMAIN = import.meta.env.VITE_BASE_DOMAIN || 'acronym.sk'
+import { BASE_DOMAIN } from '../config'
 
 const info = ref(null)
 const loading = ref(true)

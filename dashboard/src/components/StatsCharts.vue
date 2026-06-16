@@ -25,7 +25,7 @@ ChartJS.register(
 )
 
 const props = defineProps({
-  // history: array of { t, cpu, mem, memLimit, rx, tx }
+  // history: array of { label, cpu, mem }
   history: { type: Array, default: () => [] },
   latest: { type: Object, default: null }
 })

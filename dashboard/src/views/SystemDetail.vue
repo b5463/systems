@@ -8,13 +8,12 @@ import LogConsole from '../components/LogConsole.vue'
 import ExecTerminal from '../components/ExecTerminal.vue'
 import CopyButton from '../components/CopyButton.vue'
 import { useToast } from '../composables/useToast'
+import { BASE_DOMAIN, hostFor, urlFor } from '../config'
+import { fmtDateTime } from '../utils/date'
 
 const { showToast } = useToast()
 const props = defineProps({ slug: { type: String, required: true } })
 const router = useRouter()
-
-const BASE_DOMAIN = import.meta.env.VITE_BASE_DOMAIN || 'acronym.sk'
-const SCHEME = import.meta.env.VITE_PUBLIC_SCHEME || 'https'
 
 const TABS = ['Overview', 'Deployments', 'Logs', 'Metrics', 'Console', 'Settings']
 const tab = ref('Overview')
@@ -173,15 +172,9 @@ async function setPrimary(val) {
 const fileInput = ref(null)
 const rollingBack = ref(false)
 
-const publicHost = computed(() => (system.value ? `${system.value.slug}.${BASE_DOMAIN}` : ''))
-const publicUrl = computed(() => (system.value ? `${SCHEME}://${publicHost.value}` : '#'))
+const publicHost = computed(() => (system.value ? hostFor(system.value.slug) : ''))
+const publicUrl = computed(() => (system.value ? urlFor(system.value.slug) : '#'))
 const isRunning = computed(() => system.value?.status === 'running')
-
-function fmtDate(s) {
-  if (!s) return '–'
-  const d = new Date(s)
-  return Number.isNaN(d.getTime()) ? s : d.toLocaleString()
-}
 
 /* ---- Truth model ---- */
 const truth = computed(() => {
@@ -541,8 +534,8 @@ onBeforeUnmount(() => {
         <div class="kv"><span class="k">Port</span><span class="v mono">{{ system.port ?? '–' }}</span></div>
         <div class="kv"><span class="k">Container</span><span class="v mono small">{{ system.container_id ? String(system.container_id).slice(0,12) : '–' }}</span></div>
         <div class="kv"><span class="k">Image</span><span class="v mono small">{{ system.image_id ? String(system.image_id).replace('sha256:','').slice(0,12) : '–' }}</span></div>
-        <div class="kv"><span class="k">Created</span><span class="v small">{{ fmtDate(system.created_at) }}</span></div>
-        <div class="kv"><span class="k">Last deploy</span><span class="v small">{{ fmtDate(system.updated_at) }}</span></div>
+        <div class="kv"><span class="k">Created</span><span class="v small">{{ fmtDateTime(system.created_at) }}</span></div>
+        <div class="kv"><span class="k">Last deploy</span><span class="v small">{{ fmtDateTime(system.updated_at) }}</span></div>
       </div>
 
       <div v-if="showBuildLog" class="card">
@@ -575,7 +568,7 @@ onBeforeUnmount(() => {
             <div class="c-name">Release {{ deployHistory.length - i }}</div>
             <div class="c-sub">image {{ h.image_id ? String(h.image_id).replace('sha256:','').slice(0,12) : '–' }}</div>
           </div>
-          <div class="conn-state">{{ fmtDate(h.deployed_at) }}</div>
+          <div class="conn-state">{{ fmtDateTime(h.deployed_at) }}</div>
         </div>
       </div>
     </div>

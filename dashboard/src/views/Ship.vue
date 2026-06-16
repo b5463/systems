@@ -4,15 +4,13 @@ import { useRouter } from 'vue-router'
 import { api } from '../api/client'
 import LogConsole from '../components/LogConsole.vue'
 import FlowField from '../components/FlowField.vue'
+import { BASE_DOMAIN, SCHEME } from '../config'
 
 const router = useRouter()
 
 // Defined deploy pipeline — shown as a reference rail (atmosphere, not a fake
 // live readout; SYSTEMS. does not assert which substep is running).
 const LIFECYCLE = ['archive', 'detect', 'install', 'build', 'container', 'route', 'HTTPS', 'health', 'live']
-
-const BASE_DOMAIN = import.meta.env.VITE_BASE_DOMAIN || 'acronym.sk'
-const SCHEME = import.meta.env.VITE_PUBLIC_SCHEME || 'https'
 
 const VISIBILITY = [
   { key: 'public', label: 'Public', desc: 'Public route. Anyone with the URL can reach it.' },

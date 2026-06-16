@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { api } from '../api/client'
 import CopyButton from '../components/CopyButton.vue'
+import { fmtDate } from '../utils/date'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -117,11 +118,6 @@ const users = ref([])
 const usersLoading = ref(true)
 const usersError = ref('')
 
-function fmtDate(s) {
-  if (!s) return '–'
-  const d = new Date(s)
-  return Number.isNaN(d.getTime()) ? s : d.toLocaleDateString()
-}
 
 async function loadUsers() {
   usersError.value = ''

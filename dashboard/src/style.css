@@ -598,35 +598,6 @@ select:focus {
   font-size: 13px;
 }
 
-.notice-error {
-  background: rgba(248, 81, 73, 0.1);
-  border: 1px solid rgba(248, 81, 73, 0.4);
-  color: #ff8b85;
-  padding: 10px 14px;
-  border-radius: var(--radius-sm);
-  font-size: 13px;
-}
-
-.notice-building {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.notice-building .dot {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: var(--warn);
-  animation: pulse 1.4s ease-in-out infinite;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .notice-building .dot {
-    animation: none;
-  }
-}
-
 .empty {
   text-align: center;
   padding: 48px 16px;

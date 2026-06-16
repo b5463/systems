@@ -4,12 +4,11 @@ import { useRouter } from 'vue-router'
 import { api } from '../api/client'
 import StatusBadge from '../components/StatusBadge.vue'
 import { useToast } from '../composables/useToast'
+import { BASE_DOMAIN, hostFor, urlFor } from '../config'
+import { fmtAgo } from '../utils/date'
 
 const router = useRouter()
 const { showToast } = useToast()
-
-const BASE_DOMAIN = import.meta.env.VITE_BASE_DOMAIN || 'acronym.sk'
-const SCHEME = import.meta.env.VITE_PUBLIC_SCHEME || 'https'
 
 const systems = ref([])
 const loading = ref(true)
@@ -53,8 +52,6 @@ async function loadServer() {
 
 function tick() { if (document.visibilityState === 'visible') load(true) }
 function open(s) { router.push({ name: 'system-detail', params: { slug: s.slug } }) }
-function hostFor(slug) { return `${slug}.${BASE_DOMAIN}` }
-function urlFor(slug) { return `${SCHEME}://${hostFor(slug)}` }
 
 const active = computed(() => systems.value.filter((s) => s.status !== 'deleted'))
 const deleted = computed(() => systems.value.filter((s) => s.status === 'deleted'))
@@ -103,18 +100,6 @@ function statusLabel(s) {
   }
 }
 function statusTone(s) { return s === 'connected' ? 'ok' : s === 'unavailable' ? 'error' : 'idle' }
-
-function fmtAgo(s) {
-  if (!s) return '—'
-  const d = new Date(s)
-  if (Number.isNaN(d.getTime())) return s
-  const mins = Math.round((Date.now() - d.getTime()) / 60000)
-  if (mins < 1) return 'just now'
-  if (mins < 60) return `${mins}m ago`
-  const hrs = Math.round(mins / 60)
-  if (hrs < 24) return `${hrs}h ago`
-  return `${Math.round(hrs / 24)}d ago`
-}
 
 onMounted(async () => {
   await Promise.all([load(), loadServer()])
