@@ -27,6 +27,8 @@ const currentTitle = computed(() => {
 })
 
 const initial = computed(() => (auth.user?.username || '?').slice(0, 1).toUpperCase())
+
+function openShortcuts() { window.dispatchEvent(new Event('app:shortcuts')) }
 </script>
 
 <template>
@@ -50,6 +52,7 @@ const initial = computed(() => (auth.user?.username || '?').slice(0, 1).toUpperC
       </nav>
 
       <div class="sidebar-foot">
+        <button class="kbd-hint" @click="openShortcuts">Keyboard shortcuts <kbd>?</kbd></button>
         <RouterLink class="sidebar-user nav-link" :to="{ name: 'admin' }">
           <span class="avatar">{{ initial }}</span>
           <span style="min-width:0">
@@ -98,5 +101,29 @@ const initial = computed(() => (auth.user?.username || '?').slice(0, 1).toUpperC
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.kbd-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-dim);
+  font-size: 11.5px;
+  padding: 6px 8px;
+  margin-bottom: 4px;
+  border-radius: var(--radius-xs);
+}
+.kbd-hint:hover { color: var(--text-muted); background: var(--bg-hover); }
+.kbd-hint kbd {
+  font-family: var(--mono);
+  font-size: 10px;
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 3px;
+  padding: 1px 5px;
+  color: var(--text-muted);
 }
 </style>

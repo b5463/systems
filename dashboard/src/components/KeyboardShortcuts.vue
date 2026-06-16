@@ -42,8 +42,17 @@ function onKey(e) {
   }
 }
 
-onMounted(() => window.addEventListener('keydown', onKey))
-onBeforeUnmount(() => { window.removeEventListener('keydown', onKey); clearTimeout(gTimer) })
+// Also openable from a UI affordance (works without a keyboard, e.g. mobile).
+function toggle() { showHelp.value = !showHelp.value }
+onMounted(() => {
+  window.addEventListener('keydown', onKey)
+  window.addEventListener('app:shortcuts', toggle)
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onKey)
+  window.removeEventListener('app:shortcuts', toggle)
+  clearTimeout(gTimer)
+})
 </script>
 
 <template>

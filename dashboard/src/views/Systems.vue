@@ -30,8 +30,10 @@ async function load(silent = false) {
     systems.value = data.projects || []
     for (const s of systems.value) {
       const prev = prevStatuses.value[s.slug]
-      if (prev === 'running' && (s.status === 'error' || s.status === 'stopped')) {
-        showToast(`${s.name} stopped unexpectedly`, 'error')
+      // Only alert on a genuine crash (running → error); a running → stopped
+      // transition is usually a deliberate Stop, so don't cry wolf.
+      if (prev === 'running' && s.status === 'error') {
+        showToast(`${s.name} crashed`, 'error')
       }
       prevStatuses.value[s.slug] = s.status
     }
@@ -140,8 +142,12 @@ onBeforeUnmount(() => clearInterval(timer))
   <!-- Empty -->
   <div v-else-if="!active.length && !deleted.length" class="empty-block">
     <div class="eb-title">No systems yet.</div>
-    <div class="eb-sub">Ship a <span class="mono">.zip</span> to deploy one at <span class="mono">slug.{{ BASE_DOMAIN }}</span>.</div>
-    <div class="eb-actions"><RouterLink class="btn btn-primary" :to="{ name: 'ship' }">Ship a system</RouterLink></div>
+    <div class="eb-sub">
+      A <strong>system</strong> is an app SYSTEMS. builds and runs for you. Zip your
+      project (Vue/Vite or a static site — Node and Dockerfile too once enabled),
+      ship it, and it goes live at <span class="mono">slug.{{ BASE_DOMAIN }}</span> with HTTPS.
+    </div>
+    <div class="eb-actions"><RouterLink class="btn btn-primary" :to="{ name: 'ship' }">Ship your first system</RouterLink></div>
   </div>
 
   <template v-else>

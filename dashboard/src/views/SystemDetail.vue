@@ -332,10 +332,28 @@ onBeforeUnmount(() => {
     <!-- OVERVIEW -->
     <div v-show="tab === 'Overview'" class="stack">
       <div v-if="system.status === 'error'" class="callout danger">
-        <div class="co-bar"></div><div>This system crashed or its last deploy failed. Check the logs, then restart or roll back.</div>
+        <div class="co-bar"></div>
+        <div class="stack" style="gap:10px">
+          <div v-if="isCrashed(system)">
+            This system <strong>crashed</strong> — it was running, then the container stopped.
+            Check the logs, then restart{{ system.previous_image_id ? ' (or roll back to the last release)' : '' }}.
+          </div>
+          <div v-else>
+            The last <strong>build failed</strong>, so nothing new went live. Check the build log,
+            fix it, and redeploy{{ system.previous_image_id ? ' — or roll back to the last working release' : '' }}.
+          </div>
+          <div class="row gap-sm flex-wrap">
+            <button class="btn btn-sm" @click="selectTab('Logs')">View logs</button>
+            <button v-if="isCrashed(system)" class="btn btn-sm" :disabled="!!acting" @click="lifecycle('restart')">Restart</button>
+            <button class="btn btn-sm" :disabled="redeploying" @click="pickRedeploy">Redeploy…</button>
+            <button v-if="system.previous_image_id" class="btn btn-sm" :disabled="rollingBack" @click="doRollback">
+              <span v-if="rollingBack" class="spinner"></span><span v-else>Roll back</span>
+            </button>
+          </div>
+        </div>
       </div>
       <div v-else-if="system.status === 'building'" class="callout warn">
-        <div class="co-bar"></div><div>This system is building — the build log is streaming under Deployments.</div>
+        <div class="co-bar"></div><div>This system is building — this can take a minute. Live output appears in the build log below.</div>
       </div>
 
       <!-- Truth model -->
@@ -362,10 +380,11 @@ onBeforeUnmount(() => {
             <button v-else class="btn" :disabled="!!acting" @click="lifecycle('stop')">
               <span v-if="acting === 'stop'" class="spinner"></span><span v-else>Stop</span>
             </button>
-            <button class="btn" :disabled="redeploying" @click="pickRedeploy">
-              <span v-if="redeploying" class="spinner"></span><span v-else>Redeploy</span>
+            <button class="btn" :disabled="redeploying" title="Upload a new .zip — it builds and replaces the running container" @click="pickRedeploy">
+              <span v-if="redeploying" class="spinner"></span><span v-else>Redeploy…</span>
             </button>
           </div>
+          <div class="hint">Redeploy uploads a new <span class="mono">.zip</span>; the previous release is kept for rollback.</div>
         </div>
 
         <div class="action-group">

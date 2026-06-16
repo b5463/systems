@@ -149,9 +149,13 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
       <div class="section-label">Build log</div>
       <LogConsole :slug="deployedSlug" mode="build" @finished="onBuildFinished" />
     </div>
+    <div v-if="buildResult === 'error'" class="hint">
+      The build failed, so nothing went live — but the system now exists in a failed state.
+      Open it to read the logs and redeploy a fix.
+    </div>
     <div class="btn-row" style="max-width: 360px">
       <button class="btn" @click="reset">Ship another</button>
-      <button class="btn btn-primary" @click="openSystem">Open system</button>
+      <button class="btn btn-primary" @click="openSystem">{{ buildResult === 'error' ? 'Open system to fix' : 'Open system' }}</button>
     </div>
   </div>
 
@@ -168,6 +172,7 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
         <div class="field" style="margin:0">
           <label class="label" for="slug">Slug</label>
           <input id="slug" aria-label="notes" :value="slug" placeholder="notes" autocapitalize="none" autocorrect="off" @input="onSlugInput" />
+          <div class="hint">Becomes the URL below — choose carefully, it can't be changed after deploy.</div>
         </div>
         <div class="field" style="margin:0">
           <label class="label">Public URL</label>

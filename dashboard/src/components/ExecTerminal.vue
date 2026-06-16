@@ -118,10 +118,11 @@ onBeforeUnmount(() => {
 <template>
   <div class="stack">
     <div class="spread small muted">
-      <span>Interactive shell</span>
-      <span>{{ status }}</span>
+      <span>Interactive shell — click and type to run commands in the container</span>
+      <span>{{ status === 'connected' ? 'connected' : status }}</span>
     </div>
     <div ref="wrap" class="term-wrap" @click="term && term.focus()"></div>
     <div v-if="errMsg" class="error-box">{{ errMsg }}</div>
+    <div class="hint">Changes here live in the running container and are lost on the next redeploy or restart.</div>
   </div>
 </template>

@@ -59,7 +59,7 @@ function present(status) {
     case 'unavailable': return { tone: 'error', label: 'Not connected' }
     case 'overdue': return { tone: 'warn', label: 'Overdue' }
     case 'none': return { tone: 'warn', label: 'None yet' }
-    case 'host_validation': return { tone: 'idle', label: 'Requires host validation' }
+    case 'host_validation': return { tone: 'idle', label: 'Set up on host' }
     case 'planned': return { tone: 'idle', label: 'Planned' }
     case 'not_configured': return { tone: 'idle', label: 'Not configured' }
     case 'not_measured': return { tone: 'idle', label: 'Not measured yet' }
@@ -122,6 +122,14 @@ onMounted(load)
   <div v-else-if="error" class="error-box">{{ error }}</div>
 
   <template v-else-if="info">
+    <div class="callout" style="margin-bottom: 22px">
+      <div class="co-bar" style="background: var(--accent)"></div>
+      <div><strong>“Set up on host” and “Not measured yet” are expected, not errors.</strong>
+        Caddy and Postgres are built in but connected during the one-time Windows host
+        setup; DNS is configured manually. SYSTEMS. only shows a component as connected
+        once it has actually observed it.</div>
+    </div>
+
     <!-- Core services (locked target stack) -->
     <div class="section-label">Core services</div>
     <div class="card" style="padding:0; margin-bottom: 22px">
