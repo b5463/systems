@@ -993,7 +993,7 @@ select:focus {
   padding: 28px 32px 64px;
 }
 
-/* ---------- Mobile top bar + drawer ---------- */
+/* ---------- Mobile top bar + bottom tab bar ---------- */
 .mobile-bar {
   display: none;
   position: sticky;
@@ -1014,34 +1014,55 @@ select:focus {
   letter-spacing: -0.01em;
 }
 
-.drawer-backdrop {
+/* Bottom tab bar — mobile primary navigation (one tap per surface). */
+.bottom-nav {
+  display: none;
   position: fixed;
-  inset: 0;
-  z-index: 60;
-  background: rgba(0, 0, 0, 0.55);
-}
-.drawer {
-  position: fixed;
-  top: 0;
   left: 0;
+  right: 0;
   bottom: 0;
-  width: 80%;
-  max-width: 300px;
-  z-index: 61;
-  background: #0c0d10;
-  border-right: 1px solid var(--border);
+  z-index: 40;
+  height: calc(var(--nav-height) + var(--safe-bottom));
+  padding-bottom: var(--safe-bottom);
+  background: rgba(10, 10, 12, 0.92);
+  backdrop-filter: saturate(180%) blur(12px);
+  -webkit-backdrop-filter: saturate(180%) blur(12px);
+  border-top: 1px solid var(--border-soft);
+}
+.bn-tab {
+  position: relative;
+  flex: 1;
   display: flex;
   flex-direction: column;
-  padding-top: var(--safe-top);
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  color: var(--text-dim);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-decoration: none;
+  min-height: 44px;
+  transition: color 0.15s ease;
 }
-.drawer-enter-active, .drawer-leave-active { transition: transform 0.22s ease; }
-.drawer-enter-from, .drawer-leave-to { transform: translateX(-100%); }
+.bn-tab :deep(svg) { width: 21px; height: 21px; }
+.bn-tab.router-link-active { color: var(--accent); }
+.bn-tab.router-link-active::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  width: 24px;
+  height: 2px;
+  border-radius: 0 0 3px 3px;
+  background: var(--accent);
+}
 
 @media (max-width: 899px) {
   .sidebar { display: none; }
   .content { margin-left: 0; }
-  .content-inner { padding: 18px 16px 56px; }
+  .content-inner { padding: 18px 16px calc(var(--nav-height) + var(--safe-bottom) + 28px); }
   .mobile-bar { display: flex; }
+  .bottom-nav { display: flex; }
 }
 
 /* ---------- Page headings ---------- */
@@ -1527,7 +1548,7 @@ select:focus {
    Mobile polish (control-app density, not enlarged desktop)
    ============================================================ */
 @media (max-width: 720px) {
-  .content-inner { padding: 14px 14px 48px; }
+  .content-inner { padding: 14px 14px calc(var(--nav-height) + var(--safe-bottom) + 24px); }
   .page-head { margin-bottom: 16px; }
   .page-head h1 { font-size: 19px; }
 

@@ -93,8 +93,12 @@ const { toasts, dismiss, pause, resume } = useToast()
 .toast-enter-from,
 .toast-leave-to { opacity: 0; transform: translateY(12px); }
 
+@media (max-width: 899px) {
+  /* sit above the mobile bottom tab bar */
+  .toast-stack { padding-bottom: calc(var(--nav-height) + var(--safe-bottom, 0px) + 12px); }
+}
 @media (max-width: 560px) {
-  .toast-stack { left: 0; align-items: stretch; padding: 0 12px calc(12px + var(--safe-bottom, 0px)); }
+  .toast-stack { left: 0; align-items: stretch; padding-left: 12px; padding-right: 12px; }
   .toast { max-width: none; }
 }
 @media (prefers-reduced-motion: reduce) {

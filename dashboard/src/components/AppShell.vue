@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import SystemsLogo from './SystemsLogo.vue'
@@ -17,8 +17,6 @@ const nav = [
   { name: 'admin', label: 'Admin', icon: 'admin' }
 ]
 
-const drawerOpen = ref(false)
-
 const currentTitle = computed(() => {
   const match = nav.find((n) => n.name === route.name)
   if (match) return match.label
@@ -28,9 +26,6 @@ const currentTitle = computed(() => {
 })
 
 const initial = computed(() => (auth.user?.username || '?').slice(0, 1).toUpperCase())
-
-// Close the mobile drawer on any navigation.
-watch(() => route.fullPath, () => { drawerOpen.value = false })
 </script>
 
 <template>
@@ -67,13 +62,6 @@ watch(() => route.fullPath, () => { drawerOpen.value = false })
     <!-- Content column -->
     <div class="content">
       <header class="mobile-bar">
-        <button class="iconbtn" aria-label="Open navigation" @click="drawerOpen = true">
-          <svg viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="1.9" stroke-linecap="round">
-            <line x1="3" y1="6" x2="21" y2="6" />
-            <line x1="3" y1="12" x2="21" y2="12" />
-            <line x1="3" y1="18" x2="21" y2="18" />
-          </svg>
-        </button>
         <span class="mb-title">{{ currentTitle }}</span>
         <SystemsLogo size="sm" :byline="false" />
       </header>
@@ -83,45 +71,19 @@ watch(() => route.fullPath, () => { drawerOpen.value = false })
       </main>
     </div>
 
-    <!-- Mobile drawer -->
-    <Teleport to="body">
-      <Transition name="fade">
-        <div v-if="drawerOpen" class="drawer-backdrop" @click="drawerOpen = false" />
-      </Transition>
-      <Transition name="drawer">
-        <aside v-if="drawerOpen" class="drawer">
-          <div class="sidebar-head">
-            <SystemsLogo size="sm" />
-            <button class="iconbtn" aria-label="Close navigation" @click="drawerOpen = false">
-              <svg viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="1.9" stroke-linecap="round">
-                <path d="M18 6 6 18M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-          <nav class="sidebar-nav">
-            <RouterLink
-              v-for="item in nav"
-              :key="item.name"
-              class="nav-link"
-              :to="{ name: item.name }"
-              @click="drawerOpen = false"
-            >
-              <NavIcon :name="item.icon" />
-              <span class="nav-label">{{ item.label }}</span>
-            </RouterLink>
-          </nav>
-          <div class="sidebar-foot">
-            <div class="sidebar-user">
-              <span class="avatar">{{ initial }}</span>
-              <span>
-                <span class="su-name">{{ auth.user?.username || 'admin' }}</span>
-                <span class="small dim">Admin</span>
-              </span>
-            </div>
-          </div>
-        </aside>
-      </Transition>
-    </Teleport>
+    <!-- Mobile bottom tab bar -->
+    <nav class="bottom-nav">
+      <RouterLink
+        v-for="item in nav"
+        :key="item.name"
+        class="bn-tab"
+        :to="{ name: item.name }"
+        :aria-label="item.label"
+      >
+        <NavIcon :name="item.icon" />
+        <span>{{ item.label }}</span>
+      </RouterLink>
+    </nav>
   </div>
 </template>
 
