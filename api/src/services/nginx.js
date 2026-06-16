@@ -75,11 +75,8 @@ async function reloadNginx() {
     exec.start({ hijack: false, stdin: false }, (err, stream) => {
       if (err) return reject(err);
 
-      let output = '';
       if (stream) {
-        stream.on('data', (chunk) => {
-          output += chunk.toString();
-        });
+        stream.on('data', () => {});
         stream.on('end', resolve);
         stream.on('error', reject);
       } else {

@@ -5,7 +5,6 @@ const net = require('net');
 const fs = require('fs');
 const fsp = require('fs/promises');
 const path = require('path');
-const { db } = require('../db');
 const dockerService = require('../services/docker');
 const { features } = require('../util/flags');
 

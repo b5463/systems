@@ -168,8 +168,7 @@ async function projectsRoutes(fastify, options) {
     if (!project) return;
     if (project.status === 'deleted') return reply.code(409).send({ error: 'System is deleted.' });
 
-    let basicUser = project.basic_user;
-    let basicHash = project.basic_hash;
+    let basicUser, basicHash;
     if (visibility === 'password') {
       if (!username || !password) return reply.code(400).send({ error: 'Username and password are required for password protection.' });
       // The username is written verbatim into the Caddy route file, so restrict

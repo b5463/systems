@@ -141,7 +141,6 @@ export const api = {
   // session which starts the same build pipeline as a normal deploy.
   // Requires ENABLE_LARGE_UPLOADS on the server.
   async chunkedDeploy({ fields, file, onProgress, chunkSize = 8 * 1024 * 1024 } = {}) {
-    const auth = useAuthStore()
     const totalChunks = Math.max(1, Math.ceil(file.size / chunkSize))
     const init = await this.post('/upload/init', {
       name: fields.name, slug: fields.slug, visibility: fields.visibility,

@@ -76,7 +76,7 @@ async function execRoutes(fastify, options) {
     socket.on('message', (msg) => {
       if (!execStream || closed) return;
       const raw = msg.toString();
-      let parsed = null;
+      let parsed;
       try {
         parsed = JSON.parse(raw);
       } catch (e) {

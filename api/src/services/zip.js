@@ -20,7 +20,6 @@ const MAX_FILE_BYTES = 100 * 1024 * 1024; // 100MB per file
 async function extractZip(zipPath, destDir) {
   await fsp.mkdir(destDir, { recursive: true });
 
-  const normalizedDest = path.resolve(destDir) + path.sep;
   const extractedFiles = [];
   let entryCount = 0;
 

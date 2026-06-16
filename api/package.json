@@ -6,25 +6,31 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
-    "test": "node --test"
+    "test": "node --test",
+    "lint": "eslint src test"
   },
   "engines": {
     "node": ">=20"
   },
   "dependencies": {
-    "fastify": "^4",
-    "@fastify/multipart": "^8",
-    "@fastify/websocket": "^8",
     "@fastify/cors": "^9",
     "@fastify/jwt": "^8",
+    "@fastify/multipart": "^8",
     "@fastify/rate-limit": "^9",
-    "dockerode": "^4",
-    "better-sqlite3": "^9",
+    "@fastify/websocket": "^8",
     "bcrypt": "^5",
+    "better-sqlite3": "^9",
+    "dockerode": "^4",
+    "fastify": "^4",
     "unzipper": "^0.12",
     "uuid": "^10"
   },
   "optionalDependencies": {
     "pg": "^8"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.5.0",
+    "globals": "^17.6.0"
   }
 }

@@ -163,11 +163,11 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
         <div class="section-label">System</div>
         <div class="field" style="margin:0">
           <label class="label" for="name">Name</label>
-          <input aria-label="Notes API" id="name" v-model="name" placeholder="Notes API" autocorrect="off" />
+          <input id="name" v-model="name" aria-label="Notes API" placeholder="Notes API" autocorrect="off" />
         </div>
         <div class="field" style="margin:0">
           <label class="label" for="slug">Slug</label>
-          <input aria-label="notes" id="slug" :value="slug" placeholder="notes" autocapitalize="none" autocorrect="off" @input="onSlugInput" />
+          <input id="slug" aria-label="notes" :value="slug" placeholder="notes" autocapitalize="none" autocorrect="off" @input="onSlugInput" />
         </div>
         <div class="field" style="margin:0">
           <label class="label">Public URL</label>

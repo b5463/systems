@@ -201,9 +201,9 @@ onMounted(loadUsers)
       <!-- Change password -->
       <div class="card stack">
         <div class="section-label">Change password</div>
-        <input aria-label="Current password" v-model="currentPassword" type="password" placeholder="Current password" autocomplete="current-password" />
-        <input aria-label="New password (min 8 chars)" v-model="newPassword" type="password" placeholder="New password (min 8 chars)" autocomplete="new-password" />
-        <input aria-label="Confirm new password" v-model="confirmPassword" type="password" placeholder="Confirm new password" autocomplete="new-password" />
+        <input v-model="currentPassword" aria-label="Current password" type="password" placeholder="Current password" autocomplete="current-password" />
+        <input v-model="newPassword" aria-label="New password (min 8 chars)" type="password" placeholder="New password (min 8 chars)" autocomplete="new-password" />
+        <input v-model="confirmPassword" aria-label="Confirm new password" type="password" placeholder="Confirm new password" autocomplete="new-password" />
         <div v-if="pwError" class="error-box">{{ pwError }}</div>
         <div v-else-if="pwMsg" class="notice">{{ pwMsg }}</div>
         <button class="btn btn-primary btn-block" :disabled="pwSaving" @click="changePassword">
@@ -219,7 +219,7 @@ onMounted(loadUsers)
         </div>
 
         <template v-if="!twoFAEnabled">
-          <p class="small muted" style="margin:0" v-if="!tfaOtpauth">
+          <p v-if="!tfaOtpauth" class="small muted" style="margin:0">
             Add a time-based code from an authenticator app as a second step at sign-in.
           </p>
           <button v-if="!tfaOtpauth" class="btn btn-block" :disabled="tfaBusy" @click="startSetup2FA">
@@ -230,7 +230,7 @@ onMounted(loadUsers)
             <p class="small muted" style="margin:0">Add this secret to your authenticator, then enter a code to confirm.</p>
             <div class="kv"><span class="k">Secret</span><span class="v mono small row gap-sm" style="justify-content:flex-end">{{ tfaSecret }}<CopyButton :text="tfaSecret" label="Secret" /></span></div>
             <div class="hint mono small" style="word-break:break-all">{{ tfaOtpauth }}</div>
-            <input aria-label="Six-digit code" v-model="tfaCode" inputmode="numeric" autocomplete="one-time-code" placeholder="123456" />
+            <input v-model="tfaCode" aria-label="Six-digit code" inputmode="numeric" autocomplete="one-time-code" placeholder="123456" />
             <button class="btn btn-primary btn-block" :disabled="tfaBusy" @click="enable2FA">
               <span v-if="tfaBusy" class="spinner"></span><span v-else>Confirm &amp; enable</span>
             </button>
@@ -239,8 +239,8 @@ onMounted(loadUsers)
 
         <template v-else>
           <p class="small muted" style="margin:0">Enter your password and a current code to turn two-factor off.</p>
-          <input aria-label="Current password" v-model="tfaPassword" type="password" autocomplete="current-password" placeholder="Current password" />
-          <input aria-label="Six-digit code" v-model="tfaCode" inputmode="numeric" autocomplete="one-time-code" placeholder="123456" />
+          <input v-model="tfaPassword" aria-label="Current password" type="password" autocomplete="current-password" placeholder="Current password" />
+          <input v-model="tfaCode" aria-label="Six-digit code" inputmode="numeric" autocomplete="one-time-code" placeholder="123456" />
           <button class="btn btn-danger btn-block" :disabled="tfaBusy" @click="disable2FA">
             <span v-if="tfaBusy" class="spinner"></span><span v-else>Disable two-factor</span>
           </button>
@@ -309,8 +309,8 @@ onMounted(loadUsers)
           <!-- Add form -->
           <div v-if="showAddForm" class="stack" style="gap:8px; margin-top:6px">
             <div class="label" style="margin:0">New admin</div>
-            <input aria-label="username" v-model="newUsername" placeholder="username" autocapitalize="none" autocorrect="off" />
-            <input aria-label="password (min 8 chars)" v-model="newUserPassword" type="password" placeholder="password (min 8 chars)" autocomplete="new-password" />
+            <input v-model="newUsername" aria-label="username" placeholder="username" autocapitalize="none" autocorrect="off" />
+            <input v-model="newUserPassword" aria-label="password (min 8 chars)" type="password" placeholder="password (min 8 chars)" autocomplete="new-password" />
             <div v-if="addUserError" class="error-box">{{ addUserError }}</div>
             <div class="btn-row">
               <button class="btn btn-sm" @click="showAddForm = false">Cancel</button>

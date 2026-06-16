@@ -158,7 +158,7 @@ onMounted(load)
         <div class="conn-state"><span class="sdot ok"></span>Reachable</div>
       </div>
       <div class="conn-row">
-        <div style="flex:1"><div class="c-name">Backend / API</div><div class="c-sub" v-if="info.self">uptime {{ fmtUptime(info.self.uptimeSeconds) }} · {{ info.self.rssMb }} MB · node {{ info.self.node }}</div></div>
+        <div style="flex:1"><div class="c-name">Backend / API</div><div v-if="info.self" class="c-sub">uptime {{ fmtUptime(info.self.uptimeSeconds) }} · {{ info.self.rssMb }} MB · node {{ info.self.node }}</div></div>
         <div class="conn-state"><span class="sdot ok"></span>Reachable</div>
       </div>
       <div class="conn-row">

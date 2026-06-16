@@ -613,8 +613,8 @@ onBeforeUnmount(() => {
       <div class="card stack">
         <div class="section-label">Add / update variables</div>
         <div v-for="(row, i) in envVars" :key="i" class="row">
-          <input aria-label="KEY" v-model="row.key" placeholder="KEY" autocapitalize="characters" autocorrect="off" />
-          <input aria-label="value" v-model="row.value" placeholder="value" autocorrect="off" />
+          <input v-model="row.key" aria-label="KEY" placeholder="KEY" autocapitalize="characters" autocorrect="off" />
+          <input v-model="row.value" aria-label="value" placeholder="value" autocorrect="off" />
           <button class="iconbtn" aria-label="Remove" @click="removeEnvRow(i)">✕</button>
         </div>
         <button class="btn btn-sm" @click="addEnvRow">+ Add row</button>
@@ -633,8 +633,8 @@ onBeforeUnmount(() => {
           <button type="button" :class="{ active: system.visibility === 'password' }" :disabled="visSaving" @click="setVisibility('password')">Password</button>
         </div>
         <div v-if="system.visibility === 'password'" class="small muted">Protected. Update the credentials below to rotate.</div>
-        <input aria-label="basic-auth username" v-model="visUser" placeholder="basic-auth username" autocapitalize="none" autocorrect="off" />
-        <input aria-label="basic-auth password" v-model="visPass" type="password" placeholder="basic-auth password" autocomplete="new-password" />
+        <input v-model="visUser" aria-label="basic-auth username" placeholder="basic-auth username" autocapitalize="none" autocorrect="off" />
+        <input v-model="visPass" aria-label="basic-auth password" type="password" placeholder="basic-auth password" autocomplete="new-password" />
         <div class="hint">Public: open route. Private: no public route. Password: Caddy basic auth (hashed).</div>
       </div>
 
@@ -669,11 +669,11 @@ onBeforeUnmount(() => {
         <div class="hint">Map this system to a repo. A push to the branch triggers a redeploy (requires the webhook configured in GitHub).</div>
         <div class="field" style="margin:0">
           <label class="label" for="repo">Repository</label>
-          <input id="repo" aria-label="Repository (owner/name)" v-model="repoInput" placeholder="owner/name" autocapitalize="none" autocorrect="off" />
+          <input id="repo" v-model="repoInput" aria-label="Repository (owner/name)" placeholder="owner/name" autocapitalize="none" autocorrect="off" />
         </div>
         <div class="field" style="margin:0">
           <label class="label" for="branch">Branch</label>
-          <input id="branch" aria-label="Branch" v-model="branchInput" placeholder="main" autocapitalize="none" autocorrect="off" />
+          <input id="branch" v-model="branchInput" aria-label="Branch" placeholder="main" autocapitalize="none" autocorrect="off" />
         </div>
         <div v-if="repoMsg" class="notice">{{ repoMsg }}</div>
         <button class="btn btn-primary btn-block" :disabled="repoSaving" @click="saveRepo">

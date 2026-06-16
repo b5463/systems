@@ -144,8 +144,8 @@ onBeforeUnmount(() => clearTimeout(textDebounce))
         <option value="">All event types</option>
         <option v-for="a in ACTION_OPTIONS" :key="a" :value="a">{{ humanize(a) }}</option>
       </select>
-      <input aria-label="Filter by system" v-model="filterTarget" placeholder="Filter by system" autocapitalize="none" autocorrect="off" style="flex:1; min-width: 150px" />
-      <input aria-label="Filter by admin" v-model="filterUser" placeholder="Filter by admin" autocapitalize="none" autocorrect="off" style="flex:1; min-width: 150px" />
+      <input v-model="filterTarget" aria-label="Filter by system" placeholder="Filter by system" autocapitalize="none" autocorrect="off" style="flex:1; min-width: 150px" />
+      <input v-model="filterUser" aria-label="Filter by admin" placeholder="Filter by admin" autocapitalize="none" autocorrect="off" style="flex:1; min-width: 150px" />
     </div>
     <div class="small muted">{{ total }} event{{ total === 1 ? '' : 's' }}</div>
   </div>

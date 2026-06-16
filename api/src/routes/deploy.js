@@ -1,6 +1,5 @@
 'use strict';
 
-const path = require('path');
 const fsp = require('fs/promises');
 const { v4: uuidv4 } = require('uuid');
 const { db, auditLog } = require('../db');
