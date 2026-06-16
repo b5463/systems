@@ -170,10 +170,15 @@ CMD ["python", "${entryPoint}"]
 `;
     await fsp.writeFile(path.join(dirPath, 'nginx.conf'), nginxConf);
 
+    // `COPY . html` would otherwise publish secrets/VCS files from the archive.
+    // Keep them out of the build context (nginx.conf stays — it's COPYed first).
+    const dockerignore = `.git\n.gitignore\n.env\n.env.*\nnode_modules\nDockerfile\n.dockerignore\n`;
+    await fsp.writeFile(path.join(dirPath, '.dockerignore'), dockerignore);
+
     content = `FROM nginx:alpine
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY . /usr/share/nginx/html
-# Remove the nginx.conf we copied into html dir
+# nginx.conf is needed for the COPY above; drop it from the served web root
 RUN rm -f /usr/share/nginx/html/nginx.conf
 EXPOSE 3000
 CMD ["nginx", "-g", "daemon off;"]

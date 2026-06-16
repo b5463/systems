@@ -4,6 +4,9 @@ const bcrypt = require('bcrypt');
 const { db, auditLog } = require('../db');
 const totp = require('../util/totp');
 
+// A fixed bcrypt hash used only to spend equivalent time on unknown-user logins.
+const DUMMY_HASH = '$2b$12$LS.DksBFMLXDgraHFAgGFOqaqkWL1x15NcdADtOyxtIOWJHnW2pK6';
+
 // Issue a token carrying the user's current token_version. Bumping
 // token_version (password change, admin reset, explicit revoke) invalidates
 // every previously issued token for that user.
@@ -46,6 +49,9 @@ async function authRoutes(fastify, options) {
       .get(username);
 
     if (!user) {
+      // Compare against a dummy hash so an unknown username takes the same time
+      // as a known one (no timing oracle for user enumeration).
+      await bcrypt.compare(password, DUMMY_HASH);
       auditLog({ action: 'login_fail', target: username, detail: 'user not found', ip });
       return reply.code(401).send({ error: 'Invalid credentials' });
     }
@@ -172,9 +178,12 @@ async function authRoutes(fastify, options) {
     if (!totp.verify(request.body.code, user.totp_secret)) {
       return reply.code(400).send({ error: 'Code did not verify. Check the time on your device and try again.' });
     }
-    db.prepare('UPDATE users SET totp_enabled = 1 WHERE id = ?').run(user.id);
+    // Bump token_version (revokes other sessions) and re-issue this session's
+    // token so the admin who just enabled 2FA isn't logged out.
+    db.prepare('UPDATE users SET totp_enabled = 1, token_version = token_version + 1 WHERE id = ?').run(user.id);
     auditLog({ user_id: user.id, action: '2fa_enabled', target: user.username, ip: request.ip });
-    return { message: 'Two-factor enabled.' };
+    const updated = db.prepare('SELECT id, username, token_version FROM users WHERE id = ?').get(user.id);
+    return { message: 'Two-factor enabled.', token: signToken(fastify, updated) };
   });
 
   // Disable 2FA (requires current password + a valid code).
@@ -194,9 +203,10 @@ async function authRoutes(fastify, options) {
     if (!totp.verify(request.body.code, user.totp_secret)) {
       return reply.code(400).send({ error: 'Code did not verify.' });
     }
-    db.prepare('UPDATE users SET totp_enabled = 0, totp_secret = NULL WHERE id = ?').run(user.id);
+    db.prepare('UPDATE users SET totp_enabled = 0, totp_secret = NULL, token_version = token_version + 1 WHERE id = ?').run(user.id);
     auditLog({ user_id: user.id, action: '2fa_disabled', target: user.username, ip: request.ip });
-    return { message: 'Two-factor disabled.' };
+    const updated = db.prepare('SELECT id, username, token_version FROM users WHERE id = ?').get(user.id);
+    return { message: 'Two-factor disabled.', token: signToken(fastify, updated) };
   });
 }
 

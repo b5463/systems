@@ -54,6 +54,21 @@ async function reconcileOnce() {
         }
       }
     }
+
+    // Recover interrupted builds: a row stuck in 'building' past ~3x the build
+    // timeout can't finish (the in-process build died with a restart), and
+    // reconcileStatus deliberately skips 'building' — so handle it explicitly.
+    const stuckMs = (Number(process.env.BUILD_TIMEOUT_SECONDS) || 600) * 1000 * 3;
+    const stuck = db.prepare(
+      `SELECT slug, status FROM projects WHERE status = 'building'
+       AND (julianday('now') - julianday(updated_at)) * 86400000 > ?`
+    ).all(stuckMs);
+    for (const s of stuck) {
+      db.prepare(`UPDATE projects SET status = 'error', updated_at = datetime('now') WHERE slug = ?`).run(s.slug);
+      auditLog({ action: 'build_stuck', target: s.slug, detail: 'recovered to error after timeout' });
+      changes.push({ slug: s.slug, from: 'building', to: 'error' });
+      notify.send({ kind: 'system_error', slug: s.slug, detail: 'build stuck → error' }).catch(() => {});
+    }
   } finally {
     running = false;
   }

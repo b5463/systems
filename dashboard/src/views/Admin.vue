@@ -71,7 +71,8 @@ async function enable2FA() {
   if (!tfaCode.value) return (tfaError.value = 'Enter the 6-digit code.')
   tfaBusy.value = true
   try {
-    await api.post('/auth/2fa/enable', { code: tfaCode.value })
+    const data = await api.post('/auth/2fa/enable', { code: tfaCode.value })
+    if (data && data.token) auth.setToken(data.token)
     tfaSecret.value = ''; tfaOtpauth.value = ''; tfaCode.value = ''
     tfaMsg.value = 'Two-factor enabled.'
     await auth.fetchMe()
@@ -85,7 +86,8 @@ async function disable2FA() {
   if (!tfaPassword.value || !tfaCode.value) return (tfaError.value = 'Password and a current code are required.')
   tfaBusy.value = true
   try {
-    await api.post('/auth/2fa/disable', { password: tfaPassword.value, code: tfaCode.value })
+    const data = await api.post('/auth/2fa/disable', { password: tfaPassword.value, code: tfaCode.value })
+    if (data && data.token) auth.setToken(data.token)
     tfaPassword.value = ''; tfaCode.value = ''
     tfaMsg.value = 'Two-factor disabled.'
     await auth.fetchMe()

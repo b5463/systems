@@ -15,7 +15,21 @@ const deploy = require('./deploy');
 // ENABLE_LARGE_UPLOADS=true.
 
 const UPLOADS_DIR = process.env.UPLOADS_DIR || '/tmp/systems-uploads';
-const sessions = new Map(); // uploadId -> { name, slug, visibility, totalSize, totalChunks, received, bytes, part, userId, ip }
+const sessions = new Map(); // uploadId -> { ..., createdAt }
+const SESSION_TTL_MS = (Number(process.env.UPLOAD_SESSION_TTL_MIN) || 30) * 60 * 1000;
+
+// Drop abandoned sessions + their .part files so a client that disappears after
+// /init can't leak memory or fill the disk.
+let sweeper = null;
+async function sweepStaleSessions() {
+  const now = Date.now();
+  for (const [id, s] of sessions) {
+    if (now - (s.createdAt || 0) > SESSION_TTL_MS) {
+      sessions.delete(id);
+      try { await fsp.rm(s.part, { force: true }); } catch { /* best-effort */ }
+    }
+  }
+}
 
 function freeBytes(dir) {
   try {
@@ -38,6 +52,12 @@ async function uploadRoutes(fastify, options) {
     }
     return true;
   };
+
+  // Sweep abandoned upload sessions periodically (no-op until one exists).
+  if (!sweeper) {
+    sweeper = setInterval(() => { sweepStaleSessions().catch(() => {}); }, 5 * 60 * 1000);
+    if (sweeper.unref) sweeper.unref();
+  }
 
   // Begin a session.
   fastify.post('/api/upload/init', {
@@ -81,6 +101,7 @@ async function uploadRoutes(fastify, options) {
       name, slug, visibility, totalSize, totalChunks,
       received: 0, bytes: 0, part,
       userId: request.user.id, ip: request.ip,
+      createdAt: Date.now(),
     });
     return { uploadId, state: progressState({ received: 0, total: totalSize }) };
   });

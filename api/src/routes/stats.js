@@ -54,6 +54,14 @@ async function statsRoutes(fastify, options) {
           stats.rx_bytes ?? 0,
           stats.tx_bytes ?? 0
         );
+        // Occasionally trim old history so the table doesn't grow without bound
+        // (this endpoint is polled for every running system on an interval).
+        if (Math.random() < 0.02) {
+          const hours = Number(process.env.STATS_RETENTION_HOURS) || 24;
+          db.prepare(
+            `DELETE FROM stats_history WHERE project_id = ? AND julianday(recorded_at) < julianday('now', ?)`
+          ).run(project.id, `-${hours} hours`);
+        }
       } catch (writeErr) {
         request.log.warn({ err: writeErr }, '[stats] Failed to persist stats history');
       }

@@ -82,10 +82,17 @@ async function envRoutes(fastify, options) {
       return reply.code(400).send({ error: 'Project has no running container to reconfigure' });
     }
 
-    // Validate key names
-    for (const key of Object.keys(vars)) {
+    // Validate keys and values. Values are injected into the container's Env
+    // array, so reject control characters and cap the length.
+    for (const [key, val] of Object.entries(vars)) {
       if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) {
         return reply.code(400).send({ error: `Invalid env var key: "${key}"` });
+      }
+      if (typeof val !== 'string' || /[\n\r\0]/.test(val)) {
+        return reply.code(400).send({ error: `Invalid value for "${key}": no line breaks or null bytes.` });
+      }
+      if (val.length > 8192) {
+        return reply.code(400).send({ error: `Value for "${key}" is too long (max 8192 chars).` });
       }
     }
 
@@ -96,8 +103,9 @@ async function envRoutes(fastify, options) {
       return reply.code(500).send({ error: err.message });
     }
 
-    // Store encrypted vars
-    db.prepare(`UPDATE projects SET env_vars = ?, updated_at = datetime('now') WHERE slug = ?`).run(encrypted, slug);
+    // Store encrypted vars, and mark building during the recreate so
+    // reconciliation (which skips 'building') doesn't race the swap window.
+    db.prepare(`UPDATE projects SET env_vars = ?, status = 'building', updated_at = datetime('now') WHERE slug = ?`).run(encrypted, slug);
 
     // Recreate container with new env vars (stop → remove → recreate → start)
     try {
@@ -123,7 +131,9 @@ async function envRoutes(fastify, options) {
       return { message: 'Env vars updated and container restarted', keys: Object.keys(vars) };
     } catch (err) {
       request.log.error({ err }, '[env] Failed to recreate container with new env vars');
-      db.prepare(`UPDATE projects SET status = 'error', updated_at = datetime('now') WHERE slug = ?`).run(slug);
+      // The old container was already removed; null the id so reconcile/lifecycle
+      // don't act on a removed container. Operator redeploys to recover.
+      db.prepare(`UPDATE projects SET status = 'error', container_id = NULL, updated_at = datetime('now') WHERE slug = ?`).run(slug);
       return reply.code(500).send({ error: `Failed to restart container: ${err.message}` });
     }
   });

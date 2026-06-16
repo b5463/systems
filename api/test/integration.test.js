@@ -107,6 +107,24 @@ test('provision-db is 404 while flag is off', async () => {
   assert.equal(res.statusCode, 404);
 });
 
+test('visibility: rejects an unsafe basic-auth username (Caddy injection guard)', async () => {
+  db.prepare(`INSERT INTO projects (name, slug, port, status, visibility) VALUES ('Vis','vis',4322,'running','public')`).run();
+  const res = await app.inject({
+    method: 'PATCH', url: '/api/projects/vis/visibility', headers: auth(),
+    payload: { visibility: 'password', username: 'bad user}', password: 'secretpw' },
+  });
+  assert.equal(res.statusCode, 400);
+});
+
+test('env: rejects values with control characters', async () => {
+  db.prepare(`INSERT INTO projects (name, slug, port, status, container_id, image_id) VALUES ('Envx','envx',4323,'running','c1','i1')`).run();
+  const res = await app.inject({
+    method: 'PUT', url: '/api/projects/envx/env', headers: auth(),
+    payload: { vars: { OK: 'fine', BAD: 'line\nbreak' } },
+  });
+  assert.equal(res.statusCode, 400);
+});
+
 test('2fa: setup -> enable -> login requires code', async () => {
   const setup = await app.inject({ method: 'POST', url: '/api/auth/2fa/setup', headers: auth() });
   assert.equal(setup.statusCode, 200);

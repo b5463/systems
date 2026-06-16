@@ -11,7 +11,10 @@ async function buildApp(opts = {}) {
   // (WebSocket handshakes can't set custom headers).
   await fastify.register(require('@fastify/jwt'), {
     secret: process.env.JWT_SECRET || (() => {
-      console.warn('[startup] WARNING: JWT_SECRET is not set. Using insecure default.');
+      if (process.env.NODE_ENV === 'production') {
+        throw new Error('JWT_SECRET must be set in production — refusing to start with an insecure default.');
+      }
+      console.warn('[startup] WARNING: JWT_SECRET is not set. Using insecure default (dev only).');
       return 'insecure-default-secret-change-me';
     })(),
     verify: {

@@ -177,6 +177,11 @@ async function projectsRoutes(fastify, options) {
     let basicHash = project.basic_hash;
     if (visibility === 'password') {
       if (!username || !password) return reply.code(400).send({ error: 'Username and password are required for password protection.' });
+      // The username is written verbatim into the Caddy route file, so restrict
+      // it to safe characters (no whitespace/braces that could inject directives).
+      if (!/^[A-Za-z0-9._-]+$/.test(username)) {
+        return reply.code(400).send({ error: 'Username may only contain letters, numbers, dot, dash, and underscore.' });
+      }
       basicUser = username;
       basicHash = await bcrypt.hash(password, 12); // Caddy basic_auth accepts bcrypt
     } else {
@@ -248,6 +253,10 @@ async function projectsRoutes(fastify, options) {
         // start without env vars rather than fail the rollback
       }
     }
+
+    // Mark building during the swap so reconciliation (which skips 'building')
+    // can't see the transient no-container window and flip the row to 'error'.
+    db.prepare(`UPDATE projects SET status = 'building', updated_at = datetime('now') WHERE slug = ?`).run(slug);
 
     try {
       // Stop + remove the current container.

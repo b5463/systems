@@ -105,6 +105,13 @@ db.exec(`
     tx_bytes INTEGER,
     recorded_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
   );
+
+  -- Indexes for hot lookups (webhook repo match, primary lookup, history scans).
+  CREATE INDEX IF NOT EXISTS idx_projects_repo ON projects(repo);
+  CREATE INDEX IF NOT EXISTS idx_projects_is_primary ON projects(is_primary);
+  CREATE INDEX IF NOT EXISTS idx_deploy_history_project ON deploy_history(project_id);
+  CREATE INDEX IF NOT EXISTS idx_stats_history_project_time ON stats_history(project_id, recorded_at);
+  CREATE INDEX IF NOT EXISTS idx_audit_log_created ON audit_log(created_at);
 `);
 
 /**
