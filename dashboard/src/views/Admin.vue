@@ -157,8 +157,10 @@ async function addUser() {
 }
 
 const deletingId = ref(null)
+const confirmRemoveId = ref(null)
 async function deleteUser(u) {
   usersError.value = ''
+  confirmRemoveId.value = null
   deletingId.value = u.id
   try {
     await api.del(`/admin/users/${u.id}`)
@@ -282,9 +284,15 @@ onMounted(loadUsers)
                 <div style="font-weight:600">{{ u.username }}</div>
                 <div class="small dim">Added {{ fmtDate(u.created_at) }}</div>
               </div>
-              <button v-if="u.id !== auth.user?.id" class="btn btn-danger btn-sm" :disabled="deletingId === u.id" @click="deleteUser(u)">
-                <span v-if="deletingId === u.id" class="spinner"></span><span v-else>Remove</span>
-              </button>
+              <template v-if="u.id !== auth.user?.id">
+                <div v-if="confirmRemoveId === u.id" class="row gap-sm">
+                  <button class="btn btn-sm" @click="confirmRemoveId = null">Cancel</button>
+                  <button class="btn btn-danger btn-sm" :disabled="deletingId === u.id" @click="deleteUser(u)">
+                    <span v-if="deletingId === u.id" class="spinner"></span><span v-else>Confirm</span>
+                  </button>
+                </div>
+                <button v-else class="btn btn-danger btn-sm" @click="confirmRemoveId = u.id">Remove</button>
+              </template>
               <span v-else class="chip">you</span>
             </div>
           </div>
