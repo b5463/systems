@@ -53,5 +53,7 @@ test('unauthenticated visit to a guarded route redirects to login', async ({ pag
 test('authenticated Systems view lists deployed systems', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('acronym_token', 'eyJfake.token.e2e'))
   await page.goto('/')
-  await expect(page.getByText('Notes API')).toBeVisible()
+  // The system name can appear in more than one place (card title + aria/label);
+  // assert at least one is visible rather than requiring a unique match.
+  await expect(page.getByText('Notes API').first()).toBeVisible()
 })
