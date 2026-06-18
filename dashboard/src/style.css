@@ -1298,8 +1298,8 @@ select:focus {
 }
 
 /* ---------- Inline icon button (ghost) ---------- */
-.btn-ghost { background: transparent; border-color: transparent; }
-.btn-ghost:hover { background: var(--bg-elevated); border-color: var(--border-soft); }
+.btn-ghost { background: transparent; border-color: var(--border-soft); }
+.btn-ghost:hover { background: var(--bg-elevated); border-color: var(--border); }
 
 .btn-sm { min-height: 36px; padding: 0 12px; font-size: 13px; }
 
@@ -1620,7 +1620,92 @@ select:focus {
 /* don't double up: inputs already show a focus ring via box-shadow */
 input:focus-visible, textarea:focus-visible, select:focus-visible { outline: none; }
 
-/* ---------- Critical operational banners (Server page) ---------- */
+/* ---------- SelectMenu — accessible custom dropdown ---------- */
+.select-menu { position: relative; }
+.select-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-height: 46px;
+  padding: 0 12px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 15px;
+  font-family: var(--font);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+.select-trigger:hover { border-color: var(--border-strong); }
+.select-trigger:focus-visible {
+  outline: none;
+  border-color: var(--focus-border);
+  box-shadow: 0 0 0 3px var(--focus-ring), 0 0 14px rgba(255,255,255,0.04);
+}
+.select-menu.open .select-trigger {
+  border-color: var(--focus-border);
+  box-shadow: 0 0 0 3px var(--focus-ring);
+}
+.sm-chevron {
+  width: 10px; height: 6px;
+  flex-shrink: 0;
+  color: var(--text-dim);
+  transition: transform 0.15s ease;
+}
+.select-menu.open .sm-chevron { transform: rotate(180deg); }
+.select-list {
+  position: absolute;
+  z-index: 200;
+  top: calc(100% + 4px);
+  left: 0; right: 0;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 4px;
+  margin: 0;
+  list-style: none;
+  max-height: 260px;
+  overflow-y: auto;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+}
+.select-option {
+  padding: 9px 10px;
+  border-radius: var(--radius-xs);
+  font-size: 14px;
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: background 0.08s ease, color 0.08s ease;
+}
+.select-option.is-focused { background: var(--bg-hover); color: var(--text); }
+.select-option.is-selected { color: var(--text); font-weight: 600; }
+.select-option.is-selected.is-focused { background: var(--bg-hover); }
+
+/* ---------- Form labels — persistent, not placeholder-only ---------- */
+.field-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+  letter-spacing: 0.01em;
+}
+.field-group { display: flex; flex-direction: column; gap: 0; }
+.field-group .field-label { margin-bottom: 6px; }
+.field-group input,
+.field-group textarea,
+.field-group select { margin-top: 0; }
+
+/* ---------- Severity model — distinct sdot tones ---------- */
+/* .sdot.config = needs host setup / informational action required */
+.sdot.config { background: #4a6888; }
+/* .sdot.ok / .warn / .error / .idle already defined above */
+
+/* ---------- Button affordance — ghost has visible rest border ---------- */
+/* override the zero-opacity ghost so it reads as a real control without hover */
 .critical-banner {
   display: flex;
   align-items: flex-start;
