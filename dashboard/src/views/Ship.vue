@@ -65,17 +65,31 @@ const visDesc = computed(() => VISIBILITY.find((v) => v.key === visibility.value
 // Dry-run plan: ask the API what WOULD happen (validated slug, container name,
 // generated Caddy route) without touching Docker/Caddy.
 const plan = ref(null)
+const planChecking = ref(false)
 let planTimer = null
 function refreshPlan() {
   clearTimeout(planTimer)
-  if (!slugValid.value) { plan.value = null; return }
+  plan.value = null
+  if (!slugValid.value) { planChecking.value = false; return }
+  planChecking.value = true
   planTimer = setTimeout(async () => {
-    try { const d = await api.post('/deploy/plan', { slug: slug.value, visibility: visibility.value }); plan.value = d.plan }
-    catch { plan.value = null }
-  }, 350)
+    try {
+      const d = await api.post('/deploy/plan', { slug: slug.value, visibility: visibility.value })
+      plan.value = d.plan
+    } catch { plan.value = null }
+    finally { planChecking.value = false }
+  }, 400)
 }
 watch([slug, visibility], refreshPlan)
 onBeforeUnmount(() => clearTimeout(planTimer))
+
+const slugStatus = computed(() => {
+  if (!slugValid.value) return null
+  if (planChecking.value) return { tone: 'idle', label: 'Checking…' }
+  if (!plan.value) return null
+  if (plan.value.valid === false) return { tone: 'error', label: plan.value.error || 'Slug unavailable' }
+  return { tone: 'ok', label: 'Available' }
+})
 
 function setFile(f) {
   if (!f) return
@@ -172,7 +186,10 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
         <div class="field" style="margin:0">
           <label class="label" for="slug">Slug</label>
           <input id="slug" aria-label="notes" :value="slug" placeholder="notes" autocapitalize="none" autocorrect="off" @input="onSlugInput" />
-          <div class="hint">Becomes the URL below — choose carefully, it can't be changed after deploy.</div>
+          <div v-if="slugStatus" class="slug-status" :class="slugStatus.tone">
+            <span class="sdot" :class="slugStatus.tone" style="flex-shrink:0"></span>{{ slugStatus.label }}
+          </div>
+          <div v-else class="hint">Becomes the URL below — choose carefully, it can't be changed after deploy.</div>
         </div>
         <div class="field" style="margin:0">
           <label class="label">Public URL</label>
@@ -219,7 +236,7 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
       </div>
 
       <div class="card stack">
-        <div class="step-head"><span class="step-num" :class="{ active: !!file }">2</span><div class="section-label">Detection &amp; plan</div></div>
+        <div class="step-head"><span class="step-num" :class="{ active: !!file, done: !!file && plan && plan.valid !== false }">2</span><div class="section-label">Detection &amp; plan</div></div>
         <div class="detect-row">
           <span class="kv"><span class="k">Type</span><span class="v dim">{{ file ? 'detected during build' : 'waiting for archive…' }}</span></span>
           <span class="kv"><span class="k">Container</span><span class="v mono small">{{ plan ? plan.containerName : (slug ? 'systems-' + slug : 'systems-{slug}') }}</span></span>
@@ -227,7 +244,6 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
           <span class="kv"><span class="k">Proxy</span><span class="v dim">{{ plan ? plan.proxy : '—' }}</span></span>
           <span class="kv"><span class="k">Route</span><span class="v dim">{{ plan ? (plan.routePublished ? 'Caddy route generated after upload' : 'none (private)') : '—' }}</span></span>
         </div>
-        <div v-if="plan && plan.valid === false" class="error-box" style="margin-top:8px">{{ plan.error }}</div>
         <details v-if="plan && plan.route" style="margin-top:8px">
           <summary class="small muted" style="cursor:pointer">Planned Caddy route (dry-run preview)</summary>
           <pre class="plan-route">{{ plan.route }}</pre>
@@ -235,7 +251,7 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
       </div>
 
       <div class="card stack">
-        <div class="step-head"><span class="step-num" :class="{ active: !!file }">3</span><div class="section-label">Ship</div></div>
+        <div class="step-head"><span class="step-num" :class="{ active: !!file && plan && plan.valid !== false }">3</span><div class="section-label">Ship</div></div>
         <div class="lifecycle">
           <template v-for="(step, i) in LIFECYCLE" :key="step">
             <span class="lc-step"><span class="lc-dot"></span>{{ step }}</span>
@@ -267,4 +283,11 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
   font-family: var(--mono); font-size: 12px; color: var(--text-muted);
   white-space: pre-wrap; overflow-x: auto;
 }
+.slug-status {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 13px; margin-top: 6px; padding: 4px 0;
+}
+.slug-status.ok { color: var(--ok); }
+.slug-status.error { color: var(--danger); }
+.slug-status.idle { color: var(--text-dim); }
 </style>

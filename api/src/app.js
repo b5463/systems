@@ -5,7 +5,10 @@ const Fastify = require('fastify');
 // Build (but do not start) the configured Fastify app. Extracted from index.js
 // so tests can use app.inject() without binding a port or touching Docker.
 async function buildApp(opts = {}) {
-  const fastify = Fastify(opts.fastify || { logger: false });
+  const fastify = Fastify({
+    trustProxy: !!process.env.REVERSE_PROXY || process.env.TRUST_PROXY === 'true',
+    ...(opts.fastify || { logger: false }),
+  });
 
   // @fastify/jwt — accepts the Authorization header or a ?token= query param
   // (WebSocket handshakes can't set custom headers).

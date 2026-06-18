@@ -14,16 +14,20 @@
   /* Lines */
   --border: #262830;
   --border-soft: #1a1c22;
+  --border-strong: #3a3d47;
 
-  /* Type */
+  /* Type — three-level hierarchy at readable contrast */
   --text: #ececee;
-  --text-muted: #9296a0;
-  --text-dim: #585c66;
+  --text-muted: #b2b6bf;
+  --text-dim: #72777f;
 
-  /* Single restrained signal accent — used sparingly for focus/active */
+  /* Focus — white glow, matches login identity. Not cyan. */
+  --focus-border: rgba(255, 255, 255, 0.65);
+  --focus-ring: rgba(255, 255, 255, 0.1);
+
+  /* Accent — decorative use only (logo dot, dropzone drag-over). Never for focus/interaction. */
   --accent: #5fb0d4;
-  --accent-hover: #79c1e2;
-  --accent-dim: #0e1c24;
+  --accent-dim: #0d1820;
 
   /* State colors — meaning only */
   --danger: #ef5b51;
@@ -39,9 +43,9 @@
   --radius-sm: 6px;
   --radius-xs: 4px;
   --nav-height: 56px;
-  --sidebar-width: 248px;
+  --sidebar-width: 256px;
   --sidebar-collapsed: 64px;
-  --content-max: 1120px;
+  --content-max: 1320px;
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-top: env(safe-area-inset-top, 0px);
 
@@ -68,7 +72,7 @@ body {
   font-family: var(--font);
   background: var(--bg);
   color: var(--text);
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.45;
   overflow-x: hidden;
   -webkit-tap-highlight-color: transparent;
@@ -80,7 +84,7 @@ body {
 }
 
 a {
-  color: var(--accent);
+  color: var(--text-muted);
   text-decoration: none;
 }
 
@@ -127,8 +131,8 @@ select {
 input:focus,
 textarea:focus,
 select:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(95, 176, 212, 0.12);
+  border-color: var(--focus-border);
+  box-shadow: 0 0 0 3px var(--focus-ring), 0 0 14px rgba(255, 255, 255, 0.04);
 }
 
 ::placeholder {
@@ -219,7 +223,7 @@ select:focus {
 }
 
 .card:focus-within {
-  border-color: rgba(95, 176, 212, 0.3);
+  border-color: rgba(255, 255, 255, 0.14);
 }
 
 .card-tap {
@@ -234,7 +238,7 @@ select:focus {
 
 .card-tap:active {
   transform: scale(0.99);
-  border-color: var(--accent);
+  border-color: rgba(255, 255, 255, 0.28);
 }
 
 @keyframes fadeUp {
@@ -276,7 +280,7 @@ select:focus {
 
 .btn:hover {
   background: var(--bg-hover);
-  border-color: var(--accent);
+  border-color: rgba(255, 255, 255, 0.22);
 }
 
 .btn:active {
@@ -566,7 +570,7 @@ select:focus {
 
 .tabs button.active {
   color: var(--text);
-  border-bottom-color: var(--accent);
+  border-bottom-color: var(--text);
 }
 
 /* ---------- Misc ---------- */
@@ -673,7 +677,7 @@ select:focus {
   width: 22px;
   height: 22px;
   border: 2px solid var(--border);
-  border-top-color: var(--accent);
+  border-top-color: var(--text-muted);
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
 }
@@ -702,8 +706,8 @@ select:focus {
 }
 
 .dropzone.over {
-  border-color: var(--accent);
-  background: var(--accent-dim);
+  border-color: var(--focus-border);
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .dropzone.has-file {
@@ -736,7 +740,7 @@ select:focus {
 .progress > span {
   display: block;
   height: 100%;
-  background: var(--accent);
+  background: var(--text-muted);
   transition: width 0.15s ease;
 }
 
@@ -998,7 +1002,7 @@ select:focus {
   width: 100%;
   max-width: var(--content-max);
   margin: 0 auto;
-  padding: 28px 32px 64px;
+  padding: 36px clamp(28px, 3.5vw, 56px) 80px;
 }
 
 /* ---------- Mobile top bar + bottom tab bar ---------- */
@@ -1054,7 +1058,7 @@ select:focus {
   transition: color 0.15s ease;
 }
 .bn-tab :deep(svg) { width: 21px; height: 21px; }
-.bn-tab.router-link-active { color: var(--accent); }
+.bn-tab.router-link-active { color: var(--text); }
 .bn-tab.router-link-active::before {
   content: '';
   position: absolute;
@@ -1083,7 +1087,7 @@ select:focus {
   flex-wrap: wrap;
 }
 .page-head h1 {
-  font-size: 22px;
+  font-size: 26px;
   font-weight: 700;
   letter-spacing: -0.02em;
   margin: 0;
@@ -1567,7 +1571,7 @@ select:focus {
 @media (max-width: 720px) {
   .content-inner { padding: 14px 14px calc(var(--nav-height) + var(--safe-bottom) + 24px); }
   .page-head { margin-bottom: 16px; }
-  .page-head h1 { font-size: 19px; }
+  .page-head h1 { font-size: 21px; }
 
   /* compact metric tiles — no giant single-number blocks */
   .metric { padding: 12px 13px; }
@@ -1608,12 +1612,42 @@ select:focus {
    ============================================================ */
 :where(a, button, .btn, .nav-link, .card-tap, .tabs button, .segmented button,
         .iconbtn, [tabindex]):focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+  outline: none;
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--focus-border),
+              0 0 16px var(--focus-ring);
   border-radius: var(--radius-xs);
 }
 /* don't double up: inputs already show a focus ring via box-shadow */
 input:focus-visible, textarea:focus-visible, select:focus-visible { outline: none; }
+
+/* ---------- Critical operational banners (Server page) ---------- */
+.critical-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 13px 16px;
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+  margin-bottom: 12px;
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+.critical-banner.error {
+  background: var(--danger-dim);
+  border-color: rgba(239, 91, 81, 0.3);
+  color: #f97c74;
+}
+.critical-banner.warn {
+  background: var(--warn-dim);
+  border-color: rgba(214, 162, 60, 0.3);
+  color: #e4b550;
+}
+.cb-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
 
 /* ---------- Route transition (snappy fade; reduced-motion safe) ---------- */
 .route-enter-active,

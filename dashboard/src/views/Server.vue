@@ -164,6 +164,30 @@ const defaults = computed(() => {
     logFile: d.LogConfig?.Config?.['max-file'] || '—'
   }
 })
+
+// Critical operational alerts — surfaced as prominent banners at the top of the page.
+// Only raised when the data has actually been measured (not for "not_measured" states).
+const criticals = computed(() => {
+  if (!info.value) return []
+  const alerts = []
+  const d = info.value.disk
+  const b = info.value.backup
+  if (d?.status === 'measured' && d.usedPct >= 90) {
+    alerts.push({ level: 'error', message: `Disk is ${d.usedPct}% full — only ${d.freeGb} GB free. Free space before deploying.` })
+  } else if (d?.status === 'measured' && d.usedPct >= 75) {
+    alerts.push({ level: 'warn', message: `Disk is ${d.usedPct}% full (${d.freeGb} GB free). Consider running disk cleanup.` })
+  }
+  if (b?.status === 'none') {
+    alerts.push({ level: 'warn', message: 'No backups found. Run a backup before deploying to production.' })
+  } else if (b?.status === 'overdue') {
+    alerts.push({ level: 'warn', message: `Backup overdue — last backup was ${b.ageHours}h ago (threshold: 168h).` })
+  }
+  if (info.value.docker?.status === 'unavailable') {
+    alerts.push({ level: 'error', message: 'Docker is not reachable. Deploys will fail until Docker is running.' })
+  }
+  return alerts
+})
+
 onMounted(() => { load(); loadCleanup(); })
 </script>
 
@@ -185,6 +209,23 @@ onMounted(() => { load(); loadCleanup(); })
   <div v-else-if="error" class="error-box">{{ error }}</div>
 
   <template v-else-if="info">
+    <!-- Critical operational alerts — disk, backups, Docker -->
+    <div
+      v-for="(alert, i) in criticals"
+      :key="i"
+      class="critical-banner"
+      :class="alert.level"
+    >
+      <svg class="cb-icon" viewBox="0 0 20 20" fill="none">
+        <path v-if="alert.level === 'error'" d="M10 3L18 17H2L10 3Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+        <path v-else d="M10 6v5m0 3h.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        <circle v-if="alert.level === 'warn'" cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.5"/>
+        <line v-if="alert.level === 'error'" x1="10" y1="9" x2="10" y2="13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        <circle v-if="alert.level === 'error'" cx="10" cy="15.5" r="0.75" fill="currentColor"/>
+      </svg>
+      <span>{{ alert.message }}</span>
+    </div>
+
     <div class="callout" style="margin-bottom: 22px">
       <div class="co-bar" style="background: var(--accent)"></div>
       <div><strong>“Set up on host” and “Not measured yet” are expected, not errors.</strong>
@@ -221,32 +262,23 @@ onMounted(() => { load(); loadCleanup(); })
       </div>
     </div>
 
-    <!-- SYSTEMS. health -->
-    <div class="section-label">SYSTEMS. health</div>
+    <!-- SYSTEMS. runtime -->
+    <div class="section-label">SYSTEMS. runtime</div>
     <div class="card" style="padding:0; margin-bottom: 22px">
       <div class="conn-row">
-        <div class="c-name" style="flex:1">Frontend</div>
+        <div class="c-name" style="flex:1">Dashboard</div>
         <div class="conn-state"><span class="sdot ok"></span>Reachable</div>
       </div>
       <div class="conn-row">
-        <div style="flex:1"><div class="c-name">Backend / API</div><div v-if="info.self" class="c-sub">uptime {{ fmtUptime(info.self.uptimeSeconds) }} · {{ info.self.rssMb }} MB · node {{ info.self.node }}</div></div>
+        <div style="flex:1">
+          <div class="c-name">API</div>
+          <div v-if="info.self" class="c-sub">uptime {{ fmtUptime(info.self.uptimeSeconds) }} · {{ info.self.rssMb }} MB · node {{ info.self.node }}</div>
+        </div>
         <div class="conn-state"><span class="sdot ok"></span>Reachable</div>
       </div>
       <div class="conn-row">
-        <div class="c-name" style="flex:1">Deployment worker</div>
+        <div class="c-name" style="flex:1">Deploy worker</div>
         <div class="conn-state"><span class="sdot" :class="present(info.health.deploymentWorker).tone"></span>{{ present(info.health.deploymentWorker).label }}</div>
-      </div>
-      <div class="conn-row">
-        <div class="c-name" style="flex:1">Docker access</div>
-        <div class="conn-state"><span class="sdot" :class="present(info.health.dockerAccess).tone"></span>{{ present(info.health.dockerAccess).label }}</div>
-      </div>
-      <div class="conn-row">
-        <div class="c-name" style="flex:1">Caddy config</div>
-        <div class="conn-state"><span class="sdot" :class="present(info.health.caddyConfig).tone"></span>{{ present(info.health.caddyConfig).label }}</div>
-      </div>
-      <div class="conn-row">
-        <div class="c-name" style="flex:1">Postgres connection</div>
-        <div class="conn-state"><span class="sdot" :class="present(info.health.postgres).tone"></span>{{ present(info.health.postgres).label }}</div>
       </div>
       <div class="conn-row">
         <div style="flex:1"><div class="c-name">Disk</div><div class="c-sub">{{ disk.sub }}</div></div>
@@ -255,7 +287,7 @@ onMounted(() => { load(); loadCleanup(); })
       <div class="conn-row">
         <div style="flex:1"><div class="c-name">Backups</div><div class="c-sub">{{ backupMsg || backup.sub }}</div></div>
         <div class="row gap-sm" style="align-items:center">
-          <button class="btn btn-sm btn-ghost" :disabled="backingUp" @click="runBackup">
+          <button class="btn btn-sm" :disabled="backingUp" @click="runBackup">
             <span v-if="backingUp" class="spinner"></span><span v-else>Back up now</span>
           </button>
           <div class="conn-state"><span class="sdot" :class="backup.tone"></span>{{ backup.label }}</div>
@@ -334,7 +366,13 @@ onMounted(() => { load(); loadCleanup(); })
       <div class="kv"><span class="k">GitHub deploys</span><span class="v">{{ info.features.githubDeploys ? 'Enabled' : 'Disabled' }}</span></div>
       <div class="kv"><span class="k">Large uploads</span><span class="v">{{ info.features.largeUploads ? 'Enabled' : 'Disabled' }}</span></div>
       <div class="kv"><span class="k">Notifications</span><span class="v">{{ info.features.notifications ? 'Enabled' : 'Disabled' }}</span></div>
-      <div class="kv"><span class="k">Upload limit</span><span class="v mono">{{ info.features.uploadMaxMb }} MB (V2 target {{ info.features.v2UploadMaxMb }} MB)</span></div>
+      <div class="kv">
+        <span class="k">Upload limit</span>
+        <span class="v mono">
+          {{ info.features.largeUploads ? info.features.v2UploadMaxMb : info.features.uploadMaxMb }} MB
+          <template v-if="!info.features.largeUploads"> · {{ info.features.v2UploadMaxMb }} MB when <span class="mono">ENABLE_LARGE_UPLOADS</span> is on</template>
+        </span>
+      </div>
       <div class="hint">These are wired but off by default; enable each in <span class="mono">.env</span> after validating on the Windows host. Pulling external code (GitHub deploys), running container shells, and provisioning databases are the higher-risk ones.</div>
     </div>
 
