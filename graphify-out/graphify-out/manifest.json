@@ -1,0 +1,702 @@
+{
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\api\\eslint.config.js": {
+    "mtime": 1781742368.6872294,
+    "ast_hash": "efa94ff8930159bf7e3c57c2ae5340d0",
+    "semantic_hash": "efa94ff8930159bf7e3c57c2ae5340d0"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\api\\package.json": {
+    "mtime": 1781742368.689227,
+    "ast_hash": "240e6ef47611f70c39c7df5a866b79a8",
+    "semantic_hash": "240e6ef47611f70c39c7df5a866b79a8"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\api\\src\\app.js": {
+    "mtime": 1781742368.690229,
+    "ast_hash": "dfd6f77c4b18db5bca2c5089c6e123eb",
+    "semantic_hash": "dfd6f77c4b18db5bca2c5089c6e123eb"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\api\\src\\index.js": {
+    "mtime": 1781742368.6912317,
+    "ast_hash": "81bc1a9617be64ac660ce74c642e6be0",
+    "semantic_hash": "81bc1a9617be64ac660ce74c642e6be0"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\api\\src\\db\\index.js": {
+    "mtime": 1781742368.6912317,
+    "ast_hash": "1df79ac42aff823e3fadf913f24bc262",
+    "semantic_hash": "1df79ac42aff823e3fadf913f24bc262"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\api\\src\\routes\\admin.js": {
+    "mtime": 1781742368.692231,
+    "ast_hash": "8d187b388f873fb0cd3cc22b5b874284",
+    "semantic_hash": "8d187b388f873fb0cd3cc22b5b874284"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\api\\src\\routes\\audit.js": {
+    "mtime": 1781742368.692231,
+    "ast_hash": "b43112b041f1ff72ccc4a98e8564a0db",
+    "semantic_hash": "b43112b041f1ff72ccc4a98e8564a0db"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\api\\src\\routes\\auth.js": {
+    "mtime": 1781742368.69323,
+    "ast_hash": "3d9932471398ba6e9382e29e50e044d1",
+    "semantic_hash": "3d9932471398ba6e9382e29e50e044d1"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\api\\src\\routes\\deploy.js": {
+    "mtime": 1781742368.6942282,
+    "ast_hash": "a91e1ad8072880a2fce865e06a14b9d5",
+    "semantic_hash": "a91e1ad8072880a2fce865e06a14b9d5"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\api\\src\\routes\\env.js": {
+    "mtime": 1781742368.6942282,
+    "ast_hash": "1ec6259d11cb1c2b8bec36a3386fe5e7",
+    "semantic_hash": "1ec6259d11cb1c2b8bec36a3386fe5e7"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\api\\src\\routes\\exec.js": {
+    "mtime": 1781742368.6952293,
+    "ast_hash": "5e05f1f5af7ab5c8e229f165e9bdc872",
+    "semantic_hash": "5e05f1f5af7ab5c8e229f165e9bdc872"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\api\\src\\routes\\logs.js": {
+    "mtime": 1781742368.6962276,
+    "ast_hash": "dc223437a8ebe2f69e0bad2b082c085c",
+    "semantic_hash": "dc223437a8ebe2f69e0bad2b082c085c"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\api\\src\\routes\\projects.js": {
+    "mtime": 1781742368.6962276,
+    "ast_hash": "f9f430b2bae95dc613864bf2204d2e95",
+    "semantic_hash": "f9f430b2bae95dc613864bf2204d2e95"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\api\\src\\routes\\server.js": {
+    "mtime": 1781742368.697229,
+    "ast_hash": "45cfd0885c30a7f7d05f260fe040e3e3",
+    "semantic_hash": "45cfd0885c30a7f7d05f260fe040e3e3"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\api\\src\\routes\\stats.js": {
+    "mtime": 1781742368.69823,
+    "ast_hash": "acd791c22092fa507bfb2cb979d07ac6",
+    "semantic_hash": "acd791c22092fa507bfb2cb979d07ac6"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\api\\src\\routes\\upload.js": {
+    "mtime": 1781742368.69923,
+    "ast_hash": "9a02447de6debcf8d36403c5f72a8d7b",
+    "semantic_hash": "9a02447de6debcf8d36403c5f72a8d7b"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\api\\src\\routes\\webhook.js": {
+    "mtime": 1781742368.69923,
+    "ast_hash": "02b9fb8c376f866f6691e66e94ff2ac8",
+    "semantic_hash": "02b9fb8c376f866f6691e66e94ff2ac8"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\api\\src\\services\\backup.js": {
+    "mtime": 1781742368.70123,
+    "ast_hash": "a5170f33335911ebdd70c83a45b5e5bd",
+    "semantic_hash": "a5170f33335911ebdd70c83a45b5e5bd"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\api\\src\\services\\caddy.js": {
+    "mtime": 1781742368.70123,
+    "ast_hash": "b043daee36568200d8a1193ee2f73a70",
+    "semantic_hash": "b043daee36568200d8a1193ee2f73a70"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\api\\src\\services\\dbprovision-runner.js": {
+    "mtime": 1781742368.7022316,
+    "ast_hash": "91f12755ba1866bebb2a7ef73a89ede6",
+    "semantic_hash": "91f12755ba1866bebb2a7ef73a89ede6"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\api\\src\\services\\docker.js": {
+    "mtime": 1781742368.7022316,
+    "ast_hash": "0c9d880719e794874f53e7b0ef979d5b",
+    "semantic_hash": "0c9d880719e794874f53e7b0ef979d5b"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\api\\src\\services\\health.js": {
+    "mtime": 1781742368.70323,
+    "ast_hash": "5192d07c3ad97471e28afcf870ee0d51",
+    "semantic_hash": "5192d07c3ad97471e28afcf870ee0d51"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\api\\src\\services\\nginx.js": {
+    "mtime": 1781742368.70323,
+    "ast_hash": "fafabe097dc6d5911716cf03f33406b0",
+    "semantic_hash": "fafabe097dc6d5911716cf03f33406b0"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\api\\src\\services\\notify.js": {
+    "mtime": 1781742368.70423,
+    "ast_hash": "9945b2a7f7e8df36cebb4ce744248251",
+    "semantic_hash": "9945b2a7f7e8df36cebb4ce744248251"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\api\\src\\services\\proxy.js": {
+    "mtime": 1781742368.7052305,
+    "ast_hash": "4796c740bdfd6a46b2cb9a4d9cb8f126",
+    "semantic_hash": "4796c740bdfd6a46b2cb9a4d9cb8f126"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\api\\src\\services\\reconcile.js": {
+    "mtime": 1781742368.7052305,
+    "ast_hash": "2c3bb52916e4b276895f61906e4a18aa",
+    "semantic_hash": "2c3bb52916e4b276895f61906e4a18aa"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\api\\src\\services\\zip.js": {
+    "mtime": 1781742368.7062285,
+    "ast_hash": "b9fe759d50eccb8a3744b7f64b5086ec",
+    "semantic_hash": "b9fe759d50eccb8a3744b7f64b5086ec"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\api\\src\\util\\backup.js": {
+    "mtime": 1781742368.7062285,
+    "ast_hash": "ceffbf4238dcdcc55040d772b2784626",
+    "semantic_hash": "ceffbf4238dcdcc55040d772b2784626"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\api\\src\\util\\dbprovision.js": {
+    "mtime": 1781742368.7072258,
+    "ast_hash": "51e473ac3959f7ee5703d55ea60fa47c",
+    "semantic_hash": "51e473ac3959f7ee5703d55ea60fa47c"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\api\\src\\util\\flags.js": {
+    "mtime": 1781742368.7072258,
+    "ast_hash": "9b0afc86c7de66bbb1c08643928c39b4",
+    "semantic_hash": "9b0afc86c7de66bbb1c08643928c39b4"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\api\\src\\util\\limits.js": {
+    "mtime": 1781742368.708229,
+    "ast_hash": "6b76f8a335181f84a0b3f729923ff48a",
+    "semantic_hash": "6b76f8a335181f84a0b3f729923ff48a"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\api\\src\\util\\notify.js": {
+    "mtime": 1781742368.70923,
+    "ast_hash": "379acd7b89a059cd810133126225eb8a",
+    "semantic_hash": "379acd7b89a059cd810133126225eb8a"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\api\\src\\util\\pathsafe.js": {
+    "mtime": 1781742368.70923,
+    "ast_hash": "f48105190034d2e05f399f4dd97f1a1a",
+    "semantic_hash": "f48105190034d2e05f399f4dd97f1a1a"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\api\\src\\util\\project.js": {
+    "mtime": 1781742368.71023,
+    "ast_hash": "b3e875e71fb5d84a5a2fe4a2baddbe93",
+    "semantic_hash": "b3e875e71fb5d84a5a2fe4a2baddbe93"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\api\\src\\util\\projectType.js": {
+    "mtime": 1781742368.71023,
+    "ast_hash": "e6f4d736948d1ddb414c463e9be4d3aa",
+    "semantic_hash": "e6f4d736948d1ddb414c463e9be4d3aa"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\api\\src\\util\\reconcile.js": {
+    "mtime": 1781742368.711229,
+    "ast_hash": "afb6213e4335437cba3f738d57bb05cd",
+    "semantic_hash": "afb6213e4335437cba3f738d57bb05cd"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\api\\src\\util\\slug.js": {
+    "mtime": 1781742368.711229,
+    "ast_hash": "b7a6e80c202856868dfefa0d5dcca966",
+    "semantic_hash": "b7a6e80c202856868dfefa0d5dcca966"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\api\\src\\util\\thresholds.js": {
+    "mtime": 1781742368.7122364,
+    "ast_hash": "874e36fa6e6a01b74affb4aad30f3467",
+    "semantic_hash": "874e36fa6e6a01b74affb4aad30f3467"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\api\\src\\util\\totp.js": {
+    "mtime": 1781742368.7122364,
+    "ast_hash": "776fe647d7527cb0b6595f3a0021b97b",
+    "semantic_hash": "776fe647d7527cb0b6595f3a0021b97b"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\api\\src\\util\\upload.js": {
+    "mtime": 1781742368.7132347,
+    "ast_hash": "c6231776446f4d600d8595b6e862aa6d",
+    "semantic_hash": "c6231776446f4d600d8595b6e862aa6d"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\api\\src\\util\\webhook.js": {
+    "mtime": 1781742368.7132347,
+    "ast_hash": "07e6dc9c100bbafc6626d692bc528d8b",
+    "semantic_hash": "07e6dc9c100bbafc6626d692bc528d8b"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\api\\test\\backup.test.js": {
+    "mtime": 1781742368.714237,
+    "ast_hash": "84d14d4a914da485cb730ceaccdcfb61",
+    "semantic_hash": "84d14d4a914da485cb730ceaccdcfb61"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\api\\test\\caddy.test.js": {
+    "mtime": 1781742368.715237,
+    "ast_hash": "62f1bb48bb91ac319f8634046edf23e5",
+    "semantic_hash": "62f1bb48bb91ac319f8634046edf23e5"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\api\\test\\envcrypto.test.js": {
+    "mtime": 1781742368.715237,
+    "ast_hash": "6d00e8eaa46f4d506408818f5f999498",
+    "semantic_hash": "6d00e8eaa46f4d506408818f5f999498"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\api\\test\\health.test.js": {
+    "mtime": 1781742368.7162373,
+    "ast_hash": "967f2c5c35d653dd18447b4361d9fe6b",
+    "semantic_hash": "967f2c5c35d653dd18447b4361d9fe6b"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\api\\test\\integration.test.js": {
+    "mtime": 1781742368.7172375,
+    "ast_hash": "63909a9f7eb2512a3df3add10699cc7f",
+    "semantic_hash": "63909a9f7eb2512a3df3add10699cc7f"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\api\\test\\limits.test.js": {
+    "mtime": 1781742368.7172375,
+    "ast_hash": "9279d231ec766350fa4996cb311e7450",
+    "semantic_hash": "9279d231ec766350fa4996cb311e7450"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\api\\test\\pathsafe.test.js": {
+    "mtime": 1781742368.7182388,
+    "ast_hash": "55c8ee8ad4688de35512ccb389951543",
+    "semantic_hash": "55c8ee8ad4688de35512ccb389951543"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\api\\test\\proxy.test.js": {
+    "mtime": 1781742368.719239,
+    "ast_hash": "2efbba6d1dc9253bc1b296ec6db83b86",
+    "semantic_hash": "2efbba6d1dc9253bc1b296ec6db83b86"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\api\\test\\reconcile.test.js": {
+    "mtime": 1781742368.719239,
+    "ast_hash": "a94367c443a21d6ea140e95226ff1c31",
+    "semantic_hash": "a94367c443a21d6ea140e95226ff1c31"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\api\\test\\slug.test.js": {
+    "mtime": 1781742368.7202387,
+    "ast_hash": "912007edf2f28f385f62d635badef298",
+    "semantic_hash": "912007edf2f28f385f62d635badef298"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\api\\test\\thresholds.test.js": {
+    "mtime": 1781742368.7202387,
+    "ast_hash": "82274f2176da04e86c200f4dbd4be679",
+    "semantic_hash": "82274f2176da04e86c200f4dbd4be679"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\api\\test\\totp.test.js": {
+    "mtime": 1781742368.7212367,
+    "ast_hash": "c53710ec28c0d8fce69907511faeb630",
+    "semantic_hash": "c53710ec28c0d8fce69907511faeb630"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\api\\test\\v2.test.js": {
+    "mtime": 1781742368.7212367,
+    "ast_hash": "b8550093cbeedc48b3ac7001dfc9128e",
+    "semantic_hash": "b8550093cbeedc48b3ac7001dfc9128e"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\dashboard\\eslint.config.js": {
+    "mtime": 1781742368.7242346,
+    "ast_hash": "4dd4487ad817f264cea7cd842dde78c0",
+    "semantic_hash": "4dd4487ad817f264cea7cd842dde78c0"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\dashboard\\package.json": {
+    "mtime": 1781742368.7267444,
+    "ast_hash": "f9c943c7dd97616709e014144ed9b972",
+    "semantic_hash": "f9c943c7dd97616709e014144ed9b972"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\dashboard\\vite.config.js": {
+    "mtime": 1781742368.761753,
+    "ast_hash": "ec04ca18f2b431b4364400042fd193b3",
+    "semantic_hash": "ec04ca18f2b431b4364400042fd193b3"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\dashboard\\scripts\\gen-ribbon.mjs": {
+    "mtime": 1781742368.7387521,
+    "ast_hash": "9611b8aa4057d6846c058f65d3243ccb",
+    "semantic_hash": "9611b8aa4057d6846c058f65d3243ccb"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\dashboard\\scripts\\shots.mjs": {
+    "mtime": 1781742368.739753,
+    "ast_hash": "68f20b165d3ec5f644807440433b98d6",
+    "semantic_hash": "68f20b165d3ec5f644807440433b98d6"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\dashboard\\src\\App.vue": {
+    "mtime": 1781742368.7407522,
+    "ast_hash": "2524d3f0b66bccc9c4d37c11084d0fd9",
+    "semantic_hash": "2524d3f0b66bccc9c4d37c11084d0fd9"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\dashboard\\src\\config.js": {
+    "mtime": 1781742368.7517526,
+    "ast_hash": "48194ba148be679d846d0630f3874af6",
+    "semantic_hash": "48194ba148be679d846d0630f3874af6"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\dashboard\\src\\main.js": {
+    "mtime": 1781742368.7517526,
+    "ast_hash": "ddd94a24fdb8481d1754188191e3fc51",
+    "semantic_hash": "ddd94a24fdb8481d1754188191e3fc51"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\dashboard\\src\\api\\client.js": {
+    "mtime": 1781742368.7417521,
+    "ast_hash": "72593380491cd7c95b9ec7b14557de63",
+    "semantic_hash": "72593380491cd7c95b9ec7b14557de63"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\dashboard\\src\\api\\ws.js": {
+    "mtime": 1781742368.7417521,
+    "ast_hash": "0504eb92274534fdd1dad14f82c48418",
+    "semantic_hash": "0504eb92274534fdd1dad14f82c48418"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\dashboard\\src\\components\\AppShell.vue": {
+    "mtime": 1781742368.7427535,
+    "ast_hash": "04a4d2601e0abf347f3400f4705ccdff",
+    "semantic_hash": "04a4d2601e0abf347f3400f4705ccdff"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\dashboard\\src\\components\\ConfirmDialog.vue": {
+    "mtime": 1781742368.7437532,
+    "ast_hash": "4659779808ba9618d0fb04e8f62cc6ac",
+    "semantic_hash": "4659779808ba9618d0fb04e8f62cc6ac"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\dashboard\\src\\components\\CopyButton.vue": {
+    "mtime": 1781742368.7437532,
+    "ast_hash": "9d45c918591db533cbd5b1add62ddbfa",
+    "semantic_hash": "9d45c918591db533cbd5b1add62ddbfa"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\dashboard\\src\\components\\ExecTerminal.vue": {
+    "mtime": 1781742368.7447517,
+    "ast_hash": "d1004dddbe5598cffd3826a2ad2d0dc4",
+    "semantic_hash": "d1004dddbe5598cffd3826a2ad2d0dc4"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\dashboard\\src\\components\\FlowField.vue": {
+    "mtime": 1781742368.7447517,
+    "ast_hash": "dd78aa4a30f9171eb1e7eb57b10b89bf",
+    "semantic_hash": "dd78aa4a30f9171eb1e7eb57b10b89bf"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\dashboard\\src\\components\\KeyboardShortcuts.vue": {
+    "mtime": 1781742368.745751,
+    "ast_hash": "a83ece64a7a56888d2f0a44b2165cf53",
+    "semantic_hash": "a83ece64a7a56888d2f0a44b2165cf53"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\dashboard\\src\\components\\LogConsole.vue": {
+    "mtime": 1781742368.745751,
+    "ast_hash": "fcb70c3969272d0750b41593165e8abb",
+    "semantic_hash": "fcb70c3969272d0750b41593165e8abb"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\dashboard\\src\\components\\NavIcon.vue": {
+    "mtime": 1781742368.7467535,
+    "ast_hash": "5d7333a4aabf050dfe4424eada4938d4",
+    "semantic_hash": "5d7333a4aabf050dfe4424eada4938d4"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\dashboard\\src\\components\\StatsCharts.vue": {
+    "mtime": 1781742368.7477517,
+    "ast_hash": "5b740179c3df8b69e895c59667be092a",
+    "semantic_hash": "5b740179c3df8b69e895c59667be092a"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\dashboard\\src\\components\\StatusBadge.vue": {
+    "mtime": 1781742368.7477517,
+    "ast_hash": "fb74180631999230aaa2726ba6df28dd",
+    "semantic_hash": "fb74180631999230aaa2726ba6df28dd"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\dashboard\\src\\components\\SystemSettings.vue": {
+    "mtime": 1781742368.7487538,
+    "ast_hash": "339b74ebc9d1a78ac8fc42bbc454f87d",
+    "semantic_hash": "339b74ebc9d1a78ac8fc42bbc454f87d"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\dashboard\\src\\components\\SystemsLogo.vue": {
+    "mtime": 1781742368.7497504,
+    "ast_hash": "2630a8a4dbd65c952a79afeb4e7d5256",
+    "semantic_hash": "2630a8a4dbd65c952a79afeb4e7d5256"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\dashboard\\src\\components\\Toast.vue": {
+    "mtime": 1781742368.7497504,
+    "ast_hash": "cc39cec86f282edcd0b667c89c9be6a8",
+    "semantic_hash": "cc39cec86f282edcd0b667c89c9be6a8"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\dashboard\\src\\composables\\useToast.js": {
+    "mtime": 1781742368.7507524,
+    "ast_hash": "f1deadc4747b143086d4502faae4d4e6",
+    "semantic_hash": "f1deadc4747b143086d4502faae4d4e6"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\dashboard\\src\\router\\index.js": {
+    "mtime": 1781742368.7527516,
+    "ast_hash": "f2588e4e01e125d047f376bd58155da8",
+    "semantic_hash": "f2588e4e01e125d047f376bd58155da8"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\dashboard\\src\\stores\\auth.js": {
+    "mtime": 1781742368.75375,
+    "ast_hash": "314f906c912b7c9b793817c14a6ccc1e",
+    "semantic_hash": "314f906c912b7c9b793817c14a6ccc1e"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\dashboard\\src\\utils\\date.js": {
+    "mtime": 1781742368.754755,
+    "ast_hash": "22828f513d8e71bd5405b802f005bd25",
+    "semantic_hash": "22828f513d8e71bd5405b802f005bd25"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\dashboard\\src\\utils\\status.js": {
+    "mtime": 1781742368.755754,
+    "ast_hash": "6bfcb0e1b7b9c42f620f7dbcc5c5c5f3",
+    "semantic_hash": "6bfcb0e1b7b9c42f620f7dbcc5c5c5f3"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\dashboard\\src\\views\\Admin.vue": {
+    "mtime": 1781742368.7567527,
+    "ast_hash": "9023f25e8fa820a69691722a6efe7ff5",
+    "semantic_hash": "9023f25e8fa820a69691722a6efe7ff5"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\dashboard\\src\\views\\Events.vue": {
+    "mtime": 1781742368.757753,
+    "ast_hash": "61db9863ae7502fdbbbcd159dd41422b",
+    "semantic_hash": "61db9863ae7502fdbbbcd159dd41422b"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\dashboard\\src\\views\\Login.vue": {
+    "mtime": 1781742368.757753,
+    "ast_hash": "22eb269cfeff9ca1f2994f5432c52989",
+    "semantic_hash": "22eb269cfeff9ca1f2994f5432c52989"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\dashboard\\src\\views\\Server.vue": {
+    "mtime": 1781742368.7587564,
+    "ast_hash": "eb24555da0b3e10a997ea80b83024d9a",
+    "semantic_hash": "eb24555da0b3e10a997ea80b83024d9a"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\dashboard\\src\\views\\Ship.vue": {
+    "mtime": 1781742368.7587564,
+    "ast_hash": "8b2b4978de340e67d5cb1c9e835a58bc",
+    "semantic_hash": "8b2b4978de340e67d5cb1c9e835a58bc"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\dashboard\\src\\views\\SystemDetail.vue": {
+    "mtime": 1781742368.7597513,
+    "ast_hash": "0a08154f40b3121653b7b3abf0c179a0",
+    "semantic_hash": "0a08154f40b3121653b7b3abf0c179a0"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\dashboard\\src\\views\\Systems.vue": {
+    "mtime": 1781742368.760754,
+    "ast_hash": "e8fca727dcb5b673ef06061520e7823f",
+    "semantic_hash": "e8fca727dcb5b673ef06061520e7823f"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\scripts\\backup-systems-windows.ps1": {
+    "mtime": 1781742368.8077533,
+    "ast_hash": "506aeecf69d2ed89358ab188d966715e",
+    "semantic_hash": "506aeecf69d2ed89358ab188d966715e"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\scripts\\check-firewall-windows.ps1": {
+    "mtime": 1781742368.808751,
+    "ast_hash": "35855e019a4b5e6d0323489fee16436c",
+    "semantic_hash": "35855e019a4b5e6d0323489fee16436c"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\scripts\\check-systems-health-windows.ps1": {
+    "mtime": 1781742368.808751,
+    "ast_hash": "a88a2a33af8fa779fa0fa2308967d0d3",
+    "semantic_hash": "a88a2a33af8fa779fa0fa2308967d0d3"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\scripts\\deploy-systems-windows.ps1": {
+    "mtime": 1781742368.809751,
+    "ast_hash": "a85e523586b31e118807f4c9600e582f",
+    "semantic_hash": "a85e523586b31e118807f4c9600e582f"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\scripts\\restore-systems-windows.ps1": {
+    "mtime": 1781742368.809751,
+    "ast_hash": "fd3b9057bd4e55d4aa3523000826a75f",
+    "semantic_hash": "fd3b9057bd4e55d4aa3523000826a75f"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\scripts\\setup-windows.ps1": {
+    "mtime": 1781742368.8107507,
+    "ast_hash": "3fe91eaeb7b525503112328ccb6b392f",
+    "semantic_hash": "3fe91eaeb7b525503112328ccb6b392f"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\scripts\\update-systems-windows.ps1": {
+    "mtime": 1781742368.8107507,
+    "ast_hash": "a01124af2320674ffbf7b98c662fc2d3",
+    "semantic_hash": "a01124af2320674ffbf7b98c662fc2d3"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\scripts\\verify-hardening-windows.ps1": {
+    "mtime": 1781742368.8117518,
+    "ast_hash": "4ed2791e9a15061f897de3481862d20a",
+    "semantic_hash": "4ed2791e9a15061f897de3481862d20a"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\scripts\\_systems-common.ps1": {
+    "mtime": 1781742368.8067517,
+    "ast_hash": "13b6e545afaeea18a2d0970b178efc0f",
+    "semantic_hash": "13b6e545afaeea18a2d0970b178efc0f"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\docker-compose.yml": {
+    "mtime": 1781742368.761753,
+    "ast_hash": "ed5c2dbd5eb36f35e50bd8252c6a34e4",
+    "semantic_hash": "ed5c2dbd5eb36f35e50bd8252c6a34e4"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\README.md": {
+    "mtime": 1781742368.6852288,
+    "ast_hash": "ad79ee94f46a923a699d8d1581a4ec39",
+    "semantic_hash": "ad79ee94f46a923a699d8d1581a4ec39"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\.github\\FUNDING.yml": {
+    "mtime": 1781742368.6812289,
+    "ast_hash": "00bc02285c597b9b6d0c4717664e821a",
+    "semantic_hash": "00bc02285c597b9b6d0c4717664e821a"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\.github\\workflows\\ci.yml": {
+    "mtime": 1781742368.6822286,
+    "ast_hash": "4b5e20e4b32f6fec4ae2c0967495ad9f",
+    "semantic_hash": "4b5e20e4b32f6fec4ae2c0967495ad9f"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\dashboard\\index.html": {
+    "mtime": 1781742368.725238,
+    "ast_hash": "2b851e598c2f76e46564a607787d8fe8",
+    "semantic_hash": "2b851e598c2f76e46564a607787d8fe8"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\dashboard\\README.md": {
+    "mtime": 1781742368.7242346,
+    "ast_hash": "ab8f4cb8de6232cbb443ccf3c1295ca1",
+    "semantic_hash": "ab8f4cb8de6232cbb443ccf3c1295ca1"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\docs\\ARCHITECTURE.md": {
+    "mtime": 1781742368.762753,
+    "ast_hash": "6defb8db5d906f4da4f1c8afd189206f",
+    "semantic_hash": "6defb8db5d906f4da4f1c8afd189206f"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\docs\\BACKUPS.md": {
+    "mtime": 1781742368.7637522,
+    "ast_hash": "c0699e0290e5c990e2f6b15a60d2c724",
+    "semantic_hash": "c0699e0290e5c990e2f6b15a60d2c724"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\docs\\DATABASES.md": {
+    "mtime": 1781742368.7637522,
+    "ast_hash": "bf208460892852934278231fb001e681",
+    "semantic_hash": "bf208460892852934278231fb001e681"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\docs\\DEPLOYMENT.md": {
+    "mtime": 1781742368.7647533,
+    "ast_hash": "4acea231d7f0c352df87ca0ada0fbd8c",
+    "semantic_hash": "4acea231d7f0c352df87ca0ada0fbd8c"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\docs\\DISASTER_RECOVERY.md": {
+    "mtime": 1781742368.7657528,
+    "ast_hash": "a1b9bfbaf7a0881cd22b3b1c10eb883b",
+    "semantic_hash": "a1b9bfbaf7a0881cd22b3b1c10eb883b"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\docs\\DOCKERFILE_MODE.md": {
+    "mtime": 1781742368.7657528,
+    "ast_hash": "2b5e82de85266125760072f2b26578c8",
+    "semantic_hash": "2b5e82de85266125760072f2b26578c8"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\docs\\GITHUB_DEPLOYS.md": {
+    "mtime": 1781742368.7667542,
+    "ast_hash": "bd69d3a34ebca3fa81b744c4aefdfdee",
+    "semantic_hash": "bd69d3a34ebca3fa81b744c4aefdfdee"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\docs\\HARDENING.md": {
+    "mtime": 1781742368.7667542,
+    "ast_hash": "5ba053083d1e4070e61e9cc8cd8284f9",
+    "semantic_hash": "5ba053083d1e4070e61e9cc8cd8284f9"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\docs\\LARGE_UPLOADS.md": {
+    "mtime": 1781742368.7677538,
+    "ast_hash": "ba68157b963c71a84f437ea122cb5585",
+    "semantic_hash": "ba68157b963c71a84f437ea122cb5585"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\docs\\NOTIFICATIONS.md": {
+    "mtime": 1781742368.7677538,
+    "ast_hash": "408908245feb625e894b964e66014ebe",
+    "semantic_hash": "408908245feb625e894b964e66014ebe"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\docs\\OPERATIONS.md": {
+    "mtime": 1781742368.7687514,
+    "ast_hash": "7fa29cc711527d7b717d0e74126a2a3b",
+    "semantic_hash": "7fa29cc711527d7b717d0e74126a2a3b"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\docs\\RESOURCE_LIMITS.md": {
+    "mtime": 1781742368.7687514,
+    "ast_hash": "7fc1841781e6acd6b847b1bef2a73d52",
+    "semantic_hash": "7fc1841781e6acd6b847b1bef2a73d52"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\docs\\SECURITY.md": {
+    "mtime": 1781742368.769753,
+    "ast_hash": "d439f82d8f1af4a83a8574b1062c49e2",
+    "semantic_hash": "d439f82d8f1af4a83a8574b1062c49e2"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\docs\\SERVER_DEPLOYMENT_GUIDE.md": {
+    "mtime": 1781742368.769753,
+    "ast_hash": "9764753da1c2c27e1a9fa1e447f44818",
+    "semantic_hash": "9764753da1c2c27e1a9fa1e447f44818"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\docs\\SHELL_CONSOLE.md": {
+    "mtime": 1781742368.770755,
+    "ast_hash": "cbd0919d1e473ea6a1602c9bd47f1531",
+    "semantic_hash": "cbd0919d1e473ea6a1602c9bd47f1531"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\docs\\UPDATE_STRATEGY.md": {
+    "mtime": 1781742368.770755,
+    "ast_hash": "d04763765d2eddcbc5c60c47100c2a26",
+    "semantic_hash": "d04763765d2eddcbc5c60c47100c2a26"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\docs\\V2_ROADMAP.md": {
+    "mtime": 1781742368.7717545,
+    "ast_hash": "e9b30937dae17da9cfc49976ce8aff64",
+    "semantic_hash": "e9b30937dae17da9cfc49976ce8aff64"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\docs\\WINDOWS_DEPLOYMENT.md": {
+    "mtime": 1781742368.7717545,
+    "ast_hash": "1058890b516a0c08d5b36a55ffac2e13",
+    "semantic_hash": "1058890b516a0c08d5b36a55ffac2e13"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\docs\\WINDOWS_VALIDATION_CHECKLIST.md": {
+    "mtime": 1781742368.7727551,
+    "ast_hash": "38dc8d2be95f711d0296109f83503415",
+    "semantic_hash": "38dc8d2be95f711d0296109f83503415"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\docs\\WORKERS.md": {
+    "mtime": 1781742368.7737522,
+    "ast_hash": "0229e788ad830a0b5db1ca8152e04e87",
+    "semantic_hash": "0229e788ad830a0b5db1ca8152e04e87"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\dashboard\\public\\icon-192.svg": {
+    "mtime": 1781742368.7367527,
+    "ast_hash": "a734d426827847d73faf51d552992138",
+    "semantic_hash": "a734d426827847d73faf51d552992138"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\dashboard\\public\\icon-512.svg": {
+    "mtime": 1781742368.7377524,
+    "ast_hash": "9f077ecde2e05091b981d80796b374ef",
+    "semantic_hash": "9f077ecde2e05091b981d80796b374ef"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\dashboard\\public\\art\\ribbon-field.svg": {
+    "mtime": 1781742368.7277522,
+    "ast_hash": "73a466683cb9348d7cbe416f6c9abf65",
+    "semantic_hash": "73a466683cb9348d7cbe416f6c9abf65"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\dashboard\\public\\brand\\systems-wordmark-white.png": {
+    "mtime": 1781742368.7317524,
+    "ast_hash": "4145a7b481aa918589610b9cb877b7d4",
+    "semantic_hash": "4145a7b481aa918589610b9cb877b7d4"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\dashboard\\public\\brand\\systems-wordmark.png": {
+    "mtime": 1781742368.7367527,
+    "ast_hash": "477adba5c1a5e521b0fd4db75619569e",
+    "semantic_hash": "477adba5c1a5e521b0fd4db75619569e"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\docs\\assets\\header.svg": {
+    "mtime": 1781742368.7747517,
+    "ast_hash": "8fd366055a20af56e0f87b5a6023db57",
+    "semantic_hash": "8fd366055a20af56e0f87b5a6023db57"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\docs\\assets\\social-preview.png": {
+    "mtime": 1781742368.7977505,
+    "ast_hash": "9a7537271f79c50fba7db5530a8fcefd",
+    "semantic_hash": "9a7537271f79c50fba7db5530a8fcefd"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\docs\\assets\\social-preview.svg": {
+    "mtime": 1781742368.7987535,
+    "ast_hash": "540a0e90dc994aac184e23dc83e54151",
+    "semantic_hash": "540a0e90dc994aac184e23dc83e54151"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\docs\\assets\\systems-wordmark-white.png": {
+    "mtime": 1781742368.8017502,
+    "ast_hash": "4145a7b481aa918589610b9cb877b7d4",
+    "semantic_hash": "4145a7b481aa918589610b9cb877b7d4"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\docs\\assets\\systems-wordmark.png": {
+    "mtime": 1781742368.8047516,
+    "ast_hash": "477adba5c1a5e521b0fd4db75619569e",
+    "semantic_hash": "477adba5c1a5e521b0fd4db75619569e"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\docs\\assets\\screenshots\\dashboard.png": {
+    "mtime": 1781742368.7767496,
+    "ast_hash": "59da01a19d641b1f0db68c780ae17b19",
+    "semantic_hash": "59da01a19d641b1f0db68c780ae17b19"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\docs\\assets\\screenshots\\deploy.gif": {
+    "mtime": 1781742368.7887502,
+    "ast_hash": "a2473d3049450f92e736a92c680f7eba",
+    "semantic_hash": "a2473d3049450f92e736a92c680f7eba"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\docs\\assets\\screenshots\\mobile.png": {
+    "mtime": 1781742368.7907543,
+    "ast_hash": "545b2902799a89793e525d60b808e2fc",
+    "semantic_hash": "545b2902799a89793e525d60b808e2fc"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\docs\\assets\\screenshots\\server.png": {
+    "mtime": 1781742368.7917502,
+    "ast_hash": "875c1f69b2443ee159b5edd3e4a534c7",
+    "semantic_hash": "875c1f69b2443ee159b5edd3e4a534c7"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\docs\\assets\\screenshots\\ship.png": {
+    "mtime": 1781742368.7937524,
+    "ast_hash": "da3729e125967d49dc6886e37da2762a",
+    "semantic_hash": "da3729e125967d49dc6886e37da2762a"
+  },
+  "C:\\Users\\AlexanderMoravcik\\Desktop\\ACR - Rework\\systems\\docs\\assets\\screenshots\\system.png": {
+    "mtime": 1781742368.7957501,
+    "ast_hash": "445ab921f0f2a2ddd8b292c2a56c487e",
+    "semantic_hash": "445ab921f0f2a2ddd8b292c2a56c487e"
+  }
+}

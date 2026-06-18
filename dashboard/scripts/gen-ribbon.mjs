@@ -12,6 +12,11 @@ const DOCS = resolve(__dirname, '../../docs/assets')
 
 const PALETTE = ['#d6b3c0', '#aab6d2', '#b0cdbf', '#d6cab2', '#c8bcd2']
 
+// Type: a monospaced wordmark reads like a deployment/terminal tool (and the
+// trailing dot lands cleanly); taglines stay in a clean grotesque.
+const MONO = 'ui-monospace, "Cascadia Code", "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace'
+const SANS = '"Inter", ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif'
+
 // Same curl-like flow field as FlowField.vue.
 function angleAt(nx, ny) {
   const x = nx * 3.0, y = ny * 3.0
@@ -85,8 +90,8 @@ ${paths.join('\n')}
 ${paths.join('\n')}
 </g>
 <rect width="${W}" height="${H}" fill="url(#fade)"/>
-<text x="44" y="250" font-family="-apple-system, system-ui, Segoe UI, sans-serif" font-size="44" font-weight="700" letter-spacing="2" fill="#ececee">SYSTEMS.</text>
-<text x="48" y="282" font-family="-apple-system, system-ui, Segoe UI, sans-serif" font-size="18" fill="#9296a0">Deployment engine</text>
+<text x="44" y="250" font-family='${MONO}' font-size="42" font-weight="700" letter-spacing="1" fill="#ececee">SYSTEMS.</text>
+<text x="48" y="282" font-family='${SANS}' font-size="18" letter-spacing="0.3" fill="#9296a0">Deployment engine</text>
 </svg>
 `
   mkdirSync(DOCS, { recursive: true })
@@ -110,10 +115,10 @@ ${paths.join('\n')}
 ${paths.join('\n')}
 </g>
 <rect width="${W}" height="${H}" fill="url(#vig)"/>
-<g font-family="-apple-system, system-ui, Segoe UI, sans-serif" text-anchor="middle">
-  <text x="640" y="316" font-size="84" font-weight="800" letter-spacing="3" fill="#ececee">SYSTEMS.</text>
-  <text x="640" y="368" font-size="27" fill="#cfd2d8">Your own deployment engine — zip in, live URL out.</text>
-  <text x="640" y="412" font-size="18" letter-spacing="1.5" fill="#9296a0">self-hosted · admin-only · Vue + Fastify · HTTPS</text>
+<g text-anchor="middle">
+  <text x="640" y="316" font-family='${MONO}' font-size="80" font-weight="700" letter-spacing="2" fill="#ececee">SYSTEMS.</text>
+  <text x="640" y="368" font-family='${SANS}' font-size="27" fill="#cfd2d8">Your own deployment engine — zip in, live URL out.</text>
+  <text x="640" y="412" font-family='${SANS}' font-size="18" letter-spacing="1.5" fill="#9296a0">self-hosted · Vue + Fastify · automatic HTTPS</text>
 </g>
 </svg>
 `
