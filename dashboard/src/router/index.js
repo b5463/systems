@@ -1,5 +1,12 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
+import Admin from '../views/Admin.vue'
+import Events from '../views/Events.vue'
+import Login from '../views/Login.vue'
+import Server from '../views/Server.vue'
+import Ship from '../views/Ship.vue'
+import SystemDetail from '../views/SystemDetail.vue'
+import Systems from '../views/Systems.vue'
 
 // SYSTEMS. V1.1 — five operational surfaces + system detail.
 // Legacy paths (/deploy, /activity, /account, /projects/:slug) redirect to the
@@ -8,18 +15,18 @@ const routes = [
   {
     path: '/login',
     name: 'login',
-    component: () => import('../views/Login.vue'),
+    component: Login,
     meta: { public: true }
   },
-  { path: '/', name: 'systems', component: () => import('../views/Systems.vue') },
-  { path: '/ship', name: 'ship', component: () => import('../views/Ship.vue') },
-  { path: '/events', name: 'events', component: () => import('../views/Events.vue') },
-  { path: '/server', name: 'server', component: () => import('../views/Server.vue') },
-  { path: '/admin', name: 'admin', component: () => import('../views/Admin.vue') },
+  { path: '/', name: 'systems', component: Systems },
+  { path: '/ship', name: 'ship', component: Ship },
+  { path: '/events', name: 'events', component: Events },
+  { path: '/server', name: 'server', component: Server },
+  { path: '/admin', name: 'admin', component: Admin },
   {
     path: '/systems/:slug',
     name: 'system-detail',
-    component: () => import('../views/SystemDetail.vue'),
+    component: SystemDetail,
     props: true
   },
 
@@ -41,6 +48,38 @@ const router = createRouter({
   scrollBehavior() {
     return { top: 0 }
   }
+})
+
+function isRouteImportError(error) {
+  const message = String(error?.message || error || '')
+  return (
+    message.includes('Failed to fetch dynamically imported module') ||
+    message.includes('Importing a module script failed') ||
+    message.includes('error loading dynamically imported module') ||
+    message.includes('Unable to preload CSS')
+  )
+}
+
+router.onError(async (error, to) => {
+  if (!isRouteImportError(error)) return
+
+  // A stale service worker or cached index can leave the shell alive while
+  // route chunks for Ship/Events/Admin 404. Unregister once, then reload
+  // the requested route instead of leaving the content area blank.
+  const retryKey = `systems:route-reload:${to.fullPath}`
+  if (sessionStorage.getItem(retryKey)) return
+  sessionStorage.setItem(retryKey, '1')
+
+  try {
+    if ('serviceWorker' in navigator) {
+      const registrations = await navigator.serviceWorker.getRegistrations()
+      await Promise.all(registrations.map((registration) => registration.unregister()))
+    }
+  } catch {
+    // Best effort only; the reload below is the actual recovery.
+  }
+
+  window.location.assign(to.fullPath)
 })
 
 router.beforeEach((to) => {

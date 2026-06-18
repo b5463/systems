@@ -11,6 +11,18 @@ function authHeader() {
   return auth.token ? { Authorization: `Bearer ${auth.token}` } : {}
 }
 
+function jsonRequest(method, body) {
+  const hasBody = body !== undefined
+  return {
+    method,
+    headers: {
+      ...(hasBody ? { 'Content-Type': 'application/json' } : {}),
+      ...authHeader()
+    },
+    body: hasBody ? JSON.stringify(body) : undefined
+  }
+}
+
 async function handle(res) {
   if (res.status === 401) {
     const auth = useAuthStore()
@@ -55,29 +67,17 @@ export const api = {
   },
 
   async post(path, body) {
-    const res = await fetch(BASE + path, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authHeader() },
-      body: body === undefined ? undefined : JSON.stringify(body)
-    })
+    const res = await fetch(BASE + path, jsonRequest('POST', body))
     return handle(res)
   },
 
   async put(path, body) {
-    const res = await fetch(BASE + path, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', ...authHeader() },
-      body: JSON.stringify(body)
-    })
+    const res = await fetch(BASE + path, jsonRequest('PUT', body))
     return handle(res)
   },
 
   async patch(path, body) {
-    const res = await fetch(BASE + path, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', ...authHeader() },
-      body: JSON.stringify(body)
-    })
+    const res = await fetch(BASE + path, jsonRequest('PATCH', body))
     return handle(res)
   },
 

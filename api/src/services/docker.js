@@ -10,6 +10,10 @@ const ISOLATED_NETWORK = 'acronym-isolated';
 // Per-deployed-container resource limits (pure; unit-tested in util/limits).
 const { containerLimits } = require('../util/limits');
 
+function isDockerUnavailableError(err) {
+  return ['ENOENT', 'ECONNREFUSED', 'EACCES'].includes(err && err.code);
+}
+
 /**
  * Ensure the isolated Docker network exists.
  * Deployed containers run on this network, which:
@@ -436,4 +440,5 @@ module.exports = {
   execContainer,
   listManagedContainers,
   findFreePort,
+  isDockerUnavailableError,
 };

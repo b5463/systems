@@ -57,3 +57,23 @@ test('authenticated Systems view lists deployed systems', async ({ page }) => {
   // assert at least one is visible rather than requiring a unique match.
   await expect(page.getByText('Notes API').first()).toBeVisible()
 })
+
+test('authenticated core pages render their primary surfaces', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('acronym_token', 'eyJfake.token.e2e'))
+
+  await page.goto('/ship')
+  await expect(page.getByRole('heading', { name: 'Ship' })).toBeVisible()
+  await expect(page.getByText('Source archive')).toBeVisible()
+
+  await page.goto('/events')
+  await expect(page.getByRole('heading', { name: 'Events' })).toBeVisible()
+  await expect(page.getByText('No events yet.')).toBeVisible()
+
+  await page.goto('/server')
+  await expect(page.getByRole('heading', { name: 'Server' })).toBeVisible()
+  await expect(page.getByText('Core services')).toBeVisible()
+
+  await page.goto('/admin')
+  await expect(page.getByRole('heading', { name: 'Admin' })).toBeVisible()
+  await expect(page.getByText('Administrators')).toBeVisible()
+})

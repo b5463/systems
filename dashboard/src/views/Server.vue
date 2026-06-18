@@ -7,10 +7,46 @@ const info = ref(null)
 const loading = ref(true)
 const error = ref('')
 
+const DEFAULT_INFO = {
+  platform: {},
+  docker: { status: 'not_measured', managed: null, running: null },
+  caddy: { status: 'not_measured' },
+  postgres: { status: 'not_measured' },
+  wildcard: { domain: null, status: 'not_measured' },
+  self: null,
+  health: {
+    deploymentWorker: 'not_measured',
+    dockerAccess: 'not_measured',
+    caddyConfig: 'not_measured',
+    postgres: 'not_measured',
+  },
+  disk: { status: 'not_measured', usedPct: null, freeGb: null, totalGb: null },
+  backup: { status: 'not_measured', last: null, ageHours: null, count: 0 },
+  defaults: null,
+  features: null,
+}
+
+function normalizeInfo(data) {
+  const source = data && typeof data === 'object' ? data : {}
+  return {
+    ...DEFAULT_INFO,
+    ...source,
+    platform: { ...DEFAULT_INFO.platform, ...(source.platform || {}) },
+    docker: { ...DEFAULT_INFO.docker, ...(source.docker || {}) },
+    caddy: { ...DEFAULT_INFO.caddy, ...(source.caddy || {}) },
+    postgres: { ...DEFAULT_INFO.postgres, ...(source.postgres || {}) },
+    wildcard: { ...DEFAULT_INFO.wildcard, ...(source.wildcard || {}) },
+    health: { ...DEFAULT_INFO.health, ...(source.health || {}) },
+    disk: { ...DEFAULT_INFO.disk, ...(source.disk || {}) },
+    backup: { ...DEFAULT_INFO.backup, ...(source.backup || {}) },
+    features: source.features || null,
+  }
+}
+
 async function load() {
   error.value = ''
   try {
-    info.value = await api.get('/server/info')
+    info.value = normalizeInfo(await api.get('/server/info'))
   } catch (e) {
     if (e.status !== 401) error.value = e.message || 'Failed to reach the server.'
   } finally {

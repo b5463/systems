@@ -7,7 +7,15 @@ export default defineConfig({
     vue(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['icon-192.svg', 'icon-512.svg'],
+      includeAssets: [
+        'favicon.ico',
+        'favicon.svg',
+        'icon-192.svg',
+        'icon-512.svg',
+        'brand/systems-s-dot.svg',
+        'brand/systems-s-dot.png',
+        'art/ribbon-field.svg',
+      ],
       manifest: {
         name: 'SYSTEMS.',
         short_name: 'SYSTEMS.',
@@ -19,6 +27,12 @@ export default defineConfig({
         start_url: '/',
         scope: '/',
         icons: [
+          {
+            src: 'favicon.svg',
+            sizes: '512x512',
+            type: 'image/svg+xml',
+            purpose: 'any maskable'
+          },
           {
             src: 'icon-192.svg',
             sizes: '192x192',

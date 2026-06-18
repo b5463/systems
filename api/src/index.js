@@ -2,7 +2,7 @@
 
 const { buildApp } = require('./app');
 const { initDefaultUsers, pruneAudit } = require('./db');
-const { ensureIsolatedNetwork } = require('./services/docker');
+const { ensureIsolatedNetwork, isDockerUnavailableError } = require('./services/docker');
 const reconcile = require('./services/reconcile');
 const backup = require('./services/backup');
 
@@ -12,8 +12,15 @@ async function main() {
   // Initialize default users from ADMIN_USERS env var
   await initDefaultUsers();
 
-  // Ensure the isolated Docker network exists before accepting traffic
-  await ensureIsolatedNetwork();
+  // Ensure the isolated Docker network exists before accepting traffic. In local
+  // dev the API may run without Docker Desktop/WSL active; keep read-only API
+  // surfaces available and let Docker-backed actions fail at request time.
+  try {
+    await ensureIsolatedNetwork();
+  } catch (err) {
+    if (!isDockerUnavailableError(err)) throw err;
+    fastify.log.warn(`Docker unavailable at startup (${err.code}); deploy/container actions are disabled until Docker is available.`);
+  }
 
   // Reconcile DB status against real container state on boot, then on an
   // interval, so crashes/reboots don't leave stale "running" rows.

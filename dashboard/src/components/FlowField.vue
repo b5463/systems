@@ -1,9 +1,9 @@
 <script setup>
 /**
- * SYSTEMS. — organic flowing-ribbon field.
+ * SYSTEMS. - organic flowing-ribbon field.
  *
  * Smooth meandering ribbons traced along a curl-like flow field (layered
- * sin/cos), drawn as thick round-capped strokes — the hand-drawn "doodle"
+ * sin/cos), drawn as thick round-capped strokes - the hand-drawn "doodle"
  * look. Soft pastel palette on near-black. The field phase drifts slowly, so
  * the ribbons gently undulate (the "moving" animation).
  *
@@ -20,15 +20,60 @@ const props = defineProps({
   widthFactor: { type: Number, default: 0.03 },     // ribbon thickness vs min(w,h)
   glowFactor: { type: Number, default: 0.4 },       // soft glow vs line width
   speed: { type: Number, default: 0.008 },          // undulation speed
-  // Muted, dusty pastels — soft on near-black.
+  fps: { type: Number, default: 30 },               // worker animation cadence
+  maxDpr: { type: Number, default: 1.5 },            // worker backing-pixel cap
+  // Muted, dusty pastels - soft on near-black.
   palette: { type: Array, default: () => ['#d6b3c0', '#aab6d2', '#b0cdbf', '#d6cab2', '#c8bcd2'] }
 })
 
 const canvas = ref(null)
-let ctx, raf, ro
+let ctx, raf, ro, io, worker
 let w = 0, h = 0, dpr = 1
 let t = 0, last = 0, reduced = false
+let visible = true
+let workerMode = false
 let seeds = []
+
+function serializableProps() {
+  return {
+    animate: props.animate,
+    intensity: props.intensity,
+    density: props.density,
+    alpha: props.alpha,
+    widthFactor: props.widthFactor,
+    glowFactor: props.glowFactor,
+    speed: props.speed,
+    fps: props.fps,
+    maxDpr: props.maxDpr,
+    palette: [...props.palette],
+  }
+}
+
+function canvasSize() {
+  const r = canvas.value.getBoundingClientRect()
+  return {
+    width: Math.max(1, r.width),
+    height: Math.max(1, r.height),
+    pixelRatio: window.devicePixelRatio || 1,
+  }
+}
+
+function canUseWorkerCanvas() {
+  return !!(
+    window.Worker &&
+    window.OffscreenCanvas &&
+    canvas.value &&
+    canvas.value.transferControlToOffscreen
+  )
+}
+
+function workerRunning() {
+  return props.animate && !reduced && visible && !document.hidden
+}
+
+function postWorkerRunning() {
+  if (worker) worker.postMessage({ type: 'running', value: workerRunning() })
+}
 
 // Curl-like flow field: nested sin/cos gives organic, non-repeating meanders.
 function angleAt(nx, ny, time) {
@@ -45,7 +90,7 @@ function makeSeeds() {
   const cols = Math.max(3, Math.round(5 * props.density))
   let rows = Math.max(3, Math.round(4 * props.density))
   // Add rows on tall (portrait) canvases so ribbons fill the height instead of
-  // leaving sparse gaps — keeps roughly even coverage regardless of aspect.
+  // leaving sparse gaps - keeps roughly even coverage regardless of aspect.
   if (h > w) rows = Math.round(rows * (h / w))
   for (let i = 0; i < cols; i++) {
     for (let j = 0; j < rows; j++) {
@@ -62,6 +107,10 @@ function makeSeeds() {
 
 function resize() {
   if (!canvas.value) return
+  if (workerMode) {
+    worker.postMessage({ type: 'resize', size: canvasSize() })
+    return
+  }
   const r = canvas.value.getBoundingClientRect()
   dpr = Math.min(window.devicePixelRatio || 1, 2)
   w = Math.max(1, r.width); h = Math.max(1, r.height)
@@ -98,7 +147,7 @@ function draw() {
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
   // On portrait (narrow) screens the min dimension is the width, which makes
-  // ribbons read thin — boost thickness so they stay bold like the reference.
+  // ribbons read thin - boost thickness so they stay bold like the reference.
   const portraitBoost = h > w ? 1.55 : 1
   const lw = Math.max(9, Math.min(w, h) * props.widthFactor * portraitBoost)
 
@@ -120,8 +169,8 @@ function draw() {
 }
 
 function loop(ts) {
-  // Pause when the tab is hidden — no point animating an off-screen canvas.
-  if (document.hidden) { raf = requestAnimationFrame(loop); return }
+  // Pause when the tab is hidden - no point animating an off-screen canvas.
+  if (document.hidden || !visible) { raf = null; return }
   if (ts - last > 60) { // ~16fps, calm
     t += props.speed
     draw()
@@ -133,25 +182,84 @@ function loop(ts) {
 let mq = null
 function onReducedChange(e) {
   reduced = e.matches
+  if (workerMode) {
+    postWorkerRunning()
+    return
+  }
   if (reduced) { if (raf) { cancelAnimationFrame(raf); raf = null } draw() }
   else if (props.animate && !raf) raf = requestAnimationFrame(loop)
 }
 
+function onVisibilityChange() {
+  if (workerMode) {
+    postWorkerRunning()
+    return
+  }
+  if (document.hidden) {
+    if (raf) cancelAnimationFrame(raf)
+    raf = null
+  } else if (props.animate && !reduced && !raf) {
+    raf = requestAnimationFrame(loop)
+  }
+}
+
+function setupWorker() {
+  workerMode = true
+  const offscreen = canvas.value.transferControlToOffscreen()
+  worker = new Worker(new URL('./flowFieldWorker.js', import.meta.url), { type: 'module' })
+  worker.postMessage(
+    {
+      type: 'init',
+      canvas: offscreen,
+      props: serializableProps(),
+      size: canvasSize(),
+      running: workerRunning(),
+    },
+    [offscreen],
+  )
+}
+
 onMounted(() => {
-  ctx = canvas.value.getContext('2d')
   mq = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)')
   reduced = !!(mq && mq.matches)
   if (mq && mq.addEventListener) mq.addEventListener('change', onReducedChange)
-  resize() // sizes the canvas, seeds (aspect-aware), and draws
+
+  if (canUseWorkerCanvas()) {
+    setupWorker()
+  } else {
+    ctx = canvas.value.getContext('2d')
+    resize() // sizes the canvas, seeds (aspect-aware), and draws
+    if (props.animate && !reduced) raf = requestAnimationFrame(loop)
+  }
+
   ro = new ResizeObserver(resize)
   ro.observe(canvas.value)
-  if (props.animate && !reduced) raf = requestAnimationFrame(loop)
+
+  if ('IntersectionObserver' in window) {
+    io = new IntersectionObserver(([entry]) => {
+      visible = !!entry?.isIntersecting
+      if (workerMode) {
+        postWorkerRunning()
+      } else if (visible && props.animate && !reduced && !raf) {
+        raf = requestAnimationFrame(loop)
+      }
+    })
+    io.observe(canvas.value)
+  }
+
+  document.addEventListener('visibilitychange', onVisibilityChange)
 })
 
 onBeforeUnmount(() => {
   if (raf) cancelAnimationFrame(raf)
   if (ro) ro.disconnect()
+  if (io) io.disconnect()
+  if (worker) {
+    worker.postMessage({ type: 'destroy' })
+    worker.terminate()
+  }
   if (mq && mq.removeEventListener) mq.removeEventListener('change', onReducedChange)
+  document.removeEventListener('visibilitychange', onVisibilityChange)
 })
 </script>
 
