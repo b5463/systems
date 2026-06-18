@@ -20,7 +20,7 @@
     "@fastify/jwt": "^8",
     "@fastify/multipart": "^8",
     "@fastify/rate-limit": "^9",
-    "@fastify/websocket": "^8",
+    "@fastify/websocket": "^11",
     "bcrypt": "^6",
     "better-sqlite3": "^12.11.1",
     "dockerode": "^4",
