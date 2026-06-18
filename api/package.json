@@ -25,7 +25,7 @@
     "dockerode": "^4",
     "fastify": "^4",
     "unzipper": "^0.12",
-    "uuid": "^10"
+    "uuid": "^14"
   },
   "optionalDependencies": {
     "pg": "^8"
