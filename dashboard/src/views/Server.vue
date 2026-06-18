@@ -70,6 +70,33 @@ async function runBackup() {
   }
 }
 
+const cleanupInfo = ref(null)
+const cleaningUp = ref(false)
+const cleanupMsg = ref('')
+
+async function loadCleanup() {
+  try {
+    cleanupInfo.value = await api.get('/server/cleanup/preview')
+  } catch { /* best-effort */ }
+}
+
+async function doCleanup() {
+  cleanupMsg.value = ''
+  cleaningUp.value = true
+  try {
+    const result = await api.post('/server/cleanup')
+    const parts = []
+    if (result.imagesPruned) parts.push(`${result.imagesPruned} image${result.imagesPruned !== 1 ? 's' : ''} removed (~${result.imagesSizeMb} MB)`)
+    if (result.releasesPruned) parts.push(`${result.releasesPruned} release dir${result.releasesPruned !== 1 ? 's' : ''} removed`)
+    cleanupMsg.value = parts.length ? parts.join(', ') + '.' : 'Nothing to clean up.'
+    await loadCleanup()
+  } catch (e) {
+    cleanupMsg.value = e.message || 'Cleanup failed.'
+  } finally {
+    cleaningUp.value = false
+  }
+}
+
 const testingNotify = ref(false)
 const notifyMsg = ref('')
 async function testNotify() {
@@ -137,7 +164,7 @@ const defaults = computed(() => {
     logFile: d.LogConfig?.Config?.['max-file'] || '—'
   }
 })
-onMounted(load)
+onMounted(() => { load(); loadCleanup(); })
 </script>
 
 <template>
@@ -241,6 +268,34 @@ onMounted(load)
       <div class="conn-row">
         <div style="flex:1"><div class="c-name">Hardening</div><div class="c-sub">verify-hardening-windows.ps1</div></div>
         <div class="conn-state"><span class="sdot" :class="present(info.platform.hardening).tone"></span>{{ present(info.platform.hardening).label }}</div>
+      </div>
+    </div>
+
+    <!-- Disk cleanup -->
+    <div v-if="cleanupInfo" class="section-label">Disk cleanup</div>
+    <div v-if="cleanupInfo" class="card stack" style="margin-bottom: 22px">
+      <div class="kv">
+        <span class="k">Orphaned images</span>
+        <span class="v mono">{{ cleanupInfo.images.count }} image{{ cleanupInfo.images.count !== 1 ? 's' : '' }}
+          <template v-if="cleanupInfo.images.sizeMb > 0"> · ~{{ cleanupInfo.images.sizeMb }} MB</template>
+        </span>
+      </div>
+      <div v-if="cleanupInfo.releases.count > 0" class="kv">
+        <span class="k">Orphaned release dirs</span>
+        <span class="v mono">{{ cleanupInfo.releases.count }}</span>
+      </div>
+      <div class="hint">Images no longer referenced by any system (current or rollback) are safe to remove. Rollback targets are always kept.</div>
+      <div class="row gap-sm" style="align-items:center">
+        <button
+          class="btn btn-sm"
+          style="align-self:flex-start"
+          :disabled="cleaningUp || (cleanupInfo.images.count === 0 && cleanupInfo.releases.count === 0)"
+          @click="doCleanup"
+        >
+          <span v-if="cleaningUp" class="spinner"></span>
+          <span v-else>Clean up now</span>
+        </button>
+        <span v-if="cleanupMsg" class="notice" style="margin:0">{{ cleanupMsg }}</span>
       </div>
     </div>
 

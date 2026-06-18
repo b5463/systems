@@ -6,8 +6,18 @@ and off by default. Nothing sends unless `ENABLE_NOTIFICATIONS=true` and
 
 ## Triggers
 
-A POST fires when a deploy succeeds, a deploy fails, a redeploy happens, or
-reconciliation flips a system to error.
+| `kind` | When |
+|---|---|
+| `deploy` | Deploy completed successfully |
+| `deploy_failed` | Deploy failed |
+| `redeploy` | Redeploy completed |
+| `system_error` | Reconciler flipped a system to error (container died / build stuck) |
+| `alert_raised` | Infrastructure threshold crossed for the first time (disk full, backup overdue, Docker down) |
+| `test` | Manual test from the Server screen |
+
+Alert notifications use transition-based firing: a `disk_critical` alert fires
+once when the threshold is first crossed, not on every reconcile cycle. It does
+not re-fire until the condition clears and raises again.
 
 ## Payload
 

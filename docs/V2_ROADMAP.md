@@ -167,10 +167,14 @@ None of this is wired today:
   enforcement via `BUILD_TIMEOUT_SECONDS` is now in; deploys are serialized.)_
 - Per-system resource overrides in the UI — `util/limits.js` already accepts
   them; the store and UI don't exist yet.
-- Automated disk cleanup of old images / release files (kept for rollback today;
-  deploy-history rows are trimmed, the images aren't).
+- ~~Automated disk cleanup~~ — **Done.** `POST /api/server/cleanup` removes
+  orphaned managed images and release dirs without touching rollback targets.
+  Preview via `GET /api/server/cleanup/preview`; surfaced on the Server screen.
 - Persisted, editable settings in Admin (still `.env`-driven).
-- Advanced metrics history and alerting beyond the current snapshots.
+- ~~Threshold alerting~~ — **Done.** `evaluateAlerts` checks disk %, backup age,
+  Docker, and Postgres on every reconcile cycle; `alertDelta` fires a webhook
+  only on first-seen transitions (raised → notify, not every poll). Full metrics
+  history still pending.
 
 ## UX polish backlog (nice-to-have)
 
