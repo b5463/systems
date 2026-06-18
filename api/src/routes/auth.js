@@ -3,6 +3,21 @@
 const bcrypt = require('bcrypt');
 const { db, auditLog } = require('../db');
 const totp = require('../util/totp');
+const lockout = require('../util/lockout');
+
+// Per-IP login lockout state (in-memory). Escalating backoff after repeated
+// credential failures, layered on top of the per-IP rate limit. Pure decision
+// logic lives in util/lockout (unit-tested); this just holds the state.
+const loginAttempts = new Map();
+const _loginCleanup = setInterval(() => {
+  const now = Date.now();
+  for (const [key, s] of loginAttempts) {
+    if (s.lockedUntil < now && now - s.lastFailAt > lockout.DEFAULTS.windowMs) {
+      loginAttempts.delete(key);
+    }
+  }
+}, 60 * 60_000);
+if (_loginCleanup.unref) _loginCleanup.unref();
 
 // A fixed bcrypt hash used only to spend equivalent time on unknown-user logins.
 const DUMMY_HASH = '$2b$12$LS.DksBFMLXDgraHFAgGFOqaqkWL1x15NcdADtOyxtIOWJHnW2pK6';
@@ -44,6 +59,19 @@ async function authRoutes(fastify, options) {
     const { username, password, code } = request.body;
     const ip = request.ip;
 
+    // Lockout: if this IP has failed too many times recently, refuse early with
+    // a Retry-After (HTTP 429) before doing any password work.
+    const { locked, retryAfterMs } = lockout.check(loginAttempts.get(ip), Date.now());
+    if (locked) {
+      const retryAfter = Math.ceil(retryAfterMs / 1000);
+      auditLog({ action: 'login_locked', target: username, detail: `retry in ${retryAfter}s`, ip });
+      return reply
+        .code(429)
+        .header('Retry-After', String(retryAfter))
+        .send({ error: `Too many failed attempts. Try again in ${retryAfter}s.` });
+    }
+    const fail = () => loginAttempts.set(ip, lockout.onFailure(loginAttempts.get(ip), Date.now()));
+
     const user = db
       .prepare('SELECT id, username, password_hash, token_version, totp_enabled, totp_secret FROM users WHERE username = ?')
       .get(username);
@@ -52,12 +80,14 @@ async function authRoutes(fastify, options) {
       // Compare against a dummy hash so an unknown username takes the same time
       // as a known one (no timing oracle for user enumeration).
       await bcrypt.compare(password, DUMMY_HASH);
+      fail();
       auditLog({ action: 'login_fail', target: username, detail: 'user not found', ip });
       return reply.code(401).send({ error: 'Invalid credentials' });
     }
 
     const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) {
+      fail();
       auditLog({ user_id: user.id, action: 'login_fail', target: username, detail: 'wrong password', ip });
       return reply.code(401).send({ error: 'Invalid credentials' });
     }
@@ -65,14 +95,18 @@ async function authRoutes(fastify, options) {
     // Two-factor: if enabled, a valid TOTP code is required to complete login.
     if (user.totp_enabled) {
       if (!code) {
+        // Password was correct — not a credential failure, so don't count it.
         return reply.code(401).send({ error: 'Two-factor code required.', twoFactorRequired: true });
       }
       if (!totp.verify(code, user.totp_secret)) {
+        fail();
         auditLog({ user_id: user.id, action: 'login_fail', target: username, detail: '2fa code invalid', ip });
         return reply.code(401).send({ error: 'Invalid two-factor code.', twoFactorRequired: true });
       }
     }
 
+    // Success — clear any failure streak for this IP.
+    loginAttempts.delete(ip);
     const token = signToken(fastify, user);
     auditLog({ user_id: user.id, action: 'login', target: username, ip });
     return { token };

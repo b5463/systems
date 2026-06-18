@@ -161,8 +161,10 @@ Maintainability & tooling:
 None of this is wired today:
 
 - Auth: HTTP-only cookie sessions + CSRF (replacing the localStorage bearer
-  token), and login lockout/backoff (today there's rate limiting, not lockout).
-- Build-timeout enforcement (`BUILD_TIMEOUT_SECONDS`) and per-build ceilings.
+  token). _(Login lockout/backoff is now in — escalating per-IP backoff on top
+  of the rate limit.)_
+- Per-build resource ceilings and a concurrent-build cap. _(Build-timeout
+  enforcement via `BUILD_TIMEOUT_SECONDS` is now in; deploys are serialized.)_
 - Per-system resource overrides in the UI — `util/limits.js` already accepts
   them; the store and UI don't exist yet.
 - Automated disk cleanup of old images / release files (kept for rollback today;

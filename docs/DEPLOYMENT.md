@@ -68,7 +68,7 @@ upload (multipart, size-capped)
 | --- | --- | --- |
 | Max upload | 100 MB (hard cap 500 MB in transport) | `UPLOAD_MAX_MB` |
 | Large (chunked) upload cap | 2048 MB, off unless enabled | `ENABLE_LARGE_UPLOADS` / `V2_UPLOAD_MAX_MB` |
-| Build timeout | 600s (enforcement not implemented yet) | `BUILD_TIMEOUT_SECONDS` |
+| Build timeout | 600s, **enforced** — the build is torn down if it exceeds this | `BUILD_TIMEOUT_SECONDS` |
 | Release retention | 3 (automatic pruning not implemented yet) | `RELEASE_RETENTION_DEFAULT` |
 
 ## Beyond the defaults

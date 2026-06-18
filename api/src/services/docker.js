@@ -44,20 +44,41 @@ async function ensureIsolatedNetwork() {
  */
 async function buildImage(projectSlug, buildContextPath, onProgress) {
   const tag = `acronym-deploy/${projectSlug}:latest`;
+  // Hard build ceiling so a hung or runaway build can't wedge the deploy
+  // pipeline (which is serialized) or the host. Default 10 min.
+  const timeoutMs = (Number(process.env.BUILD_TIMEOUT_SECONDS) || 600) * 1000;
 
   return new Promise((resolve, reject) => {
+    let settled = false;
+    let timer = null;
+    const finish = (fn, arg) => {
+      if (settled) return;
+      settled = true;
+      if (timer) clearTimeout(timer);
+      fn(arg);
+    };
+
     docker.buildImage(
       { context: buildContextPath, src: fs.readdirSync(buildContextPath) },
       { t: tag, rm: true, forcerm: true },
       (err, stream) => {
-        if (err) return reject(err);
+        if (err) return finish(reject, err);
+
+        // On timeout: tear down the build stream and fail this deploy. `forcerm`
+        // ensures Docker cleans up intermediate containers.
+        timer = setTimeout(() => {
+          try { stream.destroy(); } catch { /* already gone */ }
+          try { onProgress(`ERROR: build exceeded ${timeoutMs / 1000}s timeout\n`); } catch { /* ignore */ }
+          finish(reject, new Error(`Build timed out after ${timeoutMs / 1000}s`));
+        }, timeoutMs);
+        if (timer.unref) timer.unref();
 
         let imageId = null;
 
         docker.modem.followProgress(
           stream,
           (finalErr, output) => {
-            if (finalErr) return reject(finalErr);
+            if (finalErr) return finish(reject, finalErr);
 
             for (const item of output) {
               if (item.aux && item.aux.ID) {
@@ -71,11 +92,11 @@ async function buildImage(projectSlug, buildContextPath, onProgress) {
 
             if (!imageId) {
               docker.getImage(tag).inspect((inspectErr, data) => {
-                if (inspectErr) return reject(inspectErr);
-                resolve(data.Id);
+                if (inspectErr) return finish(reject, inspectErr);
+                finish(resolve, data.Id);
               });
             } else {
-              resolve(imageId);
+              finish(resolve, imageId);
             }
           },
           (event) => {

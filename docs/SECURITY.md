@@ -24,14 +24,14 @@ The "not yet" column is the genuinely unbuilt work, not a release timeline.
 | Secrets in frontend | None (build-time vars are non-secret only) | — |
 | Secrets in logs | Avoided | — |
 | CORS | Locked to `systems.acronym.sk` | — |
-| Login rate limiting | **10/min per IP** | lockout/backoff |
+| Login rate limiting | **10/min per IP** + **escalating lockout/backoff** (per IP) after repeated credential failures | — |
 | API rate limiting | **100/min global**, deploy 5/min | per-route tuning |
 | Audit log | All admin actions recorded; **tamper-evident SHA-256 hash chain** (each row links to the previous), verifiable via `GET /api/audit/verify`; optional retention (`AUDIT_RETENTION_DAYS`) | export, offsite anchoring |
 | Destructive actions | **Delete** keeps history; **purge** needs the typed slug | — |
 | Docker socket | Internal to API container only | — |
 | Docker/Caddy admin API | Never public; Caddy admin bound to localhost | — |
 | Postgres | Wired; not publicly exposed (SQLite is the local dev file) | — |
-| Uploaded code | Treated as untrusted; zip-slip prevented; entry/size caps | build timeouts, build resource ceilings |
+| Uploaded code | Treated as untrusted; zip-slip prevented; entry/size caps; **build timeout** (`BUILD_TIMEOUT_SECONDS`, default 600s) | per-build resource ceilings, concurrent-build cap |
 | Container hardening | `CapDrop ALL`, `no-new-privileges`, mem/CPU caps, ICC off | — |
 | Custom Dockerfile | Built, admin-only, off behind `ENABLE_DOCKERFILE_MODE` | — |
 
@@ -51,8 +51,8 @@ The "not yet" column is the genuinely unbuilt work, not a release timeline.
 
 - Cookie-based sessions (HTTP-only, Secure in prod, SameSite) + CSRF tokens, to
   replace the localStorage bearer token.
-- Login lockout/backoff after repeated failures.
-- Build timeouts (`BUILD_TIMEOUT_SECONDS`) and per-build resource ceilings.
+- Per-build **resource** ceilings and a concurrent-build cap (the build *timeout*
+  `BUILD_TIMEOUT_SECONDS` is now enforced; deploys are already serialized).
 - Env var masking in the UI with explicit reveal + audit on reveal.
 
 ## Change safety

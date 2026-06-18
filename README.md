@@ -143,6 +143,56 @@ SYSTEMS. is your control panel, not a service, so access is locked down:
   routing, Postgres, HTTPS — the parts only a live host can prove out. See
   [`docs/V2_ROADMAP.md`](docs/V2_ROADMAP.md).
 
+## Preparing a project to deploy
+
+You ship a **zip of your project**. SYSTEMS. inspects what's inside, picks a
+build, containers it, and serves it. You don't write any SYSTEMS.-specific
+config — just package your app so it fits one of the shapes below.
+
+**The one golden rule:** your app must serve HTTP on **port 3000** inside the
+container. Static sites get this for free; for Node/Python you bind to `3000`
+yourself. The dashboard maps a public port to `3000` automatically.
+
+How the build type is auto-detected from the archive (a single top-level folder
+is fine — it's unwrapped for you):
+
+| Your project has… | Detected as | What runs |
+| --- | --- | --- |
+| just HTML/CSS/JS (no `package.json`) | **static** | nginx serves it on `:3000`, with SPA fallback to `index.html` |
+| a `package.json` | **node** | `node:20-alpine`, `npm install --production`, then `npm start` |
+| `requirements.txt` or `pyproject.toml` | **python** | `python:3.12-slim`, `pip install -r requirements.txt`, then runs `app.py` (or `main.py`) |
+| a `Dockerfile` at the root | **dockerfile** | built as-is — **gated**, needs `ENABLE_DOCKERFILE_MODE` |
+
+### Per-type checklist
+
+- **Static site** (incl. a pre-built Vue/Vite/React app): zip the **built
+  output** so `index.html` is at the root (e.g. the contents of `dist/`, not the
+  source). Client-side routes fall back to `index.html` automatically. Nothing
+  to configure.
+- **Node**: include a `package.json` with a `"start"` script that launches a
+  server **listening on `0.0.0.0:3000`**. Runtime dependencies must be under
+  `"dependencies"` (dev-only deps are skipped by `npm install --production`). A
+  raw Vue/Vite *source* zip is detected as Node — if you just want the static
+  build, ship the built output instead (above).
+- **Python**: include `requirements.txt` (or `pyproject.toml`) and an entrypoint
+  named `app.py` or `main.py` that listens on `0.0.0.0:3000`.
+- **Dockerfile** (advanced): `EXPOSE 3000` and serve there. Only built when
+  `ENABLE_DOCKERFILE_MODE` is on, since it runs your build instructions.
+
+### Good to know
+
+- **Size:** archives up to **100 MB** by default (≤ 5000 entries, ≤ 100 MB per
+  file). Larger uploads need `ENABLE_LARGE_UPLOADS` (up to 2 GB).
+- **Secrets / env vars:** don't bake them into the image. Deploy first, then add
+  them per system under **System detail → Settings** — they're stored encrypted
+  and injected into the container (saving them recreates it).
+- **Health:** set the **health path** in Settings; your app should return a 2xx
+  there so the dashboard can show an honest healthy/unreachable state.
+- **After it's live:** it's served at `{slug}.<base>`; choose Public,
+  password-protected, or Private (no public route) in Settings.
+
+Full pipeline details and routing are in [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
+
 ## Dashboard
 
 - **Systems** — overview: counts, what needs attention, latest deploy, system cards.
