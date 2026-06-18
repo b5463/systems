@@ -12,6 +12,23 @@ consistent DB + routes; one click or `POST /api/server/backup`, plus an optional
 scheduler) and the PowerShell scripts (full-volume / offsite). Restore runs
 through `restore-systems-windows.ps1`.
 
+## Recovery objectives (RTO / RPO)
+
+Targets for a single Windows host. **RPO** = how much data you can lose;
+**RTO** = how long recovery takes.
+
+| Scenario | RTO (time to recover) | RPO (data at risk) |
+| --- | --- | --- |
+| Roll back a bad deploy | **~1 min** — previous image is retained, one click | none (only that system's new release) |
+| Restore platform state on the same host | **~5–15 min** — `restore-systems-windows.ps1` (DB + routes + releases, reload, restart, verify) | since the last backup |
+| Rebuild on a new machine (§17) | **~30–60 min** — install prereqs, restore, repoint + propagate DNS | since the last off-box backup |
+
+**Hitting the RPO:** with the in-app scheduler on (`ENABLE_BACKUP_SCHEDULER`,
+default 24h) **RPO ≤ 24h**; a one-click *Back up now* before any risky change
+makes planned-change RPO effectively zero. With the scheduler off, RPO is the
+time since your last manual or PowerShell backup — so schedule one. Keep at
+least one backup **off the box** (§17) or the new-machine RPO is unbounded.
+
 General first move for almost everything:
 ```powershell
 .\scripts\check-systems-health-windows.ps1

@@ -1,8 +1,14 @@
 'use strict';
 
-const { db } = require('../db');
+const { db, verifyAuditChain } = require('../db');
 
 async function auditRoutes(fastify, options) {
+  // Verify the tamper-evident audit-log hash chain. Returns ok=false plus the
+  // first offending row id if any entry was modified, removed, or reordered.
+  fastify.get('/api/audit/verify', {
+    preHandler: [fastify.authenticate],
+  }, async () => verifyAuditChain());
+
   // Returns audit log entries, newest first.
   // Optional filters: action, target (LIKE), username (LIKE), limit (default 100, max 200)
   fastify.get('/api/audit', {

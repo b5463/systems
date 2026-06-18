@@ -1,0 +1,12 @@
+# Default owner for everything — requested for review on every PR.
+* @b5463
+
+# Security-sensitive surfaces: auth, deploy pipeline, proxy/routing, secrets,
+# audit, and the security docs warrant an explicit look.
+/api/src/routes/auth.js   @b5463
+/api/src/routes/deploy.js @b5463
+/api/src/routes/webhook.js @b5463
+/api/src/services/        @b5463
+/api/src/util/audit.js    @b5463
+/docs/SECURITY.md         @b5463
+/docs/adr/                @b5463

@@ -7,7 +7,7 @@ on:
 
 jobs:
   api:
-    name: API — lint + tests
+    name: API — lint + tests + coverage + audit
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -22,9 +22,15 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm test
+      # Enforce a coverage floor on the unit-tested core (util/*). Routes and
+      # services are excluded — they're covered by the integration tests but not
+      # to a percentage we want to gate on. Raise these thresholds over time.
+      - run: npm run test:coverage
+      # Fail the build on known high/critical advisories in runtime dependencies.
+      - run: npm audit --omit=dev --audit-level=high
 
   dashboard:
-    name: Dashboard — lint + build
+    name: Dashboard — lint + build + audit
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -39,3 +45,25 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run build
+      - run: npm audit --audit-level=high
+
+  e2e:
+    name: Dashboard — e2e (Playwright)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dashboard
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      # Playwright is installed at job time so it isn't a committed dependency
+      # (keeps the app bundle lean and the lockfile focused on runtime deps).
+      - run: npm i -D --no-save @playwright/test@^1.49
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test --config=e2e/playwright.config.mjs

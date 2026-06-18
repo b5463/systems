@@ -26,7 +26,7 @@ The "not yet" column is the genuinely unbuilt work, not a release timeline.
 | CORS | Locked to `systems.acronym.sk` | — |
 | Login rate limiting | **10/min per IP** | lockout/backoff |
 | API rate limiting | **100/min global**, deploy 5/min | per-route tuning |
-| Audit log | All admin actions recorded | export |
+| Audit log | All admin actions recorded; **tamper-evident SHA-256 hash chain** (each row links to the previous), verifiable via `GET /api/audit/verify`; optional retention (`AUDIT_RETENTION_DAYS`) | export, offsite anchoring |
 | Destructive actions | **Delete** keeps history; **purge** needs the typed slug | — |
 | Docker socket | Internal to API container only | — |
 | Docker/Caddy admin API | Never public; Caddy admin bound to localhost | — |

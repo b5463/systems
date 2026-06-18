@@ -33,6 +33,8 @@ function openShortcuts() { window.dispatchEvent(new Event('app:shortcuts')) }
 
 <template>
   <div class="shell">
+    <a class="skip-link" href="#main-content">Skip to content</a>
+
     <!-- Desktop sidebar -->
     <aside class="sidebar">
       <div class="sidebar-head">
@@ -70,7 +72,7 @@ function openShortcuts() { window.dispatchEvent(new Event('app:shortcuts')) }
         <SystemsLogo size="sm" :byline="false" />
       </header>
 
-      <main class="content-inner">
+      <main id="main-content" class="content-inner" tabindex="-1">
         <slot />
       </main>
     </div>
@@ -94,6 +96,23 @@ function openShortcuts() { window.dispatchEvent(new Event('app:shortcuts')) }
 </template>
 
 <style scoped>
+/* Keyboard skip link — visually hidden until focused, then pinned top-left. */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 100;
+  padding: 8px 14px;
+  background: var(--bg-hover);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+}
+.skip-link:focus {
+  left: 8px;
+  top: 8px;
+}
+.content-inner:focus { outline: none; }
 .su-name {
   display: block;
   font-weight: 600;

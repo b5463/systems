@@ -3,7 +3,7 @@ import skipFormatting from '@vue/eslint-config-prettier/skip-formatting'
 import globals from 'globals'
 
 export default [
-  { ignores: ['dist/**', 'dev-dist/**', 'node_modules/**', 'scripts/**'] },
+  { ignores: ['dist/**', 'dev-dist/**', 'node_modules/**', 'scripts/**', 'e2e/**'] },
   ...vue.configs['flat/recommended'],
   skipFormatting,
   {

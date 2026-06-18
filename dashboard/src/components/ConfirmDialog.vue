@@ -15,13 +15,28 @@ const emit = defineEmits(['update:open', 'confirm', 'cancel'])
 const typed = ref('')
 const inputEl = ref(null)
 const confirmEl = ref(null)
+const modalEl = ref(null)
 let lastFocused = null
 
 const canConfirm = () => !props.requireText || typed.value === props.requireText
 
 function close() { emit('update:open', false); emit('cancel') }
 function confirm() { if (canConfirm() && !props.busy) emit('confirm') }
-function onKeydown(e) { if (e.key === 'Escape') { e.stopPropagation(); close() } }
+
+// Keep keyboard focus inside the dialog while it's open (focus trap), and close
+// on Escape.
+function onKeydown(e) {
+  if (e.key === 'Escape') { e.stopPropagation(); close(); return }
+  if (e.key !== 'Tab' || !modalEl.value) return
+  const focusable = Array.from(
+    modalEl.value.querySelectorAll('button:not([disabled]), input, [href], [tabindex]:not([tabindex="-1"])')
+  ).filter((el) => el.offsetParent !== null)
+  if (focusable.length === 0) return
+  const first = focusable[0]
+  const last = focusable[focusable.length - 1]
+  if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus() }
+  else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus() }
+}
 
 watch(() => props.open, (v) => {
   if (v) {
@@ -41,8 +56,8 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown))
   <Teleport to="body">
     <Transition name="fade">
       <div v-if="open" class="modal-backdrop" @click.self="close">
-        <div class="modal stack" role="dialog" aria-modal="true" :aria-label="title">
-          <h3 style="margin:0">{{ title }}</h3>
+        <div ref="modalEl" class="modal stack" role="dialog" aria-modal="true" aria-labelledby="confirm-dialog-title">
+          <h3 id="confirm-dialog-title" style="margin:0">{{ title }}</h3>
           <div class="stack" style="gap:10px"><slot /></div>
           <template v-if="requireText">
             <label class="label" style="margin:0">Type <span class="mono" style="color:var(--text)">{{ requireText }}</span> to confirm</label>

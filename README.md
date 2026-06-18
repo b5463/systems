@@ -41,10 +41,10 @@ Windows host.
 - **Status you can trust.** It checks each system against what Docker is actually
   doing, so a crash or reboot never leaves a stale "running" badge — and it tells
   a failed build apart from a crashed container.
-- **See everything.** Live logs, an interactive container shell, metrics, and an
-  audit trail of every action.
+- **See everything.** Live logs, an interactive container shell, metrics, and a
+  tamper-evident audit trail of every action.
 - **Safe by default.** Optional two-factor, encrypted env vars, typed-confirmation
-  on destructive actions, and built-in backups.
+  on destructive actions, a hash-chained audit log, and built-in backups.
 
 ## A look around
 
@@ -278,6 +278,9 @@ the production target.
 - [`docs/UPDATE_STRATEGY.md`](docs/UPDATE_STRATEGY.md) — updating SYSTEMS.
 - [`docs/DISASTER_RECOVERY.md`](docs/DISASTER_RECOVERY.md) — recovery runbook
 - [`docs/WINDOWS_VALIDATION_CHECKLIST.md`](docs/WINDOWS_VALIDATION_CHECKLIST.md) — host validation steps
+- [`docs/ACCESSIBILITY.md`](docs/ACCESSIBILITY.md) — accessibility posture & checklist
+- [`docs/adr/`](docs/adr/README.md) — architecture decision records
+- [`CONTRIBUTING.md`](CONTRIBUTING.md) — dev setup, PR flow, and standards
 - [`docs/V2_ROADMAP.md`](docs/V2_ROADMAP.md) — where this came from and where it's going
 - Optional features (off by default): [`DATABASES`](docs/DATABASES.md) · [`LARGE_UPLOADS`](docs/LARGE_UPLOADS.md) · [`DOCKERFILE_MODE`](docs/DOCKERFILE_MODE.md) · [`WORKERS`](docs/WORKERS.md) · [`GITHUB_DEPLOYS`](docs/GITHUB_DEPLOYS.md) · [`NOTIFICATIONS`](docs/NOTIFICATIONS.md) · [`SHELL_CONSOLE`](docs/SHELL_CONSOLE.md)
 

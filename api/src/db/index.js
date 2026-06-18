@@ -4,6 +4,7 @@ const Database = require('better-sqlite3');
 const bcrypt = require('bcrypt');
 const path = require('path');
 const fs = require('fs');
+const { GENESIS, hashEntry, verifyChain } = require('../util/audit');
 
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', '..', '..', 'data');
 
@@ -86,6 +87,12 @@ try { db.exec(`ALTER TABLE projects ADD COLUMN deploy_branch TEXT NOT NULL DEFAU
 // acronym.sk -> portfolio, while the dashboard stays on systems.acronym.sk.
 try { db.exec(`ALTER TABLE projects ADD COLUMN is_primary INTEGER NOT NULL DEFAULT 0`); } catch {}
 
+// Tamper-evident audit log: each row links to the previous via a SHA-256 hash
+// chain (see util/audit). Rows written before this migration keep NULL hashes
+// and verification simply starts at the first hashed row.
+try { db.exec(`ALTER TABLE audit_log ADD COLUMN prev_hash TEXT`); } catch {}
+try { db.exec(`ALTER TABLE audit_log ADD COLUMN hash TEXT`); } catch {}
+
 db.exec(`
   CREATE TABLE IF NOT EXISTS deploy_history (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -152,8 +159,29 @@ async function initDefaultUsers() {
   }
 }
 
+// Audit-log statements (prepared after the hash-chain migration above).
+const _insertAudit = db.prepare(
+  'INSERT INTO audit_log (user_id, action, target, detail, ip, prev_hash) VALUES (?, ?, ?, ?, ?, ?)'
+);
+const _setAuditHash = db.prepare('UPDATE audit_log SET hash = ? WHERE id = ?');
+const _lastAudit = db.prepare('SELECT hash FROM audit_log ORDER BY id DESC LIMIT 1');
+const _getAuditRow = db.prepare(
+  'SELECT id, user_id, action, target, detail, ip, created_at FROM audit_log WHERE id = ?'
+);
+
+// Insert + hash atomically so the chain head is always consistent, even under
+// concurrent writers (better-sqlite3 transactions are synchronous).
+const _writeAudit = db.transaction(({ user_id, action, target, detail, ip }) => {
+  const prev = _lastAudit.get();
+  const prevHash = prev && prev.hash ? prev.hash : GENESIS;
+  const info = _insertAudit.run(user_id, action, target, detail, ip, prevHash);
+  const row = _getAuditRow.get(info.lastInsertRowid);
+  _setAuditHash.run(hashEntry(prevHash, row), row.id);
+  return row.id;
+});
+
 /**
- * Append an entry to the audit log.
+ * Append a tamper-evident entry to the audit log.
  * @param {object} entry
  * @param {number|null} entry.user_id
  * @param {string} entry.action
@@ -162,9 +190,29 @@ async function initDefaultUsers() {
  * @param {string} [entry.ip]
  */
 function auditLog({ user_id = null, action, target = null, detail = null, ip = null }) {
-  db.prepare(
-    'INSERT INTO audit_log (user_id, action, target, detail, ip) VALUES (?, ?, ?, ?, ?)'
-  ).run(user_id, action, target, detail, ip);
+  _writeAudit({ user_id, action, target, detail, ip });
 }
 
-module.exports = { db, initDefaultUsers, auditLog };
+/** Verify the audit-log hash chain. Returns { ok, total, verified, brokenAtId, reason }. */
+function verifyAuditChain() {
+  const rows = db
+    .prepare('SELECT id, user_id, action, target, detail, ip, created_at, prev_hash, hash FROM audit_log ORDER BY id ASC')
+    .all();
+  return verifyChain(rows);
+}
+
+/**
+ * Delete audit rows older than `retentionDays`. Pruning the oldest rows is an
+ * expected administrative action; the chain stays verifiable from the first
+ * retained row forward. `0`/unset = keep everything.
+ */
+function pruneAudit(retentionDays) {
+  const days = Number(retentionDays);
+  if (!Number.isFinite(days) || days <= 0) return { pruned: 0 };
+  const info = db
+    .prepare(`DELETE FROM audit_log WHERE created_at < datetime('now', ?)`)
+    .run(`-${Math.floor(days)} days`);
+  return { pruned: info.changes };
+}
+
+module.exports = { db, initDefaultUsers, auditLog, verifyAuditChain, pruneAudit };

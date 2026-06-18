@@ -1,0 +1,30 @@
+version: 2
+updates:
+  # API runtime + dev dependencies.
+  - package-ecosystem: npm
+    directory: /api
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      api-minor-and-patch:
+        update-types: [minor, patch]
+    labels: [dependencies, api]
+
+  # Dashboard (Vue/Vite) dependencies.
+  - package-ecosystem: npm
+    directory: /dashboard
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      dashboard-minor-and-patch:
+        update-types: [minor, patch]
+    labels: [dependencies, dashboard]
+
+  # Keep GitHub Actions (checkout, setup-node, …) current.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    labels: [dependencies, ci]

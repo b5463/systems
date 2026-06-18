@@ -55,7 +55,7 @@ aren't in the schema yet.
 | admins (`users`) | id, username, password_hash, `token_version` (session revocation), `totp_secret`/`totp_enabled` (opt-in 2FA) | email, role, last_login |
 | systems (`projects`) | name, slug, container_id, image_id, port, status, env_vars (encrypted), prev image/container, `visibility`, `deploy_type`, health fields, `route_published`, `repo`/`deploy_branch` (GitHub deploys) | explicit `route_id` |
 | deployments (`deploy_history`) | image_id, container_id, deployed_at | release number, size, build duration, status |
-| events (`audit_log`) | user_id, action, target, detail, ip, created_at | — |
+| events (`audit_log`) | user_id, action, target, detail, ip, created_at, `prev_hash`/`hash` (tamper-evident chain) | export, offsite anchoring |
 | metrics (`stats_history`) | cpu, mem, net snapshots | retention policy |
 | routes | implicit (proxy config files) | explicit `routes` table mirroring proxy state |
 | settings | from `.env` | persisted, editable in Admin |
@@ -93,6 +93,26 @@ private system can't be (no public route to serve). Endpoint:
 → live`. Redeploys snapshot the previous image for rollback. See
 [`DEPLOYMENT.md`](DEPLOYMENT.md).
 
+```mermaid
+flowchart LR
+  U[Zip upload] --> X[Zip-slip-safe extract]
+  X --> D{Detect type}
+  D -->|has Dockerfile| G[Use Dockerfile<br/>gated flag]
+  D -->|Vue/Vite or static| GG[Generate Dockerfile]
+  G --> B[Build image]
+  GG --> B
+  B --> R[Run hardened container<br/>free port, CapDrop ALL]
+  R --> W[Write proxy route]
+  W --> V[Validate + reload proxy]
+  V --> L[Live at slug.&lt;base&gt;]
+  B -. on failure .-> C[Clean temp + image]
+  R -. redeploy .-> P[Snapshot previous image<br/>for one-click rollback]
+```
+
+Deploys are serialized by an in-process lock (`withDeployLock`), so two builds
+never race over ports or routes; a failed build cleans up its temp dir and
+image rather than leaving a half-state.
+
 ## 5. Background services & operations
 
 Beyond request handling, the API runs a few in-process jobs, started in
@@ -127,3 +147,10 @@ Caddy or Postgres are live when they aren't.
 
 Still not done: migrating auth from a localStorage JWT to HTTP-only cookie
 sessions + CSRF (see [`SECURITY.md`](SECURITY.md)).
+
+## 7. Key decisions (ADRs)
+
+The reasoning behind the bigger choices — admin-only model, SQLite→Postgres,
+Caddy, honest-status reconciliation, off-by-default flags, env encryption, and
+the tamper-evident audit log — is recorded as short ADRs in
+[`docs/adr/`](adr/README.md).
