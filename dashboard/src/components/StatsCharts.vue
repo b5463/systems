@@ -72,6 +72,7 @@ function makeOptions() {
       x: { display: false, grid: { display: false } },
       y: {
         beginAtZero: true,
+        min: 0, // CPU%/MB are never negative — don't let the axis show below 0
         grid: { color: 'rgba(255,255,255,0.06)' },
         ticks: { color: '#b2b6bf', maxTicksLimit: 4 }
       }
@@ -92,7 +93,7 @@ const cpuData = computed(() => ({
       backgroundColor: 'rgba(242,243,245,0.08)',
       borderWidth: 2,
       fill: true,
-      tension: 0.3
+      cubicInterpolationMode: 'monotone'
     }
   ]
 }))
@@ -107,7 +108,7 @@ const memData = computed(() => ({
       backgroundColor: 'rgba(236,236,238,0.08)',
       borderWidth: 2,
       fill: true,
-      tension: 0.3
+      cubicInterpolationMode: 'monotone'
     }
   ]
 }))

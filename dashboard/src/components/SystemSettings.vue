@@ -274,7 +274,7 @@ async function provisionDb() {
       <button class="btn btn-sm btn-ghost" @click="bulkOpen = !bulkOpen">{{ bulkOpen ? 'Close bulk paste' : 'Paste .env' }}</button>
     </div>
     <div v-if="bulkOpen" class="bulk-env">
-      <textarea v-model="bulkText" rows="6" placeholder="KEY=value&#10;ANOTHER=value" spellcheck="false"></textarea>
+      <textarea v-model="bulkText" rows="6" placeholder="KEY=value&#10;ANOTHER=value" aria-label="Paste environment variables as KEY=value lines" spellcheck="false"></textarea>
       <button class="btn btn-sm" style="align-self:flex-start" @click="pasteEnvText">Import lines</button>
     </div>
     <ul v-if="envIssues.length" class="env-issues">

@@ -1,3 +1,8 @@
+<script>
+// Module-scoped instance counter (shared across all SelectMenu instances).
+let smCounter = 0
+</script>
+
 <script setup>
 import { ref, computed, nextTick, onMounted, onBeforeUnmount } from 'vue'
 
@@ -15,6 +20,13 @@ const listRef = ref(null)
 const menuStyle = ref({})
 let queryStr = ''
 let queryTimer = null
+
+// Stable per-instance ids so the combobox can point aria-activedescendant at
+// the focused option (lets screen readers announce arrow-key navigation).
+const uid = `sm${smCounter++}`
+const listId = `${uid}-list`
+const optId = (i) => `${uid}-opt-${i}`
+const activeDescendant = computed(() => (open.value && focusedIdx.value >= 0 ? optId(focusedIdx.value) : undefined))
 
 const current = computed(() => props.options.find((o) => o.value === props.modelValue) || null)
 
@@ -107,6 +119,8 @@ onBeforeUnmount(() => {
       role="combobox"
       :aria-expanded="String(open)"
       aria-haspopup="listbox"
+      :aria-controls="listId"
+      :aria-activedescendant="activeDescendant"
       @click="open ? close() : openMenu()"
       @keydown="onTriggerKeydown"
     >
@@ -118,6 +132,7 @@ onBeforeUnmount(() => {
     <Teleport to="body">
       <ul
         v-if="open"
+        :id="listId"
         ref="listRef"
         class="select-list select-list-floating"
         :style="menuStyle"
@@ -126,6 +141,7 @@ onBeforeUnmount(() => {
       >
         <li
           v-for="(opt, i) in options"
+          :id="optId(i)"
           :key="opt.value"
           class="select-option"
           :class="{ 'is-selected': opt.value === modelValue, 'is-focused': i === focusedIdx }"
