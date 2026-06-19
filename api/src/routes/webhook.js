@@ -1,9 +1,9 @@
 'use strict';
 
 const fsp = require('fs/promises');
-const { v4: uuidv4 } = require('uuid');
 const { db, auditLog } = require('../db');
 const { features } = require('../util/flags');
+const { tmpZip } = require('../util/tmp');
 const { verifySignature, branchAllowed } = require('../util/webhook');
 const notify = require('../services/notify');
 const deploy = require('./deploy');
@@ -68,7 +68,7 @@ async function webhookRoutes(fastify, options) {
     auditLog({ action: 'github_push', target: project.slug, detail: `${repo} ${ref}` });
 
     // Download the commit zipball and redeploy (best-effort, async).
-    const zipPath = `/tmp/${uuidv4()}.zip`;
+    const zipPath = tmpZip();
     try {
       await downloadZipball(repo, ref.replace('refs/heads/', ''), zipPath);
     } catch (e) {

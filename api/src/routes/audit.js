@@ -15,7 +15,7 @@ async function auditRoutes(fastify, options) {
   fastify.get('/api/audit', {
     preHandler: [fastify.authenticate],
   }, async (request) => {
-    const { action, target, username, from, to } = request.query || {};
+    const { action, actions, target, username, from, to } = request.query || {};
 
     let limit = Number(request.query && request.query.limit);
     if (!Number.isFinite(limit) || limit <= 0) limit = 100;
@@ -27,7 +27,15 @@ async function auditRoutes(fastify, options) {
     const where = [];
     const params = [];
 
-    if (action) {
+    // `actions` (comma-separated) takes precedence over a single `action` — it
+    // backs the category and severity filters, which map to a set of actions.
+    const actionList = actions
+      ? String(actions).split(',').map((s) => s.trim()).filter(Boolean).slice(0, 50)
+      : [];
+    if (actionList.length) {
+      where.push(`a.action IN (${actionList.map(() => '?').join(', ')})`);
+      params.push(...actionList);
+    } else if (action) {
       where.push('a.action = ?');
       params.push(action);
     }

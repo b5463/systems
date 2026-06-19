@@ -2,9 +2,11 @@
 
 const fs = require('fs');
 const fsp = require('fs/promises');
+const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const { features } = require('../util/flags');
 const { validateChunk, fitsOnDisk, uploadTempPath, progressState } = require('../util/upload');
+const { TMP_DIR, tmpZip } = require('../util/tmp');
 const { slugError } = require('../util/slug');
 const deploy = require('./deploy');
 
@@ -13,7 +15,8 @@ const deploy = require('./deploy');
 // and handed to the same build pipeline as a normal deploy. OFF unless
 // ENABLE_LARGE_UPLOADS=true.
 
-const UPLOADS_DIR = process.env.UPLOADS_DIR || '/tmp/systems-uploads';
+const UPLOADS_DIR = process.env.UPLOADS_DIR || path.join(TMP_DIR, 'uploads');
+try { fs.mkdirSync(UPLOADS_DIR, { recursive: true }); } catch { /* created lazily otherwise */ }
 const sessions = new Map(); // uploadId -> { ..., createdAt }
 const SESSION_TTL_MS = (Number(process.env.UPLOAD_SESSION_TTL_MIN) || 30) * 60 * 1000;
 
@@ -146,7 +149,7 @@ async function uploadRoutes(fastify, options) {
       return reply.code(409).send({ error: `Upload incomplete (${s.received}/${s.totalChunks} chunks).` });
     }
 
-    const zipPath = `/tmp/${uuidv4()}.zip`;
+    const zipPath = tmpZip();
     try {
       await fsp.rename(s.part, zipPath);
     } catch (e) {

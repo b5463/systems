@@ -1,7 +1,6 @@
 'use strict';
 
 const fsp = require('fs/promises');
-const { v4: uuidv4 } = require('uuid');
 const { db, auditLog } = require('../db');
 const dockerService = require('../services/docker');
 const { extractZip, detectProjectType, generateDockerfile } = require('../services/zip');
@@ -10,6 +9,7 @@ const notify = require('../services/notify');
 const { slugError } = require('../util/slug');
 const { pub } = require('../util/project');
 const { MAX_MULTIPART_BYTES } = require('../util/upload');
+const { tmpZip, tmpDir } = require('../util/tmp');
 const { features } = require('../util/flags');
 
 // In-memory build log buffers keyed by slug
@@ -39,7 +39,7 @@ async function readUploadToTmp(request) {
     if (part.type === 'field') {
       fields[part.fieldname] = part.value;
     } else if (part.type === 'file' && part.fieldname === 'file') {
-      zipPath = `/tmp/${uuidv4()}.zip`;
+      zipPath = tmpZip();
       const chunks = [];
       let total = 0;
       for await (const chunk of part.file) {
@@ -308,7 +308,7 @@ async function beginDeploy({ name, slug, visibility = 'public', zipPath, userId,
   buildLogs.set(slug, []);
   buildStatus.set(slug, 'building');
 
-  const extractDir = `/tmp/${uuidv4()}`;
+  const extractDir = tmpDir();
   setImmediate(() => {
     runBuildPipeline(slug, zipPath, extractDir, port, userId, ip, envVars).catch((err) => {
       console.error('[deploy] Unhandled pipeline error:', err);
@@ -329,7 +329,7 @@ async function beginRedeploy({ slug, zipPath, userId, ip }) {
   buildLogs.set(slug, []);
   buildStatus.set(slug, 'building');
 
-  const extractDir = `/tmp/${uuidv4()}`;
+  const extractDir = tmpDir();
   setImmediate(() => {
     runRedeployPipeline(slug, zipPath, extractDir, userId, ip).catch((err) => {
       console.error('[redeploy] Unhandled pipeline error:', err);

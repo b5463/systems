@@ -14,9 +14,12 @@ const page = ref(1)
 const perPage = 25
 
 const ACTION_LABELS = {
-  deploy: 'Shipped system', redeploy: 'Redeployed', rollback: 'Rolled back',
-  restart: 'Restarted', stop: 'Stopped', start: 'Started',
-  login: 'Signed in', login_fail: 'Failed sign-in', logout: 'Signed out',
+  deploy: 'Shipped system', redeploy: 'Redeployed', redeploy_fail: 'Redeploy failed',
+  rollback: 'Rolled back', restart: 'Restarted', stop: 'Stopped', start: 'Started',
+  github_push: 'GitHub push deploy',
+  login: 'Signed in', login_fail: 'Failed sign-in', login_locked: 'Sign-in locked out',
+  logout: 'Signed out', sessions_revoked: 'Signed out other sessions', session_revoked: 'Revoked a session',
+  '2fa_enabled': 'Enabled two-factor', '2fa_disabled': 'Disabled two-factor',
   env_update: 'Updated env vars', delete: 'Deleted system',
   user_create: 'Added admin', user_delete: 'Removed admin',
   password_change: 'Changed password', password_reset: 'Reset password',
@@ -29,8 +32,9 @@ const ACTION_LABELS = {
 }
 
 const ACTION_CATEGORIES = {
-  deploy: ['deploy', 'redeploy', 'rollback', 'start', 'stop', 'restart'],
-  auth: ['login', 'login_fail', 'password_change'],
+  deploy: ['deploy', 'redeploy', 'redeploy_fail', 'rollback', 'start', 'stop', 'restart', 'github_push'],
+  auth: ['login', 'login_fail', 'login_locked', 'logout', 'sessions_revoked', 'session_revoked',
+    'password_change', '2fa_enabled', '2fa_disabled'],
   admin: ['user_create', 'user_delete', 'env_update', 'delete'],
   system: ['backup_succeeded', 'backup_failed', 'restore_started', 'restore_completed',
     'update_started', 'update_failed', 'update_completed', 'caddy_validate_failed',
@@ -45,8 +49,16 @@ const categoryMenuOptions = [
   { value: 'system', label: 'System events' },
 ]
 
+const severityMenuOptions = [
+  { value: '', label: 'Any result' },
+  { value: 'ok', label: 'Success' },
+  { value: 'warn', label: 'Warning' },
+  { value: 'error', label: 'Failure' },
+]
+
 const filterCategory = ref('')
 const filterAction = ref('')
+const filterSeverity = ref('')
 const filterTarget = ref('')
 const filterUser = ref('')
 const filterFrom = ref('')
@@ -54,7 +66,7 @@ const filterTo = ref('')
 let textDebounce = null
 
 const filteredActionOptions = computed(() => {
-  const base = filterCategory.value ? (ACTION_CATEGORIES[filterCategory.value] || []) : Object.keys(ACTION_LABELS).slice(0, 13)
+  const base = filterCategory.value ? (ACTION_CATEGORIES[filterCategory.value] || []) : Object.keys(ACTION_LABELS)
   return [{ value: '', label: 'All event types' }, ...base.map(a => ({ value: a, label: humanize(a) }))]
 })
 
@@ -65,17 +77,33 @@ function humanize(action) {
 
 function dotClass(action) {
   switch (action) {
-    case 'deploy': case 'redeploy': case 'start': case 'restart':
-    case 'backup_succeeded': case 'update_completed': case 'restore_completed': return 'ok'
-    case 'stop': return 'idle'
-    case 'login_fail': case 'delete': case 'user_delete': case 'error':
-    case 'backup_failed': case 'update_failed': case 'caddy_validate_failed':
+    case 'deploy': case 'redeploy': case 'start': case 'restart': case 'login': case '2fa_enabled':
+    case 'github_push': case 'backup_succeeded': case 'update_completed': case 'restore_completed': return 'ok'
+    case 'stop': case 'logout': return 'idle'
+    case 'login_fail': case 'login_locked': case 'delete': case 'user_delete': case 'error':
+    case 'redeploy_fail': case 'backup_failed': case 'update_failed': case 'caddy_validate_failed':
     case 'docker_unavailable': case 'postgres_unavailable': return 'error'
-    case 'env_update': case 'rollback': case 'disk_warning': case 'backup_overdue':
+    case 'env_update': case 'rollback': case 'disk_warning': case 'backup_overdue': case 'sessions_revoked':
+    case 'session_revoked': case '2fa_disabled':
     case 'resource_warning': case 'restore_started': case 'update_started': return 'warn'
     default: return 'idle'
   }
 }
+
+// Every known action that carries a given severity (derived from dotClass) —
+// backs the severity filter, which the API receives as an `actions` list.
+function severityActions(sev) {
+  return Object.keys(ACTION_LABELS).filter((a) => dotClass(a) === sev)
+}
+
+// The effective set of actions to query: a specific event type wins, else the
+// chosen severity, else the chosen category. Empty = no action constraint.
+const effectiveActions = computed(() => {
+  if (filterAction.value) return [filterAction.value]
+  if (filterSeverity.value) return severityActions(filterSeverity.value)
+  if (filterCategory.value) return ACTION_CATEGORIES[filterCategory.value] || []
+  return []
+})
 
 function fmtTime(s) {
   if (!s) return ''
@@ -113,9 +141,12 @@ const grouped = computed(() => {
   return groups
 })
 
+const expandedId = ref(null)
+function toggleRow(id) { expandedId.value = expandedId.value === id ? null : id }
+
 const pageCount = computed(() => Math.max(1, Math.ceil(total.value / perPage)))
 const hasActiveFilters = computed(() =>
-  !!(filterCategory.value || filterAction.value || filterTarget.value.trim() ||
+  !!(filterCategory.value || filterAction.value || filterSeverity.value || filterTarget.value.trim() ||
      filterUser.value.trim() || filterFrom.value || filterTo.value)
 )
 
@@ -124,7 +155,8 @@ async function load() {
   if (!loading.value) refreshing.value = true
   try {
     const params = new URLSearchParams()
-    if (filterAction.value) params.set('action', filterAction.value)
+    const acts = effectiveActions.value
+    if (acts.length) params.set('actions', acts.join(','))
     if (filterTarget.value.trim()) params.set('target', filterTarget.value.trim())
     if (filterUser.value.trim()) params.set('username', filterUser.value.trim())
     if (filterFrom.value) params.set('from', filterFrom.value + 'T00:00:00.000Z')
@@ -145,7 +177,7 @@ async function load() {
 }
 
 function clearFilters() {
-  filterCategory.value = ''; filterAction.value = ''
+  filterCategory.value = ''; filterAction.value = ''; filterSeverity.value = ''
   filterTarget.value = ''; filterUser.value = ''
   filterFrom.value = ''; filterTo.value = ''
   page.value = 1; load()
@@ -176,7 +208,7 @@ watch(filterCategory, () => {
   }
   page.value = 1; load()
 })
-watch(filterAction, () => { page.value = 1; load() })
+watch([filterAction, filterSeverity], () => { page.value = 1; load() })
 watch([filterTarget, filterUser, filterFrom, filterTo], () => {
   clearTimeout(textDebounce)
   textDebounce = setTimeout(() => { page.value = 1; load() }, 300)
@@ -207,6 +239,10 @@ onBeforeUnmount(() => clearTimeout(textDebounce))
       <div class="field-group" style="min-width:160px; flex:1">
         <label class="field-label">Event type</label>
         <SelectMenu v-model="filterAction" :options="filteredActionOptions" placeholder="All event types" />
+      </div>
+      <div class="field-group" style="min-width:130px; flex:1">
+        <label class="field-label">Result</label>
+        <SelectMenu v-model="filterSeverity" :options="severityMenuOptions" placeholder="Any result" />
       </div>
       <div class="field-group" style="min-width:130px; flex:1">
         <label class="field-label" for="ev-target">System</label>
@@ -275,6 +311,7 @@ onBeforeUnmount(() => clearTimeout(textDebounce))
         <table class="ev-table">
           <thead>
             <tr>
+              <th style="width:1%"></th>
               <th>Time</th>
               <th>Action</th>
               <th>System</th>
@@ -283,18 +320,34 @@ onBeforeUnmount(() => clearTimeout(textDebounce))
             </tr>
           </thead>
           <tbody>
-            <tr v-for="e in entries" :key="e.id">
-              <td class="mono small" style="white-space:nowrap; color:var(--text-dim)">{{ fmtDateTime(e.created_at) }}</td>
-              <td>
-                <span style="display:inline-flex; align-items:center; gap:8px; white-space:nowrap">
-                  <span class="sdot" :class="dotClass(e.action)" style="flex-shrink:0"></span>
-                  {{ humanize(e.action) }}
-                </span>
-              </td>
-              <td><span v-if="e.target" class="chip">{{ e.target }}</span></td>
-              <td class="mono small muted">{{ e.username || 'system' }}</td>
-              <td class="mono small dim">{{ e.ip || '—' }}</td>
-            </tr>
+            <template v-for="e in entries" :key="e.id">
+              <tr class="ev-trow" :class="{ open: expandedId === e.id }" :aria-expanded="expandedId === e.id" @click="toggleRow(e.id)">
+                <td class="ev-caret"><span :class="{ rot: expandedId === e.id }">▸</span></td>
+                <td class="mono small" style="white-space:nowrap; color:var(--text-dim)">{{ fmtDateTime(e.created_at) }}</td>
+                <td>
+                  <span style="display:inline-flex; align-items:center; gap:8px; white-space:nowrap">
+                    <span class="sdot" :class="dotClass(e.action)" style="flex-shrink:0"></span>
+                    {{ humanize(e.action) }}
+                  </span>
+                </td>
+                <td><span v-if="e.target" class="chip">{{ e.target }}</span></td>
+                <td class="mono small muted">{{ e.username || 'system' }}</td>
+                <td class="mono small dim">{{ e.ip || '—' }}</td>
+              </tr>
+              <tr v-if="expandedId === e.id" class="ev-detail-row">
+                <td></td>
+                <td colspan="5">
+                  <div class="ev-detail">
+                    <div class="kv"><span class="k">When</span><span class="v mono small">{{ e.created_at }}</span></div>
+                    <div class="kv"><span class="k">Event</span><span class="v">{{ humanize(e.action) }} <span class="mono dim small">({{ e.action }})</span></span></div>
+                    <div v-if="e.target" class="kv"><span class="k">System</span><span class="v mono small">{{ e.target }}</span></div>
+                    <div class="kv"><span class="k">Admin</span><span class="v mono small">{{ e.username || 'system' }}</span></div>
+                    <div class="kv"><span class="k">IP address</span><span class="v mono small">{{ e.ip || '—' }}</span></div>
+                    <div v-if="e.detail" class="kv"><span class="k">Detail</span><span class="v small">{{ e.detail }}</span></div>
+                  </div>
+                </td>
+              </tr>
+            </template>
           </tbody>
         </table>
       </div>
@@ -362,7 +415,17 @@ onBeforeUnmount(() => clearTimeout(textDebounce))
   vertical-align: middle;
 }
 .ev-table tbody tr:last-child td { border-bottom: none; }
-.ev-table tbody tr:hover td { background: var(--bg-hover); }
+.ev-trow { cursor: pointer; }
+.ev-trow:hover td { background: var(--bg-hover); }
+.ev-trow.open td { background: var(--bg-elevated); border-bottom-color: transparent; }
+.ev-caret { color: var(--text-dim); width: 1%; }
+.ev-caret span { display: inline-block; transition: transform 0.15s ease; }
+.ev-caret span.rot { transform: rotate(90deg); }
+.ev-detail-row td { background: var(--bg-elevated); padding: 0 14px 12px; }
+.ev-detail { display: flex; flex-direction: column; gap: 2px; padding: 4px 0 2px; }
+.ev-detail .kv { padding: 5px 0; border-bottom: 1px solid var(--border-soft); }
+.ev-detail .kv:last-child { border-bottom: none; }
+@media (prefers-reduced-motion: reduce) { .ev-caret span { transition: none; } }
 .ev-pagination {
   display: flex;
   align-items: center;

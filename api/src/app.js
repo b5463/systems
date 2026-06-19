@@ -65,6 +65,13 @@ async function buildApp(opts = {}) {
     if (!u || (request.user.tv ?? 0) !== (u.token_version || 0)) {
       return reply.code(401).send({ error: 'Session expired. Please sign in again.' });
     }
+    // Per-session revocation: a token carrying a jti must still have a live
+    // session row (legacy tokens without a jti fall back to token_version only).
+    if (request.user.jti) {
+      const s = db.prepare('SELECT id FROM sessions WHERE jti = ?').get(request.user.jti);
+      if (!s) return reply.code(401).send({ error: 'This session was signed out.' });
+      db.prepare(`UPDATE sessions SET last_seen_at = datetime('now') WHERE id = ?`).run(s.id);
+    }
   });
 
   await fastify.register(require('./routes/auth'));

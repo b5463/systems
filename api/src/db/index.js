@@ -93,6 +93,22 @@ try { db.exec(`ALTER TABLE projects ADD COLUMN is_primary INTEGER NOT NULL DEFAU
 try { db.exec(`ALTER TABLE audit_log ADD COLUMN prev_hash TEXT`); } catch {}
 try { db.exec(`ALTER TABLE audit_log ADD COLUMN hash TEXT`); } catch {}
 
+// Auth sessions: one row per signed-in token (jti). Enables a real session
+// list (device / IP / last active) and per-session revocation, on top of the
+// coarse token_version "sign-out-everywhere" mechanism.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    jti TEXT UNIQUE NOT NULL,
+    user_agent TEXT,
+    ip TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    last_seen_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
+`);
+
 db.exec(`
   CREATE TABLE IF NOT EXISTS deploy_history (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -160,9 +160,64 @@ async function revokeSessions() {
     const data = await api.post('/auth/revoke-sessions')
     if (data && data.token) auth.setToken(data.token)
     revokeMsg.value = 'Other sessions signed out.'
+    await loadSessions()
   } catch (e) {
     revokeMsg.value = e.message || 'Could not revoke sessions.'
   } finally { revoking.value = false }
+}
+
+// Active session list (device / IP / last active) with per-session revocation.
+const sessions = ref([])
+const sessionsLoading = ref(true)
+const revokingId = ref(null)
+async function loadSessions() {
+  try {
+    const data = await api.get('/auth/sessions')
+    sessions.value = data.sessions || []
+  } catch { /* best-effort — currentSession fallback still shows */ }
+  finally { sessionsLoading.value = false }
+}
+const otherSessionCount = computed(() => sessions.value.filter((s) => !s.current).length)
+
+async function revokeSession(s) {
+  revokeMsg.value = ''
+  revokingId.value = s.id
+  try {
+    const data = await api.del(`/auth/sessions/${s.id}`)
+    if (data && data.current) { await auth.logout(); return router.replace({ name: 'login' }) }
+    await loadSessions()
+  } catch (e) {
+    revokeMsg.value = e.message || 'Could not revoke session.'
+  } finally { revokingId.value = null }
+}
+
+// Parse a user-agent into a short device/browser label.
+function deviceLabel(ua) {
+  if (!ua) return 'Unknown device'
+  const browser = /Edg\//.test(ua) ? 'Edge' : /OPR\/|Opera/.test(ua) ? 'Opera'
+    : /Chrome\//.test(ua) ? 'Chrome' : /Firefox\//.test(ua) ? 'Firefox'
+    : /Safari\//.test(ua) ? 'Safari' : 'Browser'
+  const os = /Windows/.test(ua) ? 'Windows' : /Mac OS X|Macintosh/.test(ua) ? 'macOS'
+    : /Android/.test(ua) ? 'Android' : /iPhone|iPad|iOS/.test(ua) ? 'iOS'
+    : /Linux/.test(ua) ? 'Linux' : ''
+  return os ? `${browser} on ${os}` : browser
+}
+
+function fmtSeen(s) {
+  if (!s) return ''
+  const d = new Date(s.endsWith('Z') || s.includes('T') ? s : s.replace(' ', 'T') + 'Z')
+  if (Number.isNaN(d.getTime())) return s
+  const diff = (Date.now() - d.getTime()) / 1000
+  if (diff < 60) return 'just now'
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`
+  return `${Math.floor(diff / 86400)}d ago`
+}
+
+// Caps Lock detection for password fields.
+const capsOn = ref(false)
+function onPwKey(e) {
+  if (typeof e.getModifierState === 'function') capsOn.value = e.getModifierState('CapsLock')
 }
 
 /* ---------- Admins ---------- */
@@ -232,7 +287,7 @@ async function deleteUser(u) {
   }
 }
 
-onMounted(() => { loadUsers(); loadServerInfo() })
+onMounted(() => { loadUsers(); loadServerInfo(); loadSessions() })
 </script>
 
 <template>
@@ -275,7 +330,7 @@ onMounted(() => { loadUsers(); loadServerInfo() })
         <div class="field-group">
           <label class="field-label" for="ap-cur-pw">Current password</label>
           <div class="input-wrap">
-            <input id="ap-cur-pw" v-model="currentPassword" :type="showCurrentPw ? 'text' : 'password'" autocomplete="current-password" />
+            <input id="ap-cur-pw" v-model="currentPassword" :type="showCurrentPw ? 'text' : 'password'" autocomplete="current-password" @keyup="onPwKey" @keydown="onPwKey" />
             <button type="button" class="pw-toggle" :aria-label="showCurrentPw ? 'Hide password' : 'Show password'" @click="showCurrentPw = !showCurrentPw">
               <svg v-if="!showCurrentPw" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z"/><circle cx="12" cy="12" r="3"/></svg>
               <svg v-else viewBox="0 0 24 24"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
@@ -285,7 +340,7 @@ onMounted(() => { loadUsers(); loadServerInfo() })
         <div class="field-group">
           <label class="field-label" for="ap-new-pw">New password</label>
           <div class="input-wrap">
-            <input id="ap-new-pw" v-model="newPassword" :type="showNewPw ? 'text' : 'password'" autocomplete="new-password" />
+            <input id="ap-new-pw" v-model="newPassword" :type="showNewPw ? 'text' : 'password'" autocomplete="new-password" @keyup="onPwKey" @keydown="onPwKey" />
             <button type="button" class="pw-toggle" :aria-label="showNewPw ? 'Hide password' : 'Show password'" @click="showNewPw = !showNewPw">
               <svg v-if="!showNewPw" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z"/><circle cx="12" cy="12" r="3"/></svg>
               <svg v-else viewBox="0 0 24 24"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
@@ -306,6 +361,8 @@ onMounted(() => { loadUsers(); loadServerInfo() })
             </button>
           </div>
         </div>
+        <div v-if="capsOn" class="caps-warn small">⇪ Caps Lock is on</div>
+        <div class="hint">At least 8 characters. Mixing case, digits and symbols makes it stronger.</div>
         <div v-if="pwError" class="error-box">{{ pwError }}</div>
         <div v-else-if="pwMsg" class="notice">{{ pwMsg }}</div>
         <button class="btn btn-primary btn-block" :disabled="pwSaving" @click="changePassword">
@@ -357,16 +414,39 @@ onMounted(() => { loadUsers(); loadServerInfo() })
         <div v-else-if="tfaMsg" class="notice">{{ tfaMsg }}</div>
       </div>
 
-      <!-- Session -->
+      <!-- Sessions -->
       <div class="card stack">
-        <div class="section-label">Session</div>
-        <div v-if="currentSession" class="kv">
+        <div class="spread">
+          <div class="section-label">Active sessions</div>
+          <button v-if="otherSessionCount > 0" class="btn btn-sm btn-ghost" :disabled="revoking" @click="revokeSessions">
+            <span v-if="revoking" class="spinner"></span><span v-else>Sign out {{ otherSessionCount }} other{{ otherSessionCount === 1 ? '' : 's' }}</span>
+          </button>
+        </div>
+
+        <div v-if="sessionsLoading" class="muted small">Loading sessions…</div>
+
+        <template v-else-if="sessions.length">
+          <div v-for="s in sessions" :key="s.id" class="sess-row">
+            <div style="min-width:0; flex:1">
+              <div class="row gap-sm" style="align-items:center">
+                <span class="sess-name">{{ deviceLabel(s.userAgent) }}</span>
+                <span v-if="s.current" class="chip ok">this device</span>
+              </div>
+              <div class="small dim mono">{{ s.ip || 'unknown IP' }} · active {{ fmtSeen(s.lastSeenAt) }}</div>
+            </div>
+            <button v-if="!s.current" class="btn btn-danger btn-sm" :disabled="revokingId === s.id" @click="revokeSession(s)">
+              <span v-if="revokingId === s.id" class="spinner"></span><span v-else>Revoke</span>
+            </button>
+          </div>
+        </template>
+
+        <!-- Fallback when the current token predates session tracking -->
+        <div v-else-if="currentSession" class="kv">
           <span class="k">Signed in</span>
           <span class="v small muted">{{ currentSession.since }}</span>
         </div>
-        <button class="btn btn-block" :disabled="revoking" @click="revokeSessions">
-          <span v-if="revoking" class="spinner"></span><span v-else>Sign out other sessions</span>
-        </button>
+        <div v-else class="muted small">No active sessions recorded.</div>
+
         <div v-if="revokeMsg" class="notice">{{ revokeMsg }}</div>
         <button class="btn btn-danger btn-block" :disabled="loggingOut" @click="logout">
           <span v-if="loggingOut" class="spinner"></span><span v-else>Sign out</span>
@@ -514,4 +594,14 @@ onMounted(() => { loadUsers(); loadServerInfo() })
 .pw-label.pw-weak { color: var(--danger); }
 .pw-label.pw-fair { color: var(--warn); }
 .pw-label.pw-strong { color: var(--ok); }
+.caps-warn { color: var(--warn); display: flex; align-items: center; gap: 6px; }
+.sess-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border-soft);
+}
+.sess-row:last-of-type { border-bottom: none; }
+.sess-name { font-weight: 600; font-size: 14px; }
 </style>

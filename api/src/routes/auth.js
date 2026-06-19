@@ -1,6 +1,7 @@
 'use strict';
 
 const bcrypt = require('bcrypt');
+const { v4: uuidv4 } = require('uuid');
 const { db, auditLog } = require('../db');
 const totp = require('../util/totp');
 const lockout = require('../util/lockout');
@@ -22,14 +23,31 @@ if (_loginCleanup.unref) _loginCleanup.unref();
 // A fixed bcrypt hash used only to spend equivalent time on unknown-user logins.
 const DUMMY_HASH = '$2b$12$LS.DksBFMLXDgraHFAgGFOqaqkWL1x15NcdADtOyxtIOWJHnW2pK6';
 
-// Issue a token carrying the user's current token_version. Bumping
-// token_version (password change, admin reset, explicit revoke) invalidates
-// every previously issued token for that user.
-function signToken(fastify, user) {
+// Issue a token carrying the user's current token_version and a session id
+// (jti). Bumping token_version (password change, admin reset, explicit revoke)
+// invalidates every previously issued token; the jti enables per-session
+// revocation and the device/IP session list.
+function signToken(fastify, user, jti) {
   return fastify.jwt.sign(
-    { id: user.id, username: user.username, tv: user.token_version || 0 },
+    { id: user.id, username: user.username, tv: user.token_version || 0, jti },
     { expiresIn: '7d' }
   );
+}
+
+// Record a new session row and return a token bound to it.
+function createSession(fastify, user, request) {
+  const jti = uuidv4();
+  const ua = ((request.headers && request.headers['user-agent']) || '').slice(0, 300);
+  db.prepare('INSERT INTO sessions (user_id, jti, user_agent, ip) VALUES (?, ?, ?, ?)')
+    .run(user.id, jti, ua || null, request.ip || null);
+  return signToken(fastify, user, jti);
+}
+
+// Sign-out-everywhere: drop all of this user's sessions, then open a fresh one
+// for the current request so the acting admin stays signed in.
+function rotateSoleSession(fastify, user, request) {
+  db.prepare('DELETE FROM sessions WHERE user_id = ?').run(user.id);
+  return createSession(fastify, user, request);
 }
 
 async function authRoutes(fastify, options) {
@@ -107,7 +125,7 @@ async function authRoutes(fastify, options) {
 
     // Success — clear any failure streak for this IP.
     loginAttempts.delete(ip);
-    const token = signToken(fastify, user);
+    const token = createSession(fastify, user, request);
     auditLog({ user_id: user.id, action: 'login', target: username, ip });
     return { token };
   });
@@ -123,8 +141,40 @@ async function authRoutes(fastify, options) {
   fastify.post('/api/auth/logout', {
     preHandler: [fastify.authenticate],
   }, async (request) => {
+    if (request.user.jti) db.prepare('DELETE FROM sessions WHERE jti = ?').run(request.user.jti);
     auditLog({ user_id: request.user.id, action: 'logout', ip: request.ip });
     return { message: 'Logged out successfully' };
+  });
+
+  // List active sessions for the current user (the current one is flagged).
+  fastify.get('/api/auth/sessions', {
+    preHandler: [fastify.authenticate],
+  }, async (request) => {
+    const rows = db.prepare(
+      'SELECT id, jti, user_agent, ip, created_at, last_seen_at FROM sessions WHERE user_id = ? ORDER BY last_seen_at DESC'
+    ).all(request.user.id);
+    return {
+      sessions: rows.map((r) => ({
+        id: r.id,
+        userAgent: r.user_agent,
+        ip: r.ip,
+        createdAt: r.created_at,
+        lastSeenAt: r.last_seen_at,
+        current: r.jti === request.user.jti,
+      })),
+    };
+  });
+
+  // Revoke a single session by id. The revoked session's next request 401s.
+  fastify.delete('/api/auth/sessions/:id', {
+    preHandler: [fastify.authenticate],
+  }, async (request, reply) => {
+    const id = Number(request.params.id);
+    const row = db.prepare('SELECT id, jti FROM sessions WHERE id = ? AND user_id = ?').get(id, request.user.id);
+    if (!row) return reply.code(404).send({ error: 'Session not found.' });
+    db.prepare('DELETE FROM sessions WHERE id = ?').run(id);
+    auditLog({ user_id: request.user.id, action: 'session_revoked', ip: request.ip });
+    return { message: 'Session revoked.', current: row.jti === request.user.jti };
   });
 
   // Change own password — also bumps token_version (signs out other sessions).
@@ -164,27 +214,30 @@ async function authRoutes(fastify, options) {
     db.prepare(`UPDATE users SET password_hash = ?, token_version = token_version + 1 WHERE id = ?`).run(password_hash, user.id);
 
     auditLog({ user_id: user.id, action: 'password_change', target: user.username, ip: request.ip });
-    // Re-issue a fresh token so the current session stays signed in.
+    // Re-issue a fresh token so the current session stays signed in; other
+    // sessions are dropped (sign-out-everywhere).
     const updated = db.prepare('SELECT id, username, token_version FROM users WHERE id = ?').get(user.id);
-    return { message: 'Password updated.', token: signToken(fastify, updated) };
+    return { message: 'Password updated.', token: rotateSoleSession(fastify, updated, request) };
   });
 
-  // Sign out everywhere: bump token_version and hand back a fresh token.
+  // Sign out everywhere: bump token_version, drop other sessions, hand back a
+  // fresh token for the current session.
   fastify.post('/api/auth/revoke-sessions', {
     preHandler: [fastify.authenticate],
   }, async (request) => {
     db.prepare(`UPDATE users SET token_version = token_version + 1 WHERE id = ?`).run(request.user.id);
     auditLog({ user_id: request.user.id, action: 'sessions_revoked', ip: request.ip });
     const updated = db.prepare('SELECT id, username, token_version FROM users WHERE id = ?').get(request.user.id);
-    return { message: 'Other sessions signed out.', token: signToken(fastify, updated) };
+    return { message: 'Other sessions signed out.', token: rotateSoleSession(fastify, updated, request) };
   });
 
-  // Refresh token (carries token_version forward).
+  // Refresh token: rotate the current session's jti, leaving other sessions alone.
   fastify.post('/api/auth/refresh', {
     preHandler: [fastify.authenticate],
   }, async (request) => {
     const user = db.prepare('SELECT id, username, token_version FROM users WHERE id = ?').get(request.user.id);
-    return { token: signToken(fastify, user) };
+    if (request.user.jti) db.prepare('DELETE FROM sessions WHERE jti = ?').run(request.user.jti);
+    return { token: createSession(fastify, user, request) };
   });
 
   // ─── Two-factor (TOTP) ─────────────────────────────────────────────────────
@@ -217,7 +270,7 @@ async function authRoutes(fastify, options) {
     db.prepare('UPDATE users SET totp_enabled = 1, token_version = token_version + 1 WHERE id = ?').run(user.id);
     auditLog({ user_id: user.id, action: '2fa_enabled', target: user.username, ip: request.ip });
     const updated = db.prepare('SELECT id, username, token_version FROM users WHERE id = ?').get(user.id);
-    return { message: 'Two-factor enabled.', token: signToken(fastify, updated) };
+    return { message: 'Two-factor enabled.', token: rotateSoleSession(fastify, updated, request) };
   });
 
   // Disable 2FA (requires current password + a valid code).
@@ -240,7 +293,7 @@ async function authRoutes(fastify, options) {
     db.prepare('UPDATE users SET totp_enabled = 0, totp_secret = NULL, token_version = token_version + 1 WHERE id = ?').run(user.id);
     auditLog({ user_id: user.id, action: '2fa_disabled', target: user.username, ip: request.ip });
     const updated = db.prepare('SELECT id, username, token_version FROM users WHERE id = ?').get(user.id);
-    return { message: 'Two-factor disabled.', token: signToken(fastify, updated) };
+    return { message: 'Two-factor disabled.', token: rotateSoleSession(fastify, updated, request) };
   });
 }
 
