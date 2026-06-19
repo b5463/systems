@@ -173,10 +173,13 @@ const planFacts = computed(() => {
     ]
   }
   if (!plan.value) {
+    const slugMsg = slugValid.value
+      ? (planChecking.value ? 'Checking the slug is available…' : 'Waiting for an available slug')
+      : 'Enter a valid slug (2–50 chars: a–z, 0–9 and hyphens)'
     return [
-      { label: 'Detection', value: 'Waiting for a valid slug' },
-      { label: 'Route effect', value: 'No route plan yet' },
-      { label: 'Build plan', value: file.value ? 'Detected after upload' : 'Choose an archive first' },
+      { label: 'Detection', value: slugMsg },
+      { label: 'Route effect', value: slugValid.value ? 'Route is planned once the slug is confirmed available' : 'No route planned until the slug is valid' },
+      { label: 'Build plan', value: file.value ? 'Build command and output are detected after upload' : 'Upload a .zip archive to plan the build' },
     ]
   }
   return [
@@ -210,6 +213,26 @@ const readiness = computed(() => [
 const canDeploy = computed(() =>
   readiness.value.every((r) => r.ok) && !hostBlocks.value.length && !planChecking.value && !uploading.value
 )
+
+// Specific, actionable guidance for the FIRST thing blocking deploy. Read-only —
+// mirrors the readiness gates but spells out exactly what to do next. Empty when
+// canDeploy is true.
+const nextStep = computed(() => {
+  if (canDeploy.value) return ''
+  if (!name.value.trim()) return 'Enter a system name.'
+  if (!slugValid.value) return 'Choose a valid slug (2–50 chars: a–z, 0–9 and hyphens).'
+  if (planChecking.value) return 'Checking the slug is available…'
+  if (!plan.value) return 'Waiting for a valid, available slug.'
+  if (plan.value.valid === false) return plan.value.error || 'This slug is unavailable — pick another.'
+  if (!file.value) return 'Upload a .zip archive to deploy.'
+  if (!archiveWithinLimit.value) return `Archive exceeds the ${effectiveMaxMb.value} MB upload limit.`
+  if (analyzing.value) return 'Analyzing the archive…'
+  if (!analysis.value) return 'Waiting for archive detection to finish.'
+  if ((analysis.value.blockers || []).length) return analysis.value.blockers.join(' ')
+  if (hostBlocks.value.length) return 'Resolve the required host checks before the first deploy.'
+  if (uploading.value) return 'Upload in progress…'
+  return 'Complete the checklist above to deploy.'
+})
 
 function setFile(f) {
   if (!f) return
@@ -446,7 +469,7 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
         <button class="btn btn-primary btn-block" type="submit" :disabled="!canDeploy">
           <span v-if="uploading" class="spinner"></span><span v-else>Deploy system</span>
         </button>
-        <div class="hint">{{ canDeploy ? 'Build progress streams into the log after upload.' : 'Complete the checklist above to deploy.' }}</div>
+        <div class="hint">{{ canDeploy ? 'Build progress streams into the log after upload.' : nextStep }}</div>
       </div>
     </div>
   </form>

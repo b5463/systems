@@ -382,8 +382,8 @@ async function provisionDb() {
 
   <!-- GitHub deploy-on-push (only when enabled on the server) -->
   <div v-if="features.githubDeploys" class="card stack">
-    <div class="section-label">GitHub deploy-on-push</div>
-    <div class="hint">Map this system to a repo. A push to the branch triggers a redeploy (requires the webhook configured in GitHub).</div>
+    <div class="spread"><div class="section-label">GitHub deploy-on-push</div><span class="chip">Experimental</span></div>
+    <div class="hint">Advanced / optional — off by default and enabled on the server. Map this system to a repo. A push to the branch triggers a redeploy (requires the webhook configured in GitHub).</div>
     <div class="field" style="margin:0">
       <label class="label" for="repo">Repository</label>
       <input id="repo" v-model="repoInput" aria-label="Repository (owner/name)" placeholder="owner/name" autocapitalize="none" autocorrect="off" />
@@ -400,8 +400,8 @@ async function provisionDb() {
 
   <!-- Database provisioning (only when enabled on the server) -->
   <div v-if="features.dbProvisioning" class="card stack">
-    <div class="section-label">Database</div>
-    <div class="hint">Provision a dedicated Postgres database + role. The <span class="mono">DATABASE_URL</span> is stored (encrypted) and injected on the next deploy.</div>
+    <div class="spread"><div class="section-label">Database</div><span class="chip">Experimental</span></div>
+    <div class="hint">Advanced / optional — off by default and enabled on the server. Provision a dedicated Postgres database + role. The <span class="mono">DATABASE_URL</span> is stored (encrypted) and injected on the next deploy.</div>
     <div v-if="provisionedUrl" class="kv"><span class="k">DATABASE_URL</span><span class="v mono small row gap-sm" style="justify-content:flex-end">{{ provisionedUrl }}<CopyButton :text="provisionedUrl" label="DATABASE_URL" /></span></div>
     <div v-if="provisionMsg" class="notice">{{ provisionMsg }}</div>
     <button class="btn btn-block" :disabled="provisioning" @click="provisionDb">
