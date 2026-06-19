@@ -1,10 +1,13 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { api } from '../api/client'
+import SelectMenu from '../components/SelectMenu.vue'
 
 const entries = ref([])
 const total = ref(0)
 const loading = ref(true)
+const refreshing = ref(false)
+const lastChecked = ref(null)
 const error = ref('')
 
 const ACTION_OPTIONS = [
@@ -52,6 +55,11 @@ function humanize(action) {
   if (!action) return 'Event'
   return ACTION_LABELS[action] || (action.charAt(0).toUpperCase() + action.slice(1).replace(/_/g, ' '))
 }
+
+const actionMenuOptions = [
+  { value: '', label: 'All event types' },
+  ...ACTION_OPTIONS.map((a) => ({ value: a, label: humanize(a) })),
+]
 
 function dotClass(action) {
   switch (action) {
@@ -103,6 +111,7 @@ const grouped = computed(() => {
 
 async function load() {
   error.value = ''
+  if (!loading.value) refreshing.value = true
   try {
     const params = new URLSearchParams()
     if (filterAction.value) params.set('action', filterAction.value)
@@ -112,10 +121,12 @@ async function load() {
     const data = await api.get(`/audit${qs ? `?${qs}` : ''}`)
     entries.value = data.entries || []
     total.value = data.total ?? entries.value.length
+    lastChecked.value = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   } catch (e) {
     if (e.status !== 401) error.value = e.message || 'Failed to load events.'
   } finally {
     loading.value = false
+    refreshing.value = false
   }
 }
 
@@ -133,21 +144,32 @@ onBeforeUnmount(() => clearTimeout(textDebounce))
   <div class="page-head">
     <h1>Events</h1>
     <div class="head-actions">
-      <button class="btn btn-sm btn-ghost" data-refresh @click="load">Refresh</button>
+      <button class="btn btn-sm btn-ghost" data-refresh :disabled="refreshing" @click="load">
+        <span v-if="refreshing" class="spinner"></span><span v-else>Refresh</span>
+      </button>
     </div>
   </div>
 
   <!-- Filters -->
   <div class="card stack" style="gap: 10px; margin-bottom: 20px">
     <div class="row flex-wrap" style="gap: 10px">
-      <select v-model="filterAction" style="flex:1; min-width: 160px">
-        <option value="">All event types</option>
-        <option v-for="a in ACTION_OPTIONS" :key="a" :value="a">{{ humanize(a) }}</option>
-      </select>
-      <input v-model="filterTarget" aria-label="Filter by system" placeholder="Filter by system" autocapitalize="none" autocorrect="off" style="flex:1; min-width: 150px" />
-      <input v-model="filterUser" aria-label="Filter by admin" placeholder="Filter by admin" autocapitalize="none" autocorrect="off" style="flex:1; min-width: 150px" />
+      <div class="field-group" style="flex:1; min-width:160px">
+        <label class="field-label">Event type</label>
+        <SelectMenu v-model="filterAction" :options="actionMenuOptions" placeholder="All event types" />
+      </div>
+      <div class="field-group" style="flex:1; min-width:150px">
+        <label class="field-label" for="ev-target">System</label>
+        <input id="ev-target" v-model="filterTarget" autocapitalize="none" autocorrect="off" />
+      </div>
+      <div class="field-group" style="flex:1; min-width:150px">
+        <label class="field-label" for="ev-user">Admin</label>
+        <input id="ev-user" v-model="filterUser" autocapitalize="none" autocorrect="off" />
+      </div>
     </div>
-    <div class="small muted">{{ total }} event{{ total === 1 ? '' : 's' }}</div>
+    <div class="row" style="gap:12px; align-items:center">
+      <span class="small muted">{{ total }} event{{ total === 1 ? '' : 's' }}</span>
+      <span v-if="lastChecked" class="small dim">Checked {{ lastChecked }}</span>
+    </div>
   </div>
 
   <!-- Skeleton -->

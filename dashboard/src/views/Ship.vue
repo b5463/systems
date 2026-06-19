@@ -25,6 +25,18 @@ const visibility = ref('public')
 const file = ref(null)
 const dragOver = ref(false)
 const fileInput = ref(null)
+const envVarPairs = ref([])
+
+function addEnvPair() { envVarPairs.value.push({ key: '', value: '' }) }
+function removeEnvPair(i) { envVarPairs.value.splice(i, 1) }
+const envVarsForSubmit = computed(() => {
+  const obj = {}
+  for (const p of envVarPairs.value) {
+    const k = p.key.trim()
+    if (k && /^[A-Za-z_][A-Za-z0-9_]*$/.test(k)) obj[k] = p.value
+  }
+  return obj
+})
 
 const uploading = ref(false)
 const progress = ref(0)
@@ -115,7 +127,7 @@ async function submit() {
   }
   uploading.value = true; progress.value = 0
   try {
-    const fields = { name: name.value.trim(), slug: slug.value, visibility: visibility.value }
+    const fields = { name: name.value.trim(), slug: slug.value, visibility: visibility.value, envVars: JSON.stringify(envVarsForSubmit.value) }
     const data = willChunk.value
       ? await api.chunkedDeploy({ fields, file: file.value, onProgress: (p) => (progress.value = p) })
       : await api.upload('/deploy', { fields, files: { file: file.value }, onProgress: (p) => (progress.value = p) })
@@ -131,6 +143,7 @@ function reset() {
   name.value = ''; slug.value = ''; slugEdited.value = false
   file.value = null; progress.value = 0; deployedSlug.value = ''
   phase.value = 'form'; error.value = ''; visibility.value = 'public'; buildResult.value = ''
+  envVarPairs.value = []
 }
 function openSystem() { router.push({ name: 'system-detail', params: { slug: deployedSlug.value } }) }
 </script>
@@ -216,8 +229,16 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
       </div>
 
       <div class="card stack">
-        <div class="section-label">Environment &amp; limits</div>
-        <div class="hint">Env vars are set after the first deploy, in Settings. Memory/CPU/PIDs use platform defaults — see <RouterLink :to="{ name: 'server' }">Server</RouterLink>.</div>
+        <div class="section-label">Environment variables</div>
+        <div v-if="envVarPairs.length" class="env-pairs">
+          <div v-for="(pair, i) in envVarPairs" :key="i" class="env-row">
+            <input v-model="pair.key" class="env-key" placeholder="KEY" autocapitalize="none" autocorrect="off" spellcheck="false" />
+            <input v-model="pair.value" class="env-val" placeholder="value" autocorrect="off" spellcheck="false" />
+            <button type="button" class="env-remove" :aria-label="`Remove ${pair.key || 'env var'}`" @click="removeEnvPair(i)">×</button>
+          </div>
+        </div>
+        <button type="button" class="btn btn-sm btn-ghost" style="align-self:flex-start" @click="addEnvPair">+ Add variable</button>
+        <div class="hint">Injected into the container at deploy time. Update or add more in Settings after deploy.</div>
       </div>
     </div>
 
@@ -263,8 +284,8 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
           <div class="progress"><span :style="{ width: progress + '%' }"></span></div>
           <div class="small muted center">{{ willChunk ? 'Streaming' : 'Uploading' }}… {{ progress }}%</div>
         </div>
-        <button class="btn btn-primary btn-block" type="submit" :disabled="uploading">
-          <span v-if="uploading" class="spinner"></span><span v-else>Ship it live</span>
+        <button class="btn btn-primary btn-block" type="submit" :disabled="uploading || !file || (plan && plan.valid === false)">
+          <span v-if="uploading" class="spinner"></span><span v-else>Deploy system</span>
         </button>
         <div class="hint">Build progress streams into the log after upload.</div>
       </div>
@@ -290,4 +311,10 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
 .slug-status.ok { color: var(--ok); }
 .slug-status.error { color: var(--danger); }
 .slug-status.idle { color: var(--text-dim); }
+.env-pairs { display: flex; flex-direction: column; gap: 6px; }
+.env-row { display: flex; gap: 6px; align-items: center; }
+.env-key { width: 130px; flex-shrink: 0; font-family: var(--mono); font-size: 13px; }
+.env-val { flex: 1; min-width: 0; font-family: var(--mono); font-size: 13px; }
+.env-remove { background: none; border: none; cursor: pointer; color: var(--text-dim); font-size: 18px; line-height: 1; padding: 0 4px; }
+.env-remove:hover { color: var(--danger); }
 </style>

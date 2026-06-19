@@ -201,9 +201,18 @@ onMounted(loadUsers)
       <!-- Change password -->
       <div class="card stack">
         <div class="section-label">Change password</div>
-        <input v-model="currentPassword" aria-label="Current password" type="password" placeholder="Current password" autocomplete="current-password" />
-        <input v-model="newPassword" aria-label="New password (min 8 chars)" type="password" placeholder="New password (min 8 chars)" autocomplete="new-password" />
-        <input v-model="confirmPassword" aria-label="Confirm new password" type="password" placeholder="Confirm new password" autocomplete="new-password" />
+        <div class="field-group">
+          <label class="field-label" for="ap-cur-pw">Current password</label>
+          <input id="ap-cur-pw" v-model="currentPassword" type="password" autocomplete="current-password" />
+        </div>
+        <div class="field-group">
+          <label class="field-label" for="ap-new-pw">New password</label>
+          <input id="ap-new-pw" v-model="newPassword" type="password" autocomplete="new-password" />
+        </div>
+        <div class="field-group">
+          <label class="field-label" for="ap-conf-pw">Confirm new password</label>
+          <input id="ap-conf-pw" v-model="confirmPassword" type="password" autocomplete="new-password" />
+        </div>
         <div v-if="pwError" class="error-box">{{ pwError }}</div>
         <div v-else-if="pwMsg" class="notice">{{ pwMsg }}</div>
         <button class="btn btn-primary btn-block" :disabled="pwSaving" @click="changePassword">
@@ -219,9 +228,10 @@ onMounted(loadUsers)
         </div>
 
         <template v-if="!twoFAEnabled">
-          <p v-if="!tfaOtpauth" class="small muted" style="margin:0">
-            Add a time-based code from an authenticator app as a second step at sign-in.
-          </p>
+          <div v-if="!tfaOtpauth" class="callout warn" style="margin:0">
+            <div class="co-bar"></div>
+            <div>Two-factor is <strong>off</strong>. Anyone with your password can sign in without a second check.</div>
+          </div>
           <button v-if="!tfaOtpauth" class="btn btn-block" :disabled="tfaBusy" @click="startSetup2FA">
             <span v-if="tfaBusy" class="spinner"></span><span v-else>Set up two-factor</span>
           </button>
@@ -269,7 +279,7 @@ onMounted(loadUsers)
       <div class="card stack">
         <div class="spread">
           <div class="section-label">Administrators</div>
-          <button v-if="!showAddForm && !atCap" class="btn btn-sm btn-ghost" @click="showAddForm = true">Add admin</button>
+          <button v-if="!showAddForm && !atCap && otherAdmins.length > 0" class="btn btn-sm btn-ghost" @click="showAddForm = true">Add admin</button>
           <span v-else-if="atCap" class="small dim">2 / 2</span>
         </div>
 
@@ -308,9 +318,15 @@ onMounted(loadUsers)
 
           <!-- Add form -->
           <div v-if="showAddForm" class="stack" style="gap:8px; margin-top:6px">
-            <div class="label" style="margin:0">New admin</div>
-            <input v-model="newUsername" aria-label="username" placeholder="username" autocapitalize="none" autocorrect="off" />
-            <input v-model="newUserPassword" aria-label="password (min 8 chars)" type="password" placeholder="password (min 8 chars)" autocomplete="new-password" />
+            <div class="section-label" style="margin:0">New admin</div>
+            <div class="field-group">
+              <label class="field-label" for="add-username">Username</label>
+              <input id="add-username" v-model="newUsername" autocapitalize="none" autocorrect="off" />
+            </div>
+            <div class="field-group">
+              <label class="field-label" for="add-user-pw">Password</label>
+              <input id="add-user-pw" v-model="newUserPassword" type="password" autocomplete="new-password" />
+            </div>
             <div v-if="addUserError" class="error-box">{{ addUserError }}</div>
             <div class="btn-row">
               <button class="btn btn-sm" @click="showAddForm = false">Cancel</button>
@@ -333,12 +349,16 @@ onMounted(loadUsers)
       </div>
 
       <!-- Security & audit -->
-      <div class="card stack">
-        <div class="section-label">Security &amp; audit</div>
-        <div class="row gap-sm">
-          <RouterLink class="btn btn-sm btn-ghost" :to="{ name: 'events' }">Audit log</RouterLink>
-          <RouterLink class="btn btn-sm btn-ghost" :to="{ name: 'server' }">SYSTEMS. health</RouterLink>
-        </div>
+      <div class="card" style="padding:0">
+        <div class="section-label" style="padding:14px 16px 6px">Security &amp; audit</div>
+        <RouterLink class="conn-row sa-link" :to="{ name: 'events' }">
+          <div style="flex:1"><div class="c-name">Audit log</div><div class="c-sub">Admin and system actions</div></div>
+          <span class="small dim">→</span>
+        </RouterLink>
+        <RouterLink class="conn-row sa-link" :to="{ name: 'server' }">
+          <div style="flex:1"><div class="c-name">SYSTEMS. health</div><div class="c-sub">Infrastructure and runtime</div></div>
+          <span class="small dim">→</span>
+        </RouterLink>
       </div>
     </div>
   </div>

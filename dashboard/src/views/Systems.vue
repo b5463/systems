@@ -3,6 +3,7 @@ import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '../api/client'
 import StatusBadge from '../components/StatusBadge.vue'
+import SelectMenu from '../components/SelectMenu.vue'
 import { useToast } from '../composables/useToast'
 import { BASE_DOMAIN, hostFor, urlFor } from '../config'
 import { fmtAgo } from '../utils/date'
@@ -62,6 +63,11 @@ const deleted = computed(() => systems.value.filter((s) => s.status === 'deleted
 // Search + sort for the "All systems" grid (shown once the list grows).
 const query = ref('')
 const sortBy = ref('recent')
+const sortOptions = [
+  { value: 'recent', label: 'Recent' },
+  { value: 'name', label: 'Name' },
+  { value: 'status', label: 'Status' },
+]
 const STATUS_RANK = { error: 0, building: 1, stopped: 2, running: 3 }
 const visibleSystems = computed(() => {
   const q = query.value.trim().toLowerCase()
@@ -189,11 +195,7 @@ onBeforeUnmount(() => clearInterval(timer))
       <div class="section-label" style="margin:0">All systems · {{ active.length }}</div>
       <div v-if="active.length > 4" class="row gap-sm" style="flex-wrap:wrap">
         <input v-model="query" class="sys-search" type="search" placeholder="Search name or slug" aria-label="Search systems" autocapitalize="none" autocorrect="off" />
-        <select v-model="sortBy" aria-label="Sort systems" style="width:auto">
-          <option value="recent">Recent</option>
-          <option value="name">Name</option>
-          <option value="status">Status</option>
-        </select>
+        <SelectMenu v-model="sortBy" :options="sortOptions" placeholder="Sort" style="width:140px" />
       </div>
     </div>
     <div v-if="!visibleSystems.length" class="muted small" style="margin-bottom:18px">No systems match “{{ query }}”.</div>
@@ -261,5 +263,5 @@ onBeforeUnmount(() => clearInterval(timer))
   color: var(--text-dim);
 }
 .sc-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.sc-open { color: var(--accent); white-space: nowrap; }
+.sc-open { color: var(--text-muted); white-space: nowrap; }
 </style>

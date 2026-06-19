@@ -92,7 +92,7 @@ function finishBuild(slug, status) {
   }, 5 * 60 * 1000);
 }
 
-async function runBuildPipeline(slug, zipPath, extractDir, port, userId, ip) {
+async function runBuildPipeline(slug, zipPath, extractDir, port, userId, ip, envVars = {}) {
   try {
     appendBuildLog(slug, `[deploy] Extracting zip...\n`);
     await extractZip(zipPath, extractDir);
@@ -118,7 +118,7 @@ async function runBuildPipeline(slug, zipPath, extractDir, port, userId, ip) {
     appendBuildLog(slug, `[deploy] Image built: ${imageId}\n`);
 
     appendBuildLog(slug, `[deploy] Starting container on port ${port}...\n`);
-    const containerId = await dockerService.runContainer(slug, imageId, port);
+    const containerId = await dockerService.runContainer(slug, imageId, port, envVars);
     appendBuildLog(slug, `[deploy] Container started: ${containerId}\n`);
 
     const project = db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug);
@@ -270,7 +270,7 @@ async function runRedeployPipeline(slug, zipPath, extractDir, userId, ip) {
 // Validate + create a new project row and kick the build pipeline. Shared by
 // the multipart /api/deploy endpoint and the chunked-upload completion path so
 // every entry point runs identical validation and the same pipeline.
-async function beginDeploy({ name, slug, visibility = 'public', zipPath, userId, ip }) {
+async function beginDeploy({ name, slug, visibility = 'public', zipPath, userId, ip, envVars = {} }) {
   if (!name || !slug) return { ok: false, code: 400, error: 'Missing required fields: name, slug' };
   const slugErr = slugError(slug);
   if (slugErr) return { ok: false, code: 400, error: slugErr };
@@ -291,6 +291,17 @@ async function beginDeploy({ name, slug, visibility = 'public', zipPath, userId,
     port = await dockerService.findFreePort(4000, 5000, usedPorts);
     db.prepare(`INSERT INTO projects (name, slug, port, status, visibility) VALUES (?, ?, ?, 'building', ?)`).run(name, slug, port, visibility);
     project = db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug);
+
+    // Persist encrypted env vars at deploy time if any were provided and ENV_SECRET is set
+    if (Object.keys(envVars).length > 0 && process.env.ENV_SECRET) {
+      try {
+        const { encryptEnvVars } = require('./env');
+        const encrypted = encryptEnvVars(envVars);
+        db.prepare('UPDATE projects SET env_vars = ? WHERE slug = ?').run(encrypted, slug);
+      } catch (e) {
+        console.error('[deploy] Failed to save env vars:', e);
+      }
+    }
   });
   if (conflict) return { ok: false, code: 409, error: 'A project with this name or slug already exists' };
 
@@ -299,7 +310,7 @@ async function beginDeploy({ name, slug, visibility = 'public', zipPath, userId,
 
   const extractDir = `/tmp/${uuidv4()}`;
   setImmediate(() => {
-    runBuildPipeline(slug, zipPath, extractDir, port, userId, ip).catch((err) => {
+    runBuildPipeline(slug, zipPath, extractDir, port, userId, ip, envVars).catch((err) => {
       console.error('[deploy] Unhandled pipeline error:', err);
     });
   });
@@ -379,9 +390,16 @@ async function deployRoutes(fastify, options) {
       if (up.tooLarge) return reply.code(413).send({ error: `ZIP exceeds the ${MAX_MULTIPART_BYTES / 1048576}MB limit` });
 
       const visibility = ['public', 'private'].includes(up.fields.visibility) ? up.fields.visibility : 'public';
+      let envVars = {};
+      if (up.fields.envVars) {
+        try {
+          const parsed = JSON.parse(up.fields.envVars);
+          if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) envVars = parsed;
+        } catch { /* ignore malformed */ }
+      }
       const result = await beginDeploy({
         name: up.fields.name, slug: up.fields.slug, visibility, zipPath,
-        userId: request.user.id, ip: request.ip,
+        userId: request.user.id, ip: request.ip, envVars,
       });
       if (!result.ok) {
         if (zipPath) await fsp.rm(zipPath, { force: true }).catch(() => {});

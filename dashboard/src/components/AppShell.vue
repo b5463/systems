@@ -54,7 +54,7 @@ function openShortcuts() { window.dispatchEvent(new Event('app:shortcuts')) }
       </nav>
 
       <div class="sidebar-foot">
-        <button class="kbd-hint" @click="openShortcuts">Keyboard shortcuts <kbd>?</kbd></button>
+        <button class="kbd-hint" @click="openShortcuts">Open shortcuts <kbd>?</kbd></button>
         <RouterLink class="sidebar-user nav-link" :to="{ name: 'admin' }">
           <span class="avatar">{{ initial }}</span>
           <span style="min-width:0">
@@ -121,6 +121,10 @@ function openShortcuts() { window.dispatchEvent(new Event('app:shortcuts')) }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.sidebar-foot {
+  border-top: 1px solid var(--border-soft);
+  padding-top: 8px;
+}
 .kbd-hint {
   display: flex;
   align-items: center;
@@ -129,13 +133,13 @@ function openShortcuts() { window.dispatchEvent(new Event('app:shortcuts')) }
   background: none;
   border: none;
   cursor: pointer;
-  color: var(--text-dim);
-  font-size: 11.5px;
+  color: var(--text-muted);
+  font-size: 12px;
   padding: 6px 8px;
   margin-bottom: 4px;
   border-radius: var(--radius-xs);
 }
-.kbd-hint:hover { color: var(--text-muted); background: var(--bg-hover); }
+.kbd-hint:hover { color: var(--text); background: var(--bg-hover); }
 .kbd-hint kbd {
   font-family: var(--mono);
   font-size: 10px;

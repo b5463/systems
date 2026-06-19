@@ -5,6 +5,8 @@ import { BASE_DOMAIN } from '../config'
 
 const info = ref(null)
 const loading = ref(true)
+const refreshing = ref(false)
+const loadedAt = ref(null)
 const error = ref('')
 
 const DEFAULT_INFO = {
@@ -45,12 +47,15 @@ function normalizeInfo(data) {
 
 async function load() {
   error.value = ''
+  if (!loading.value) refreshing.value = true
   try {
     info.value = normalizeInfo(await api.get('/server/info'))
+    loadedAt.value = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   } catch (e) {
     if (e.status !== 401) error.value = e.message || 'Failed to reach the server.'
   } finally {
     loading.value = false
+    refreshing.value = false
   }
 }
 
@@ -118,14 +123,14 @@ function present(status) {
     case 'connected': return { tone: 'ok', label: 'Connected' }
     case 'measured': return { tone: 'ok', label: 'OK' }
     case 'ok': return { tone: 'ok', label: 'OK' }
-    case 'in_api': return { tone: 'ok', label: 'Runs in API' }
+    case 'in_api': return { tone: 'ok', label: 'In-process' }
     case 'unavailable': return { tone: 'error', label: 'Not connected' }
     case 'overdue': return { tone: 'warn', label: 'Overdue' }
     case 'none': return { tone: 'warn', label: 'None yet' }
-    case 'host_validation': return { tone: 'idle', label: 'Set up on host' }
+    case 'host_validation': return { tone: 'config', label: 'Needs host setup' }
     case 'planned': return { tone: 'idle', label: 'Planned' }
     case 'not_configured': return { tone: 'idle', label: 'Not configured' }
-    case 'not_measured': return { tone: 'idle', label: 'Not measured yet' }
+    case 'not_measured': return { tone: 'idle', label: 'Not measured' }
     default: return { tone: 'idle', label: '—' }
   }
 }
@@ -195,7 +200,10 @@ onMounted(() => { load(); loadCleanup(); })
   <div class="page-head">
     <h1>Server</h1>
     <div class="head-actions">
-      <button class="btn btn-sm btn-ghost" data-refresh @click="load">Refresh</button>
+      <span v-if="loadedAt" class="small dim" style="align-self:center">{{ loadedAt }}</span>
+      <button class="btn btn-sm btn-ghost" data-refresh :disabled="refreshing" @click="load">
+        <span v-if="refreshing" class="spinner"></span><span v-else>Refresh</span>
+      </button>
     </div>
   </div>
 
@@ -226,16 +234,8 @@ onMounted(() => { load(); loadCleanup(); })
       <span>{{ alert.message }}</span>
     </div>
 
-    <div class="callout" style="margin-bottom: 22px">
-      <div class="co-bar" style="background: var(--accent)"></div>
-      <div><strong>“Set up on host” and “Not measured yet” are expected, not errors.</strong>
-        Caddy and Postgres are built in but connected during the one-time Windows host
-        setup; DNS is configured manually. SYSTEMS. only shows a component as connected
-        once it has actually observed it.</div>
-    </div>
-
-    <!-- Core services (locked target stack) -->
-    <div class="section-label">Core services</div>
+    <!-- Infrastructure (locked target stack) -->
+    <div class=”section-label”>Infrastructure</div>
     <div class="card" style="padding:0; margin-bottom: 22px">
       <div class="conn-row">
         <span class="conn-ico"><svg viewBox="0 0 24 24"><rect x="3" y="9" width="4" height="4" /><rect x="8" y="9" width="4" height="4" /><rect x="13" y="9" width="4" height="4" /><path d="M3 16h15a4 4 0 0 0 4-4" /></svg></span>
