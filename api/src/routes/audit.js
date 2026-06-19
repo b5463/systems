@@ -10,15 +10,19 @@ async function auditRoutes(fastify, options) {
   }, async () => verifyAuditChain());
 
   // Returns audit log entries, newest first.
-  // Optional filters: action, target (LIKE), username (LIKE), limit (default 100, max 200)
+  // Optional filters: action, target (LIKE), username (LIKE), limit (default 100, max 200),
+  //   offset (for pagination), from / to (ISO date strings for created_at range)
   fastify.get('/api/audit', {
     preHandler: [fastify.authenticate],
   }, async (request) => {
-    const { action, target, username } = request.query || {};
+    const { action, target, username, from, to } = request.query || {};
 
     let limit = Number(request.query && request.query.limit);
     if (!Number.isFinite(limit) || limit <= 0) limit = 100;
     if (limit > 200) limit = 200;
+
+    let offset = Number(request.query && request.query.offset);
+    if (!Number.isFinite(offset) || offset < 0) offset = 0;
 
     const where = [];
     const params = [];
@@ -35,6 +39,14 @@ async function auditRoutes(fastify, options) {
       where.push('u.username LIKE ?');
       params.push(`%${username}%`);
     }
+    if (from) {
+      where.push('a.created_at >= ?');
+      params.push(from);
+    }
+    if (to) {
+      where.push('a.created_at <= ?');
+      params.push(to);
+    }
 
     const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
 
@@ -45,8 +57,8 @@ async function auditRoutes(fastify, options) {
       LEFT JOIN users u ON u.id = a.user_id
       ${whereSql}
       ORDER BY a.created_at DESC
-      LIMIT ?
-    `).all(...params, limit);
+      LIMIT ? OFFSET ?
+    `).all(...params, limit, offset);
 
     const totalRow = db.prepare(`
       SELECT COUNT(*) AS c

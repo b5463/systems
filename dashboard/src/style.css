@@ -1777,4 +1777,39 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
 @media (prefers-reduced-motion: reduce) {
   .route-enter-active,
   .route-leave-active { transition: none; }
+  .sdot.warn { animation: none; }
+}
+
+/* ============================================================
+   Accessibility — high contrast mode
+   Boost surface/type/border contrast for users who prefer it.
+   ============================================================ */
+@media (prefers-contrast: more) {
+  :root {
+    --bg: #000;
+    --bg-card: #080808;
+    --bg-elevated: #101010;
+    --bg-hover: #1a1a1a;
+    --bg-input: #050505;
+    --border: #666;
+    --border-soft: #444;
+    --border-strong: #888;
+    --text: #fff;
+    --text-muted: #e0e0e0;
+    --text-dim: #b4b4b4;
+    --text-disabled: #6a6a6a;
+  }
+  .btn { border-color: #666; }
+  .nav-link { border-color: transparent; }
+  .nav-link:hover, .nav-link.router-link-active { border-color: #666; }
+  .chip { border-color: #666; }
+  .card { border-color: #555; }
+}
+
+/* ============================================================
+   Responsive — Events table + pagination wrap on small screens
+   ============================================================ */
+@media (max-width: 599px) {
+  .ev-pagination { gap: 8px; }
+  .ev-pagination span { font-size: 12px; }
 }

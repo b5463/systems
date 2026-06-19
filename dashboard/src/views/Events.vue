@@ -9,70 +9,70 @@ const loading = ref(true)
 const refreshing = ref(false)
 const lastChecked = ref(null)
 const error = ref('')
+const viewMode = ref('timeline')
+const page = ref(1)
+const perPage = 25
 
-const ACTION_OPTIONS = [
-  'deploy', 'redeploy', 'rollback', 'start', 'stop', 'restart',
-  'env_update', 'delete', 'login', 'login_fail', 'user_create', 'user_delete', 'password_change'
+const ACTION_LABELS = {
+  deploy: 'Shipped system', redeploy: 'Redeployed', rollback: 'Rolled back',
+  restart: 'Restarted', stop: 'Stopped', start: 'Started',
+  login: 'Signed in', login_fail: 'Failed sign-in', logout: 'Signed out',
+  env_update: 'Updated env vars', delete: 'Deleted system',
+  user_create: 'Added admin', user_delete: 'Removed admin',
+  password_change: 'Changed password', password_reset: 'Reset password',
+  backup_succeeded: 'Backup succeeded', backup_failed: 'Backup failed',
+  restore_started: 'Restore started', restore_completed: 'Restore completed',
+  update_started: 'Update started', update_failed: 'Update failed',
+  update_completed: 'Update completed', caddy_validate_failed: 'Caddy config invalid',
+  docker_unavailable: 'Docker unavailable', postgres_unavailable: 'Postgres unavailable',
+  disk_warning: 'Disk warning', backup_overdue: 'Backup overdue', resource_warning: 'Resource warning'
+}
+
+const ACTION_CATEGORIES = {
+  deploy: ['deploy', 'redeploy', 'rollback', 'start', 'stop', 'restart'],
+  auth: ['login', 'login_fail', 'password_change'],
+  admin: ['user_create', 'user_delete', 'env_update', 'delete'],
+  system: ['backup_succeeded', 'backup_failed', 'restore_started', 'restore_completed',
+    'update_started', 'update_failed', 'update_completed', 'caddy_validate_failed',
+    'docker_unavailable', 'postgres_unavailable', 'disk_warning', 'backup_overdue', 'resource_warning'],
+}
+
+const categoryMenuOptions = [
+  { value: '', label: 'All categories' },
+  { value: 'deploy', label: 'Deploys & ops' },
+  { value: 'auth', label: 'Auth' },
+  { value: 'admin', label: 'Admin' },
+  { value: 'system', label: 'System events' },
 ]
+
+const filterCategory = ref('')
 const filterAction = ref('')
 const filterTarget = ref('')
 const filterUser = ref('')
+const filterFrom = ref('')
+const filterTo = ref('')
 let textDebounce = null
 
-const ACTION_LABELS = {
-  deploy: 'Shipped system',
-  redeploy: 'Redeployed',
-  rollback: 'Rolled back',
-  restart: 'Restarted',
-  stop: 'Stopped',
-  start: 'Started',
-  login: 'Signed in',
-  login_fail: 'Failed sign-in',
-  logout: 'Signed out',
-  env_update: 'Updated env vars',
-  delete: 'Deleted system',
-  user_create: 'Added admin',
-  user_delete: 'Removed admin',
-  password_change: 'Changed password',
-  password_reset: 'Reset password',
-  // SYSTEMS. operating on itself
-  backup_succeeded: 'Backup succeeded',
-  backup_failed: 'Backup failed',
-  restore_started: 'Restore started',
-  restore_completed: 'Restore completed',
-  update_started: 'Update started',
-  update_failed: 'Update failed',
-  update_completed: 'Update completed',
-  caddy_validate_failed: 'Caddy config invalid',
-  docker_unavailable: 'Docker unavailable',
-  postgres_unavailable: 'Postgres unavailable',
-  disk_warning: 'Disk warning',
-  backup_overdue: 'Backup overdue',
-  resource_warning: 'Resource warning'
-}
+const filteredActionOptions = computed(() => {
+  const base = filterCategory.value ? (ACTION_CATEGORIES[filterCategory.value] || []) : Object.keys(ACTION_LABELS).slice(0, 13)
+  return [{ value: '', label: 'All event types' }, ...base.map(a => ({ value: a, label: humanize(a) }))]
+})
 
 function humanize(action) {
   if (!action) return 'Event'
   return ACTION_LABELS[action] || (action.charAt(0).toUpperCase() + action.slice(1).replace(/_/g, ' '))
 }
 
-const actionMenuOptions = [
-  { value: '', label: 'All event types' },
-  ...ACTION_OPTIONS.map((a) => ({ value: a, label: humanize(a) })),
-]
-
 function dotClass(action) {
   switch (action) {
-    case 'deploy': case 'redeploy': return 'ok'
-    case 'start': case 'restart': return 'ok'
+    case 'deploy': case 'redeploy': case 'start': case 'restart':
     case 'backup_succeeded': case 'update_completed': case 'restore_completed': return 'ok'
     case 'stop': return 'idle'
     case 'login_fail': case 'delete': case 'user_delete': case 'error':
     case 'backup_failed': case 'update_failed': case 'caddy_validate_failed':
     case 'docker_unavailable': case 'postgres_unavailable': return 'error'
-    case 'env_update': case 'rollback':
-    case 'disk_warning': case 'backup_overdue': case 'resource_warning':
-    case 'restore_started': case 'update_started': return 'warn'
+    case 'env_update': case 'rollback': case 'disk_warning': case 'backup_overdue':
+    case 'resource_warning': case 'restore_started': case 'update_started': return 'warn'
     default: return 'idle'
   }
 }
@@ -81,6 +81,14 @@ function fmtTime(s) {
   if (!s) return ''
   const d = new Date(s)
   return Number.isNaN(d.getTime()) ? s : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+}
+
+function fmtDateTime(s) {
+  if (!s) return ''
+  const d = new Date(s)
+  if (Number.isNaN(d.getTime())) return s
+  return d.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' +
+    d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
 function dayKey(s) {
@@ -94,20 +102,22 @@ function dayKey(s) {
   return d.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })
 }
 
-// Group entries by day for a readable stream.
 const grouped = computed(() => {
   const groups = []
   let current = null
   for (const e of entries.value) {
     const key = dayKey(e.created_at)
-    if (!current || current.key !== key) {
-      current = { key, items: [] }
-      groups.push(current)
-    }
+    if (!current || current.key !== key) { current = { key, items: [] }; groups.push(current) }
     current.items.push(e)
   }
   return groups
 })
+
+const pageCount = computed(() => Math.max(1, Math.ceil(total.value / perPage)))
+const hasActiveFilters = computed(() =>
+  !!(filterCategory.value || filterAction.value || filterTarget.value.trim() ||
+     filterUser.value.trim() || filterFrom.value || filterTo.value)
+)
 
 async function load() {
   error.value = ''
@@ -117,6 +127,10 @@ async function load() {
     if (filterAction.value) params.set('action', filterAction.value)
     if (filterTarget.value.trim()) params.set('target', filterTarget.value.trim())
     if (filterUser.value.trim()) params.set('username', filterUser.value.trim())
+    if (filterFrom.value) params.set('from', filterFrom.value + 'T00:00:00.000Z')
+    if (filterTo.value) params.set('to', filterTo.value + 'T23:59:59.999Z')
+    params.set('limit', String(perPage))
+    params.set('offset', String((page.value - 1) * perPage))
     const qs = params.toString()
     const data = await api.get(`/audit${qs ? `?${qs}` : ''}`)
     entries.value = data.entries || []
@@ -130,10 +144,42 @@ async function load() {
   }
 }
 
-watch(filterAction, () => load())
-watch([filterTarget, filterUser], () => {
+function clearFilters() {
+  filterCategory.value = ''; filterAction.value = ''
+  filterTarget.value = ''; filterUser.value = ''
+  filterFrom.value = ''; filterTo.value = ''
+  page.value = 1; load()
+}
+
+function exportCSV() {
+  const rows = [['Date/Time', 'Action', 'System', 'Admin', 'IP', 'Detail']]
+  for (const e of entries.value) {
+    rows.push([e.created_at, humanize(e.action), e.target || '', e.username || 'system', e.ip || '', e.detail || ''])
+  }
+  const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n')
+  const blob = new Blob([csv], { type: 'text/csv' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url; a.download = 'events.csv'; a.click()
+  URL.revokeObjectURL(url)
+}
+
+function goPage(n) {
+  if (n < 1 || n > pageCount.value) return
+  page.value = n; load()
+}
+
+watch(filterCategory, () => {
+  if (filterAction.value && filterCategory.value) {
+    const allowed = ACTION_CATEGORIES[filterCategory.value] || []
+    if (!allowed.includes(filterAction.value)) filterAction.value = ''
+  }
+  page.value = 1; load()
+})
+watch(filterAction, () => { page.value = 1; load() })
+watch([filterTarget, filterUser, filterFrom, filterTo], () => {
   clearTimeout(textDebounce)
-  textDebounce = setTimeout(() => load(), 300)
+  textDebounce = setTimeout(() => { page.value = 1; load() }, 300)
 })
 
 onMounted(load)
@@ -144,6 +190,7 @@ onBeforeUnmount(() => clearTimeout(textDebounce))
   <div class="page-head">
     <h1>Events</h1>
     <div class="head-actions">
+      <button v-if="entries.length" class="btn btn-sm btn-ghost" title="Export visible events as CSV" @click="exportCSV">Export CSV</button>
       <button class="btn btn-sm btn-ghost" data-refresh :disabled="refreshing" @click="load">
         <span v-if="refreshing" class="spinner"></span><span v-else>Refresh</span>
       </button>
@@ -153,22 +200,43 @@ onBeforeUnmount(() => clearTimeout(textDebounce))
   <!-- Filters -->
   <div class="card stack" style="gap: 10px; margin-bottom: 20px">
     <div class="row flex-wrap" style="gap: 10px">
-      <div class="field-group" style="flex:1; min-width:160px">
-        <label class="field-label">Event type</label>
-        <SelectMenu v-model="filterAction" :options="actionMenuOptions" placeholder="All event types" />
+      <div class="field-group" style="min-width:150px; flex:1">
+        <label class="field-label">Category</label>
+        <SelectMenu v-model="filterCategory" :options="categoryMenuOptions" placeholder="All categories" />
       </div>
-      <div class="field-group" style="flex:1; min-width:150px">
+      <div class="field-group" style="min-width:160px; flex:1">
+        <label class="field-label">Event type</label>
+        <SelectMenu v-model="filterAction" :options="filteredActionOptions" placeholder="All event types" />
+      </div>
+      <div class="field-group" style="min-width:130px; flex:1">
         <label class="field-label" for="ev-target">System</label>
         <input id="ev-target" v-model="filterTarget" autocapitalize="none" autocorrect="off" />
       </div>
-      <div class="field-group" style="flex:1; min-width:150px">
+      <div class="field-group" style="min-width:130px; flex:1">
         <label class="field-label" for="ev-user">Admin</label>
         <input id="ev-user" v-model="filterUser" autocapitalize="none" autocorrect="off" />
       </div>
     </div>
-    <div class="row" style="gap:12px; align-items:center">
-      <span class="small muted">{{ total }} event{{ total === 1 ? '' : 's' }}</span>
-      <span v-if="lastChecked" class="small dim">Checked {{ lastChecked }}</span>
+    <div class="row flex-wrap" style="gap: 10px; align-items: flex-end">
+      <div class="field-group" style="min-width:140px">
+        <label class="field-label" for="ev-from">From</label>
+        <input id="ev-from" v-model="filterFrom" type="date" style="min-height:38px; padding:8px 10px; font-size:13px" />
+      </div>
+      <div class="field-group" style="min-width:140px">
+        <label class="field-label" for="ev-to">To</label>
+        <input id="ev-to" v-model="filterTo" type="date" style="min-height:38px; padding:8px 10px; font-size:13px" />
+      </div>
+      <div style="flex:1"></div>
+      <div class="row gap-sm" style="padding-bottom: 2px; flex-wrap: wrap">
+        <span class="small muted">{{ total }} event{{ total === 1 ? '' : 's' }}</span>
+        <span v-if="lastChecked" class="small dim">Checked {{ lastChecked }}</span>
+        <button v-if="hasActiveFilters" class="btn btn-sm btn-ghost" @click="clearFilters">Clear filters</button>
+      </div>
+    </div>
+    <!-- View mode toggle -->
+    <div class="row" style="gap: 6px; border-top: 1px solid var(--border-soft); padding-top: 10px">
+      <button class="btn btn-sm" :class="viewMode === 'timeline' ? '' : 'btn-ghost'" @click="viewMode = 'timeline'">Timeline</button>
+      <button class="btn btn-sm" :class="viewMode === 'table' ? '' : 'btn-ghost'" @click="viewMode = 'table'">Table</button>
     </div>
   </div>
 
@@ -191,13 +259,49 @@ onBeforeUnmount(() => clearTimeout(textDebounce))
 
   <div v-else-if="error" class="error-box">{{ error }}</div>
 
-  <!-- Honest empty state -->
+  <!-- Filter-aware empty state -->
   <div v-else-if="!entries.length" class="empty-block">
-    <div class="eb-title">No events yet.</div>
-    <div class="eb-sub">Actions you take are recorded here.</div>
+    <div class="eb-title">{{ hasActiveFilters ? 'No events match your filters.' : 'No events yet.' }}</div>
+    <div class="eb-sub">{{ hasActiveFilters ? 'Try adjusting or clearing the filters to see more events.' : 'Admin and system actions are recorded here as they happen.' }}</div>
+    <div v-if="hasActiveFilters" class="eb-actions">
+      <button class="btn btn-sm" @click="clearFilters">Clear filters</button>
+    </div>
   </div>
 
-  <!-- Grouped stream -->
+  <!-- TABLE VIEW -->
+  <template v-else-if="viewMode === 'table'">
+    <div class="card" style="padding: 0; overflow: hidden">
+      <div style="overflow-x: auto">
+        <table class="ev-table">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Action</th>
+              <th>System</th>
+              <th>Admin</th>
+              <th>IP</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="e in entries" :key="e.id">
+              <td class="mono small" style="white-space:nowrap; color:var(--text-dim)">{{ fmtDateTime(e.created_at) }}</td>
+              <td>
+                <span style="display:inline-flex; align-items:center; gap:8px; white-space:nowrap">
+                  <span class="sdot" :class="dotClass(e.action)" style="flex-shrink:0"></span>
+                  {{ humanize(e.action) }}
+                </span>
+              </td>
+              <td><span v-if="e.target" class="chip">{{ e.target }}</span></td>
+              <td class="mono small muted">{{ e.username || 'system' }}</td>
+              <td class="mono small dim">{{ e.ip || '—' }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </template>
+
+  <!-- TIMELINE VIEW -->
   <template v-else>
     <div v-for="group in grouped" :key="group.key" style="margin-bottom: 24px">
       <div class="section-label">{{ group.key }}</div>
@@ -225,4 +329,47 @@ onBeforeUnmount(() => clearTimeout(textDebounce))
       </div>
     </div>
   </template>
+
+  <!-- Pagination -->
+  <div v-if="!loading && !error && pageCount > 1" class="ev-pagination">
+    <button class="btn btn-sm btn-ghost" :disabled="page === 1" @click="goPage(page - 1)">← Prev</button>
+    <span class="small muted">Page {{ page }} of {{ pageCount }}</span>
+    <button class="btn btn-sm btn-ghost" :disabled="page === pageCount" @click="goPage(page + 1)">Next →</button>
+  </div>
 </template>
+
+<style scoped>
+.ev-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+.ev-table th {
+  text-align: left;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  font-weight: 700;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-soft);
+  white-space: nowrap;
+  background: var(--bg-elevated);
+}
+.ev-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-soft);
+  vertical-align: middle;
+}
+.ev-table tbody tr:last-child td { border-bottom: none; }
+.ev-table tbody tr:hover td { background: var(--bg-hover); }
+.ev-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-soft);
+}
+</style>

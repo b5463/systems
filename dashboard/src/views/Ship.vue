@@ -220,12 +220,7 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
 
       <div class="card stack">
         <div class="section-label">Build</div>
-        <div class="hint">Auto-detected from the archive — Vue/Vite, static, Node, or Dockerfile.</div>
-        <div class="detect-row">
-          <span class="kv"><span class="k">Build command</span><span class="v dim">Detected during build</span></span>
-          <span class="kv"><span class="k">Output folder</span><span class="v dim">Detected during build</span></span>
-        </div>
-        <div class="hint">Custom build overrides are planned.</div>
+        <div class="hint">SYSTEMS. auto-detects Vue/Vite, static, Node, and Dockerfile builds from your archive. Custom overrides can be added in Settings after the first deploy.</div>
       </div>
 
       <div class="card stack">
@@ -257,22 +252,22 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
       </div>
 
       <div class="card stack">
-        <div class="step-head"><span class="step-num" :class="{ active: !!file, done: !!file && plan && plan.valid !== false }">2</span><div class="section-label">Detection &amp; plan</div></div>
+        <div class="section-label">Detection &amp; plan</div>
         <div class="detect-row">
-          <span class="kv"><span class="k">Type</span><span class="v dim">{{ file ? 'detected during build' : 'waiting for archive…' }}</span></span>
+          <span class="kv"><span class="k">Type</span><span class="v dim">{{ file ? 'auto-detected at build time' : 'choose an archive above' }}</span></span>
           <span class="kv"><span class="k">Container</span><span class="v mono small">{{ plan ? plan.containerName : (slug ? 'systems-' + slug : 'systems-{slug}') }}</span></span>
           <span class="kv"><span class="k">Network</span><span class="v mono small">systems</span></span>
           <span class="kv"><span class="k">Proxy</span><span class="v dim">{{ plan ? plan.proxy : '—' }}</span></span>
           <span class="kv"><span class="k">Route</span><span class="v dim">{{ plan ? (plan.routePublished ? 'Caddy route generated after upload' : 'none (private)') : '—' }}</span></span>
         </div>
         <details v-if="plan && plan.route" style="margin-top:8px">
-          <summary class="small muted" style="cursor:pointer">Planned Caddy route (dry-run preview)</summary>
+          <summary class="small muted" style="cursor:pointer">Caddy route preview (dry-run)</summary>
           <pre class="plan-route">{{ plan.route }}</pre>
         </details>
       </div>
 
       <div class="card stack">
-        <div class="step-head"><span class="step-num" :class="{ active: !!file && plan && plan.valid !== false }">3</span><div class="section-label">Ship</div></div>
+        <div class="section-label">Ship</div>
         <div class="lifecycle">
           <template v-for="(step, i) in LIFECYCLE" :key="step">
             <span class="lc-step"><span class="lc-dot"></span>{{ step }}</span>

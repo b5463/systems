@@ -122,6 +122,23 @@ async function disable2FA() {
 }
 
 /* ---------- Sessions ---------- */
+const currentSession = computed(() => {
+  try {
+    const token = auth.token
+    if (!token) return null
+    const raw = token.split('.')[1]
+    const padded = raw.replace(/-/g, '+').replace(/_/g, '/') + '=='.slice((raw.length % 4) || 4)
+    const payload = JSON.parse(atob(padded))
+    if (!payload.iat) return null
+    const since = new Date(payload.iat * 1000)
+    const pad = n => String(n).padStart(2, '0')
+    return {
+      since: since.toLocaleDateString([], { month: 'short', day: 'numeric' }) +
+             ' at ' + pad(since.getHours()) + ':' + pad(since.getMinutes())
+    }
+  } catch { return null }
+})
+
 const revoking = ref(false)
 const revokeMsg = ref('')
 async function revokeSessions() {
@@ -308,6 +325,10 @@ onMounted(loadUsers)
       <!-- Session -->
       <div class="card stack">
         <div class="section-label">Session</div>
+        <div v-if="currentSession" class="kv">
+          <span class="k">Signed in</span>
+          <span class="v small muted">{{ currentSession.since }}</span>
+        </div>
         <button class="btn btn-block" :disabled="revoking" @click="revokeSessions">
           <span v-if="revoking" class="spinner"></span><span v-else>Sign out other sessions</span>
         </button>
