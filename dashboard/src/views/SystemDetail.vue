@@ -74,8 +74,8 @@ async function runHealthCheck() {
 const fileInput = ref(null)
 const rollingBack = ref(false)
 
-const publicHost = computed(() => (system.value ? hostFor(system.value.slug) : ''))
-const publicUrl = computed(() => (system.value ? urlFor(system.value.slug) : '#'))
+const publicHost = computed(() => (system.value ? hostFor(system.value.slug, system.value.port) : ''))
+const publicUrl = computed(() => (system.value ? urlFor(system.value.slug, system.value.port) : '#'))
 const isRunning = computed(() => system.value?.status === 'running')
 
 /* ---- Truth model ---- */

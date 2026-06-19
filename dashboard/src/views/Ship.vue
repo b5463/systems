@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { api } from '../api/client'
 import LogConsole from '../components/LogConsole.vue'
 import FlowField from '../components/FlowField.vue'
-import { BASE_DOMAIN, SCHEME } from '../config'
+import { BASE_DOMAIN, SCHEME, LOCAL_MODE, urlFor } from '../config'
 
 const router = useRouter()
 
@@ -42,8 +42,13 @@ const uploading = ref(false)
 const progress = ref(0)
 const error = ref('')
 const deployedSlug = ref('')
+const deployedPort = ref(null)
 const phase = ref('form') // form | building
 const buildResult = ref('')
+
+// Where the just-shipped system is actually reachable (localhost:port locally).
+const deployedUrl = computed(() => urlFor(deployedSlug.value, deployedPort.value))
+const deployedHost = computed(() => deployedUrl.value.replace(/^https?:\/\//, ''))
 
 // Upload limits/capabilities (from the server). When large uploads are enabled
 // and a file is bigger than the standard limit, we stream it in chunks.
@@ -149,6 +154,7 @@ async function submit() {
       ? await api.chunkedDeploy({ fields, file: file.value, onProgress: (p) => (progress.value = p) })
       : await api.upload('/deploy', { fields, files: { file: file.value }, onProgress: (p) => (progress.value = p) })
     deployedSlug.value = (data && data.project && data.project.slug) || slug.value
+    deployedPort.value = (data && data.project && data.project.port) || null
     phase.value = 'building'
   } catch (e) {
     error.value = e.message || 'Ship failed.'
@@ -158,7 +164,7 @@ async function submit() {
 }
 function reset() {
   name.value = ''; slug.value = ''; slugEdited.value = false
-  file.value = null; progress.value = 0; deployedSlug.value = ''
+  file.value = null; progress.value = 0; deployedSlug.value = ''; deployedPort.value = null
   phase.value = 'form'; error.value = ''; visibility.value = 'public'; buildResult.value = ''
   envVarPairs.value = []
 }
@@ -176,7 +182,7 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
       <div class="spread">
         <div>
           <div class="sc-name" style="font-size:17px">{{ name || deployedSlug }}</div>
-          <a class="mono small" :href="`${SCHEME}://${deployedSlug}.${BASE_DOMAIN}`" target="_blank" rel="noopener">{{ deployedSlug }}.{{ BASE_DOMAIN }}</a>
+          <a class="mono small" :href="deployedUrl" target="_blank" rel="noopener">{{ deployedHost }}</a>
         </div>
         <span v-if="buildResult === 'done'" class="live-pulse"><span class="lp-dot"></span>Live</span>
         <span v-else-if="buildResult === 'error'" class="badge badge-error"><span class="dot"></span>Failed</span>
@@ -222,8 +228,12 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
           <div v-else class="hint">Becomes the URL below — choose carefully, it can't be changed after deploy.</div>
         </div>
         <div class="field" style="margin:0">
-          <label class="label">Public URL</label>
-          <div class="url-preview url-preview-lg"><span class="scheme">{{ SCHEME }}://</span><span class="slug">{{ slug || 'your-system' }}</span>.{{ BASE_DOMAIN }}</div>
+          <label class="label">{{ LOCAL_MODE ? 'Local URL' : 'Public URL' }}</label>
+          <div class="url-preview url-preview-lg">
+            <template v-if="LOCAL_MODE"><span class="scheme">http://</span><span class="slug">localhost</span>:<span class="slug">port</span></template>
+            <template v-else><span class="scheme">{{ SCHEME }}://</span><span class="slug">{{ slug || 'your-system' }}</span>.{{ BASE_DOMAIN }}</template>
+          </div>
+          <div v-if="LOCAL_MODE" class="hint">Local testing — the system is published on a host port (shown after deploy). Set <span class="mono">VITE_BASE_DOMAIN</span> for subdomain routing.</div>
         </div>
       </div>
 

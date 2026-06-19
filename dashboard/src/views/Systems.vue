@@ -179,7 +179,7 @@ onBeforeUnmount(() => clearInterval(timer))
       <div v-if="latest" class="card card-tap" role="button" tabindex="0" @click="open(latest)" @keydown.enter="open(latest)" @keydown.space.prevent="open(latest)">
         <div class="section-label">Latest deploy</div>
         <div class="spread">
-          <div style="min-width:0"><div class="sc-name">{{ latest.name }}</div><div class="mono small dim">{{ hostFor(latest.slug) }}</div></div>
+          <div style="min-width:0"><div class="sc-name">{{ latest.name }}</div><div class="mono small dim">{{ hostFor(latest.slug, latest.port) }}</div></div>
           <div class="row gap-sm"><span class="small muted">{{ fmtAgo(latest.updated_at || latest.created_at) }}</span><StatusBadge :status="latest.status" :crashed="isCrashed(latest)" /></div>
         </div>
       </div>
@@ -209,7 +209,7 @@ onBeforeUnmount(() => clearInterval(timer))
         <div class="sc-top">
           <div style="min-width:0">
             <div class="sc-name">{{ s.name }}</div>
-            <div class="sc-host mono">{{ hostFor(s.slug) }}</div>
+            <div class="sc-host mono">{{ hostFor(s.slug, s.port) }}</div>
           </div>
           <StatusBadge :status="s.status" :crashed="isCrashed(s)" />
         </div>
@@ -226,7 +226,7 @@ onBeforeUnmount(() => clearInterval(timer))
             CPU {{ (stats[s.slug].cpu_percent ?? 0).toFixed(1) }}% · RAM {{ (stats[s.slug].memory_mb ?? 0).toFixed(0) }} MB<span v-if="s.port"> · :{{ s.port }}</span>
           </span>
           <span v-else class="small dim">{{ s.status === 'building' ? 'Building…' : s.status === 'error' ? (isCrashed(s) ? 'Crashed' : 'Build failed') : 'Not running' }}</span>
-          <a v-if="s.status === 'running'" class="sc-open small" :href="urlFor(s.slug)" target="_blank" rel="noopener" @click.stop>Open ↗</a>
+          <a v-if="s.status === 'running'" class="sc-open small" :href="urlFor(s.slug, s.port)" target="_blank" rel="noopener" @click.stop>Open ↗</a>
         </div>
       </div>
     </div>

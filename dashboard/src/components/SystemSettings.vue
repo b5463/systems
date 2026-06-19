@@ -13,7 +13,7 @@ const props = defineProps({
 const emit = defineEmits(['update', 'reload'])
 
 const error = ref('')
-const publicHost = computed(() => hostFor(props.system.slug))
+const publicHost = computed(() => hostFor(props.system.slug, props.system.port))
 
 /* Gated features (GitHub deploys, DB provisioning) */
 const features = ref({})
