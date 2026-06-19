@@ -310,6 +310,10 @@ onMounted(loadUsers)
         </template>
 
         <template v-else>
+          <div class="callout" style="margin:0">
+            <div class="co-bar"></div>
+            <div class="small">No recovery codes — your authenticator app is your only recovery path. Store your TOTP secret somewhere safe in case you lose access to it.</div>
+          </div>
           <p class="small muted" style="margin:0">Enter your password and a current code to turn two-factor off.</p>
           <input v-model="tfaPassword" aria-label="Current password" type="password" autocomplete="current-password" placeholder="Current password" />
           <input v-model="tfaCode" aria-label="Six-digit code" inputmode="numeric" autocomplete="one-time-code" placeholder="123456" />
