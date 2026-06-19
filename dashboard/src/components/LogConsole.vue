@@ -316,7 +316,7 @@ onMounted(() => {
     convertEol: true,
     disableStdin: true,
     cursorBlink: false,
-    fontSize: 12,
+    fontSize: 13,
     fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
     theme,
     scrollback: 5000,

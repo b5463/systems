@@ -79,8 +79,8 @@ body {
   font-family: var(--font);
   background: var(--bg);
   color: var(--text);
-  font-size: 15px;
-  line-height: 1.45;
+  font-size: 16px;
+  line-height: 1.5;
   overflow-x: hidden;
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior-y: none;
@@ -224,7 +224,7 @@ select.is-invalid {
 }
 
 .small {
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .xs {
@@ -250,7 +250,7 @@ select.is-invalid {
   background: var(--bg-card);
   border: 1px solid var(--border-soft);
   border-radius: var(--radius);
-  padding: 16px;
+  padding: 18px;
   animation: fadeUp 0.22s ease both;
 }
 
@@ -953,7 +953,7 @@ select.is-invalid {
   padding: 9px 12px;
   border-radius: var(--radius-sm);
   color: var(--text-muted);
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 550;
   text-decoration: none;
   border: 1px solid transparent;
@@ -1149,7 +1149,7 @@ select.is-invalid {
   flex-wrap: wrap;
 }
 .page-head h1 {
-  font-size: clamp(1.75rem, 1.5rem + 0.4vw, 2rem);
+  font-size: clamp(1.875rem, 1.6rem + 0.6vw, 2.25rem);
   font-weight: 700;
   letter-spacing: -0.02em;
   margin: 0;
@@ -1169,7 +1169,7 @@ select.is-invalid {
 .grid-2 { grid-template-columns: repeat(2, 1fr); }
 .grid-3 { grid-template-columns: repeat(3, 1fr); }
 .grid-4 { grid-template-columns: repeat(4, 1fr); }
-.grid-auto { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+.grid-auto { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
 @media (max-width: 720px) {
   .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr 1fr; }
 }
@@ -1207,7 +1207,7 @@ select.is-invalid {
 
 /* ---------- Section block ---------- */
 .section-label {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -1391,7 +1391,7 @@ select.is-invalid {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
   padding: 4px 9px;
   border-radius: var(--radius-xs);
