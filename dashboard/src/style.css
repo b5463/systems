@@ -16,10 +16,11 @@
   --border-soft: #1a1c22;
   --border-strong: #3a3d47;
 
-  /* Type — three-level hierarchy at readable contrast */
-  --text: #ececee;
+  /* Type — four-level hierarchy at readable contrast */
+  --text: #f0f1f3;
   --text-muted: #b2b6bf;
-  --text-dim: #72777f;
+  --text-dim: #868c98;
+  --text-disabled: #525862;
 
   /* Focus — white glow, matches login identity. Not cyan. */
   --focus-border: rgba(255, 255, 255, 0.65);
@@ -128,11 +129,32 @@ select {
   padding-right: 34px;
 }
 
+input:hover:not(:focus):not([disabled]):not([readonly]),
+textarea:hover:not(:focus):not([disabled]):not([readonly]),
+select:hover:not(:focus):not([disabled]) {
+  border-color: var(--border-strong);
+}
+
 input:focus,
 textarea:focus,
 select:focus {
   border-color: var(--focus-border);
   box-shadow: 0 0 0 3px var(--focus-ring), 0 0 14px rgba(255, 255, 255, 0.04);
+}
+
+input[readonly],
+textarea[readonly] {
+  color: var(--text-muted);
+  background: var(--bg-card);
+  border-color: var(--border-soft);
+  cursor: default;
+}
+
+input.is-invalid,
+textarea.is-invalid,
+select.is-invalid {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 3px rgba(239, 91, 81, 0.1);
 }
 
 ::placeholder {
@@ -289,13 +311,15 @@ select:focus {
 }
 
 .btn:disabled {
-  opacity: 0.45;
+  opacity: 0.5;
   cursor: not-allowed;
+  color: var(--text-disabled);
 }
 
 .btn:disabled:hover {
   background: var(--bg-elevated);
   border-color: var(--border);
+  color: var(--text-disabled);
 }
 
 .btn-primary {
@@ -1087,7 +1111,7 @@ select:focus {
   flex-wrap: wrap;
 }
 .page-head h1 {
-  font-size: 26px;
+  font-size: clamp(1.625rem, 1.4rem + 0.3vw, 2rem);
   font-weight: 700;
   letter-spacing: -0.02em;
   margin: 0;
@@ -1149,7 +1173,7 @@ select:focus {
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--text-dim);
+  color: var(--text-muted);
   margin-bottom: 12px;
 }
 
@@ -1302,6 +1326,10 @@ select:focus {
 .btn-ghost:hover { background: var(--bg-elevated); border-color: var(--border); }
 
 .btn-sm { min-height: 36px; padding: 0 12px; font-size: 13px; }
+
+/* Icon-only button — square, no text */
+.btn-icon { min-width: 36px; padding: 0; border-radius: var(--radius-sm); }
+.btn-icon.btn-lg { min-width: 46px; min-height: 46px; }
 
 /* ---------- Banner / callout ---------- */
 .callout {
@@ -1692,12 +1720,14 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
   color: var(--text-muted);
   margin-bottom: 6px;
   letter-spacing: 0.01em;
+  transition: color 0.12s ease;
 }
 .field-group { display: flex; flex-direction: column; gap: 0; }
 .field-group .field-label { margin-bottom: 6px; }
 .field-group input,
 .field-group textarea,
 .field-group select { margin-top: 0; }
+.field-group:focus-within .field-label { color: var(--text); }
 
 /* ---------- Severity model — distinct sdot tones ---------- */
 /* .sdot.config = needs host setup / informational action required */
