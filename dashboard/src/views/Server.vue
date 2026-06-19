@@ -23,7 +23,18 @@ const DEFAULT_INFO = {
     postgres: 'not_measured',
   },
   disk: { status: 'not_measured', usedPct: null, freeGb: null, totalGb: null },
-  backup: { status: 'not_measured', last: null, ageHours: null, count: 0 },
+  backup: {
+    status: 'not_measured',
+    last: null,
+    ageHours: null,
+    count: 0,
+    destination: '',
+    scheduler: 'disabled',
+    intervalHours: 24,
+    retentionCount: 7,
+    restoreScript: 'scripts/restore-systems-windows.ps1',
+    lastFailure: null,
+  },
   defaults: null,
   features: null,
 }
@@ -148,6 +159,19 @@ function fmtUptime(s) {
   return `${Math.floor(s / 86400)}d ${Math.floor((s % 86400) / 3600)}h`
 }
 
+function fmtDateTime(value) {
+  if (!value) return 'Never'
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return 'Unknown'
+  return d.toLocaleString([], {
+    year: 'numeric',
+    month: 'short',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
 const disk = computed(() => {
   const d = info.value?.disk
   if (!d || d.status !== 'measured') return { tone: 'idle', label: 'Not measured yet', sub: 'data volume' }
@@ -167,6 +191,22 @@ const backup = computed(() => {
     sub = `${b.count} backup${b.count !== 1 ? 's' : ''}${age ? ' · last ' + age : ''}`
   }
   return { tone: p.tone, label: p.label, sub }
+})
+
+const backupDetails = computed(() => {
+  const b = info.value?.backup || DEFAULT_INFO.backup
+  const schedulerEnabled = b.scheduler === 'enabled'
+  return {
+    destination: b.destination || 'Not configured',
+    last: fmtDateTime(b.last),
+    count: `${b.count || 0} snapshot${b.count === 1 ? '' : 's'}`,
+    scheduler: schedulerEnabled
+      ? `Enabled - every ${b.intervalHours || 24}h`
+      : `Disabled - set ENABLE_BACKUP_SCHEDULER=true for automatic backups`,
+    retention: `${b.retentionCount || 7} snapshot${(b.retentionCount || 7) === 1 ? '' : 's'} retained`,
+    restoreScript: b.restoreScript || 'scripts/restore-systems-windows.ps1',
+    lastFailure: b.lastFailure || 'None reported',
+  }
 })
 
 const defaults = computed(() => {
@@ -350,6 +390,24 @@ onMounted(() => { load(); loadCleanup(); })
           <span v-else>Clean up now</span>
         </button>
         <span v-if="cleanupMsg" class="notice" style="margin:0">{{ cleanupMsg }}</span>
+      </div>
+    </div>
+
+    <!-- Backup and restore -->
+    <div class="section-label">Backup and restore</div>
+    <div class="card stack" style="margin-bottom: 22px">
+      <div class="kv"><span class="k">Destination</span><span class="v mono small">{{ backupDetails.destination }}</span></div>
+      <div class="kv"><span class="k">Last successful backup</span><span class="v">{{ backupDetails.last }}</span></div>
+      <div class="kv"><span class="k">Available snapshots</span><span class="v mono">{{ backupDetails.count }}</span></div>
+      <div class="kv"><span class="k">Scheduler</span><span class="v">{{ backupDetails.scheduler }}</span></div>
+      <div class="kv"><span class="k">Retention</span><span class="v mono">{{ backupDetails.retention }}</span></div>
+      <div class="kv"><span class="k">Restore script</span><span class="v mono small">{{ backupDetails.restoreScript }}</span></div>
+      <div class="kv"><span class="k">Last failure</span><span class="v">{{ backupDetails.lastFailure }}</span></div>
+      <div class="row gap-sm" style="align-items:center">
+        <button class="btn btn-sm" :disabled="backingUp" @click="runBackup">
+          <span v-if="backingUp" class="spinner"></span><span v-else>Back up now</span>
+        </button>
+        <span class="notice" style="margin:0">Restore is manual so production recovery remains deliberate.</span>
       </div>
     </div>
 

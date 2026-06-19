@@ -32,14 +32,22 @@ function openShortcuts() { window.dispatchEvent(new Event('app:shortcuts')) }
 
 /* Sidebar collapse — persisted in localStorage */
 const sidebarCollapsed = ref(false)
+const compactDensity = ref(false)
 onMounted(() => {
   sidebarCollapsed.value = window.matchMedia('(min-width: 1200px)').matches
     ? false
     : localStorage.getItem('sb-col') === '1'
+  compactDensity.value = localStorage.getItem('density') === 'compact'
+  document.documentElement.classList.toggle('density-compact', compactDensity.value)
   loadHealth()
 })
 watch(sidebarCollapsed, v => localStorage.setItem('sb-col', v ? '1' : ''))
+watch(compactDensity, v => {
+  localStorage.setItem('density', v ? 'compact' : 'comfortable')
+  document.documentElement.classList.toggle('density-compact', v)
+})
 function toggleSidebar() { sidebarCollapsed.value = !sidebarCollapsed.value }
+function toggleDensity() { compactDensity.value = !compactDensity.value }
 
 /* Server health — best-effort indicator for Server nav item */
 const health = ref('idle')
@@ -108,6 +116,15 @@ async function loadHealth() {
       </nav>
 
       <div class="sidebar-foot">
+        <button
+          class="kbd-hint"
+          :aria-pressed="compactDensity"
+          :title="compactDensity ? 'Use comfortable density' : 'Use compact density'"
+          @click="toggleDensity"
+        >
+          <span class="kb-text">{{ compactDensity ? 'Comfortable density' : 'Compact density' }}</span>
+          <kbd>{{ compactDensity ? 'C' : 'D' }}</kbd>
+        </button>
         <button class="kbd-hint" @click="openShortcuts">
           <span class="kb-text">Open shortcuts</span>
           <kbd>?</kbd>

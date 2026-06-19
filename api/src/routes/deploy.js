@@ -1,6 +1,7 @@
 'use strict';
 
 const fsp = require('fs/promises');
+const path = require('path');
 const { db, auditLog } = require('../db');
 const dockerService = require('../services/docker');
 const { extractZip, detectProjectType, generateDockerfile } = require('../services/zip');
@@ -102,6 +103,17 @@ const STAGE_INFO = {
   deploy: { label: 'deploying', hint: 'Check the log above and redeploy.' },
 };
 
+function recentLogExcerpt(slug) {
+  const lines = buildLogs.get(slug) || [];
+  return lines
+    .join('')
+    .split(/\r?\n/)
+    .filter((line) => line.trim())
+    .slice(-12)
+    .join('\n')
+    .slice(0, 2000);
+}
+
 // Record a deploy/redeploy failure with the failing stage, a clear log message,
 // a recovery hint, an audit entry, a notification, and a persisted last_error so
 // the dashboard can show *what* failed rather than a bare "error".
@@ -114,10 +126,87 @@ function failBuild({ slug, stage, err, userId, ip, tag = 'deploy' }) {
   auditLog({ user_id: userId, action: `${tag}_fail`, target: slug, detail: `${stage}: ${err.message}`.slice(0, 300), ip });
   notify.send({ kind: 'deploy_failed', slug, detail: reason }).catch(() => {});
   try {
-    db.prepare(`UPDATE projects SET status = 'error', last_error = ?, updated_at = datetime('now') WHERE slug = ?`)
-      .run(reason.slice(0, 500), slug);
+    db.prepare(`UPDATE projects SET status = 'error', last_error = ?, last_error_stage = ?, last_error_hint = ?, last_error_excerpt = ?, updated_at = datetime('now') WHERE slug = ?`)
+      .run(reason.slice(0, 500), stage || null, info.hint || null, recentLogExcerpt(slug), slug);
   } catch (dbErr) {
     console.error(`[${tag}] Failed to update status to error:`, dbErr);
+  }
+}
+
+async function findProjectRoot(dirPath) {
+  const entries = await fsp.readdir(dirPath);
+  if (entries.length === 1) {
+    const only = path.join(dirPath, entries[0]);
+    try {
+      if ((await fsp.stat(only)).isDirectory()) return only;
+    } catch { /* ignore */ }
+  }
+  return dirPath;
+}
+
+async function fileExists(root, name) {
+  try {
+    await fsp.access(path.join(root, name));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function analyzeArchive(zipPath) {
+  const extractDir = tmpDir();
+  try {
+    const extracted = await extractZip(zipPath, extractDir);
+    const root = await findProjectRoot(extractDir);
+    const rootFiles = await fsp.readdir(root);
+    const lower = new Set(rootFiles.map((f) => f.toLowerCase()));
+    const projectType = await detectProjectType(extractDir);
+    const evidence = [];
+    const warnings = [];
+    const blockers = [];
+    const result = {
+      projectType,
+      entryPoint: null,
+      buildCommand: null,
+      outputFolder: null,
+      expectedPort: 3000,
+      filesUsed: evidence,
+      warnings,
+      blockers,
+      rootFolder: path.relative(extractDir, root) || '.',
+      fileCount: extracted.length,
+    };
+
+    for (const name of ['Dockerfile', 'package.json', 'requirements.txt', 'pyproject.toml', 'index.html', 'vite.config.js', 'vite.config.ts']) {
+      if (lower.has(name.toLowerCase())) evidence.push(name);
+    }
+
+    if (projectType === 'node' && await fileExists(root, 'package.json')) {
+      const pkg = JSON.parse(await fsp.readFile(path.join(root, 'package.json'), 'utf8'));
+      const scripts = pkg.scripts || {};
+      result.entryPoint = pkg.main || (scripts.start ? 'npm start' : null);
+      result.buildCommand = scripts.build ? 'npm run build' : (scripts.start ? 'npm start' : null);
+      result.outputFolder = lower.has('vite.config.js') || lower.has('vite.config.ts') ? 'dist' : null;
+      if (!scripts.start && !scripts.build) warnings.push('package.json has no start or build script.');
+      evidence.push('package.json scripts');
+    } else if (projectType === 'python') {
+      result.entryPoint = lower.has('app.py') ? 'app.py' : (lower.has('main.py') ? 'main.py' : 'main.py (expected)');
+      result.buildCommand = lower.has('requirements.txt') ? 'pip install -r requirements.txt' : 'No requirements install';
+      if (!lower.has('app.py') && !lower.has('main.py')) warnings.push('No app.py or main.py found at the archive root.');
+    } else if (projectType === 'static') {
+      result.entryPoint = lower.has('index.html') ? 'index.html' : null;
+      result.outputFolder = '.';
+      result.buildCommand = 'No build command; served by nginx';
+      if (!lower.has('index.html')) blockers.push('Static archives need index.html at the detected root.');
+    } else if (projectType === 'dockerfile') {
+      result.entryPoint = 'Dockerfile';
+      result.buildCommand = 'docker build';
+      if (!features().dockerfileMode) blockers.push('Dockerfile mode is disabled. Set ENABLE_DOCKERFILE_MODE=true to allow it.');
+    }
+
+    return result;
+  } finally {
+    await fsp.rm(extractDir, { recursive: true, force: true }).catch(() => {});
   }
 }
 
@@ -160,7 +249,9 @@ async function runBuildPipeline(slug, zipPath, extractDir, port, userId, ip, env
 
     db.prepare(`
       UPDATE projects
-      SET status = 'running', container_id = ?, image_id = ?, deploy_type = ?, last_error = NULL, updated_at = datetime('now')
+      SET status = 'running', container_id = ?, image_id = ?, deploy_type = ?, last_error = NULL,
+          last_error_stage = NULL, last_error_hint = NULL, last_error_excerpt = NULL,
+          updated_at = datetime('now')
       WHERE slug = ?
     `).run(containerId, imageId, projectType, slug);
 
@@ -266,7 +357,9 @@ async function runRedeployPipeline(slug, zipPath, extractDir, userId, ip) {
 
     db.prepare(`
       UPDATE projects
-      SET status = 'running', container_id = ?, image_id = ?, last_error = NULL, updated_at = datetime('now')
+      SET status = 'running', container_id = ?, image_id = ?, last_error = NULL,
+          last_error_stage = NULL, last_error_hint = NULL, last_error_excerpt = NULL,
+          updated_at = datetime('now')
       WHERE slug = ?
     `).run(newContainerId, newImageId, slug);
 
@@ -405,6 +498,23 @@ async function deployRoutes(fastify, options) {
       lifecycle: ['archive', 'detect', 'install', 'build', 'container', 'route', 'HTTPS', 'health', 'live'],
     };
     return { plan };
+  });
+
+  fastify.post('/api/deploy/analyze', {
+    preHandler: [fastify.authenticate],
+    config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+  }, async (request, reply) => {
+    let zipPath = null;
+    try {
+      const up = await readUploadToTmp(request);
+      zipPath = up.zipPath;
+      if (up.tooLarge) return reply.code(413).send({ error: `ZIP exceeds the ${MAX_MULTIPART_BYTES / 1048576}MB limit` });
+      if (!zipPath) return reply.code(400).send({ error: 'Missing file upload' });
+      const analysis = await analyzeArchive(zipPath);
+      return { analysis };
+    } finally {
+      if (zipPath) await fsp.rm(zipPath, { force: true }).catch(() => {});
+    }
   });
 
   // Initial deploy

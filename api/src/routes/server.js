@@ -42,6 +42,9 @@ async function serverRoutes(fastify, options) {
   fastify.get('/api/server/info', {
     preHandler: [fastify.authenticate],
   }, async () => {
+    const featureFlags = features();
+    const backupRetention = Number(process.env.BACKUP_RETENTION) || 7;
+    const backupIntervalHours = Number(process.env.BACKUP_INTERVAL_HOURS) || 24;
     const info = {
       platform: {
         name: 'SYSTEMS.',
@@ -79,9 +82,20 @@ async function serverRoutes(fastify, options) {
         dockerAccess: 'unavailable',
       },
       disk: { status: 'not_measured', usedPct: null, freeGb: null, totalGb: null },
-      backup: { status: 'not_measured', last: null, ageHours: null, count: 0 },
+      backup: {
+        status: 'not_measured',
+        last: null,
+        ageHours: null,
+        count: 0,
+        destination: backupDir(),
+        scheduler: featureFlags.backupScheduler ? 'enabled' : 'disabled',
+        intervalHours: backupIntervalHours,
+        retentionCount: backupRetention,
+        restoreScript: 'scripts/restore-systems-windows.ps1',
+        lastFailure: null,
+      },
       defaults: dockerService.containerLimits(),
-      features: features(), // V2 feature flags (risky ones off by default)
+      features: featureFlags, // V2 feature flags (risky ones off by default)
     };
 
     // Docker — the one component we can truly probe today.
@@ -141,6 +155,7 @@ async function serverRoutes(fastify, options) {
         }
         const ageHours = (Date.now() - newest) / 3.6e6;
         info.backup = {
+          ...info.backup,
           status: ageHours > 168 ? 'overdue' : 'ok',
           last: new Date(newest).toISOString(),
           ageHours: Math.round(ageHours * 10) / 10,

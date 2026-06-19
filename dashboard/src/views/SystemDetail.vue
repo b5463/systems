@@ -89,6 +89,7 @@ const isRunning = computed(() => system.value?.status === 'running')
 // (e.g. Start/Restart/Open/Check-health on a failed build with no container).
 const isBuilding = computed(() => system.value?.status === 'building')
 const hasContainer = computed(() => !!system.value?.image_id) // built at least once
+const hasRuntimeContainer = computed(() => !!system.value?.container_id)
 const canStart = computed(() => !!system.value && system.value.status === 'stopped' && !acting.value)
 const canStop = computed(() => isRunning.value && !acting.value)
 // Restart needs an existing container image (running or a stopped/crashed one).
@@ -99,6 +100,18 @@ const canRollback = computed(() => !!system.value?.previous_image_id && !isBuild
 const canHealthCheck = computed(() => isRunning.value && (system.value?.visibility !== 'private') && !checkingHealth.value)
 // Open only when there's a usable endpoint: a published route, or local testing (host port).
 const canOpen = computed(() => isRunning.value && (!!system.value?.route_published || LOCAL_MODE))
+const publicEndpointLabel = computed(() => {
+  const s = system.value
+  if (!s) return ''
+  if (s.visibility === 'private') return 'No public endpoint (private)'
+  if (s.route_published) return publicHost.value
+  return `Planned endpoint: ${publicHost.value}`
+})
+const runtimeLabel = computed(() => {
+  const type = system.value?.deploy_type
+  if (!type) return 'Auto-detected at deploy time'
+  return type === 'node' ? 'Node' : type === 'static' ? 'Static' : type
+})
 
 /* ---- Truth model ---- */
 const truth = computed(() => {
@@ -126,7 +139,7 @@ const truth = computed(() => {
     { key: 'HTTPS', tone: hs ? (health.tone === 'error' ? 'error' : 'ok') : 'idle', val: vis === 'private' ? '—' : (hs ? (health.tone === 'error' ? 'Failed' : 'Valid') : 'Not measured yet') },
     { key: 'Health', tone: health.tone, val: health.val },
     { key: 'Visibility', tone: 'idle', val: vis.charAt(0).toUpperCase() + vis.slice(1) },
-    { key: 'Runtime', tone: 'idle', val: s.deploy_type ? (s.deploy_type === 'node' ? 'Node' : s.deploy_type === 'static' ? 'Static' : s.deploy_type) : 'Auto-detected' }
+    { key: 'Runtime', tone: 'idle', val: runtimeLabel.value }
   ]
 })
 
@@ -340,8 +353,8 @@ onBeforeUnmount(() => {
           <StatusBadge :project="system" />
         </div>
         <h1 style="margin-top:10px">{{ system.name }}</h1>
-        <a v-if="canOpen" class="mono small" :href="publicUrl" target="_blank" rel="noopener">{{ publicHost }}</a>
-        <span v-else class="mono small dim">{{ publicHost }}</span>
+        <a v-if="canOpen" class="mono small" :href="publicUrl" target="_blank" rel="noopener">{{ publicEndpointLabel }}</a>
+        <span v-else class="mono small dim">{{ publicEndpointLabel }}</span>
       </div>
       <div class="head-actions">
         <button v-if="canOpen" class="btn btn-sm btn-ghost" @click="copyUrl">Copy URL</button>
@@ -370,6 +383,14 @@ onBeforeUnmount(() => {
             fix it, and redeploy{{ system.previous_image_id ? ' — or roll back to the last working release' : '' }}.
           </div>
           <div v-if="system.last_error" class="mono small" style="padding:8px 10px; background:var(--bg-input); border:1px solid var(--border-soft); border-radius:var(--radius-sm); color:var(--text-muted); white-space:pre-wrap; word-break:break-word">{{ system.last_error }}</div>
+          <div v-if="system.last_error_stage || system.last_error_hint || system.last_error_excerpt" class="failure-detail">
+            <div v-if="system.last_error_stage" class="kv"><span class="k">Failed stage</span><span class="v">{{ system.last_error_stage }}</span></div>
+            <div v-if="system.last_error_hint" class="kv"><span class="k">Suggested fix</span><span class="v">{{ system.last_error_hint }}</span></div>
+            <div v-if="system.last_error_excerpt" class="kv">
+              <span class="k">Relevant log excerpt</span>
+              <pre class="v mono small">{{ system.last_error_excerpt }}</pre>
+            </div>
+          </div>
           <div class="row gap-sm flex-wrap">
             <button class="btn btn-sm" @click="selectTab('Logs')">View logs</button>
             <button v-if="canRestart" class="btn btn-sm" :disabled="!!acting" @click="lifecycle('restart')">Restart</button>
@@ -444,8 +465,29 @@ onBeforeUnmount(() => {
 
       <input ref="fileInput" type="file" accept=".zip,application/zip" style="display:none" @change="onRedeployFile" />
 
-      <!-- Metadata -->
-      <div class="card">
+      <!-- Configured vs observed state -->
+      <div class="grid grid-2">
+        <div class="card">
+          <div class="section-label">Configured plan</div>
+          <div class="kv"><span class="k">Planned endpoint</span><span class="v mono small">{{ system.visibility === 'private' ? 'Private - no public route' : publicHost }}</span></div>
+          <div class="kv"><span class="k">Planned port</span><span class="v mono">{{ system.port ?? '-' }}</span></div>
+          <div class="kv"><span class="k">Requested visibility</span><span class="v">{{ (system.visibility || 'public').charAt(0).toUpperCase() + (system.visibility || 'public').slice(1) }}</span></div>
+          <div class="kv"><span class="k">Detected runtime</span><span class="v">{{ runtimeLabel }}</span></div>
+          <div class="kv"><span class="k">Created</span><span class="v small">{{ fmtDateTime(system.created_at) }}</span></div>
+        </div>
+        <div class="card">
+          <div class="section-label">Observed runtime</div>
+          <div v-if="isRunning && overviewStat" class="kv"><span class="k">CPU / RAM</span><span class="v mono">{{ (overviewStat.cpu_percent ?? 0).toFixed(1) }}% Â· {{ (overviewStat.memory_mb ?? 0).toFixed(0) }} MB</span></div>
+          <div class="kv"><span class="k">Container</span><span class="v mono small">{{ hasRuntimeContainer ? String(system.container_id).slice(0,12) : 'No container observed' }}</span></div>
+          <div class="kv"><span class="k">Image</span><span class="v mono small">{{ system.image_id ? String(system.image_id).replace('sha256:','').slice(0,12) : 'No built image' }}</span></div>
+          <div class="kv"><span class="k">Published route</span><span class="v">{{ system.route_published ? publicHost : (system.visibility === 'private' ? 'Not published (private)' : 'Not published') }}</span></div>
+          <div class="kv"><span class="k">Observed health</span><span class="v">{{ system.health_state ? `${system.health_state}${system.health_status ? ' / HTTP ' + system.health_status : ''}` : 'Not measured yet' }}</span></div>
+          <div class="kv"><span class="k">Last deploy</span><span class="v small">{{ fmtDateTime(system.updated_at) }}</span></div>
+        </div>
+      </div>
+
+      <!-- Legacy mixed metadata kept out of the rendered UI. -->
+      <div v-if="false" class="card">
         <div v-if="isRunning && overviewStat" class="kv"><span class="k">CPU / RAM</span><span class="v mono">{{ (overviewStat.cpu_percent ?? 0).toFixed(1) }}% · {{ (overviewStat.memory_mb ?? 0).toFixed(0) }} MB</span></div>
         <div class="kv"><span class="k">{{ hasContainer ? 'Port' : 'Planned port' }}</span><span class="v mono">{{ system.port ?? '–' }}</span></div>
         <div class="kv"><span class="k">Container</span><span class="v mono small">{{ system.container_id ? String(system.container_id).slice(0,12) : '–' }}</span></div>
@@ -582,4 +624,15 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .danger-label { color: var(--danger); }
+.failure-detail {
+  border: 1px solid var(--border-soft);
+  background: rgba(255,255,255,0.025);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+}
+.failure-detail pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
 </style>

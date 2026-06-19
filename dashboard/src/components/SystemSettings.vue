@@ -33,6 +33,8 @@ const envKeys = ref([])
 const envVars = ref([{ key: '', value: '' }])
 const envSaving = ref(false)
 const envMsg = ref('')
+const envPhase = ref('')
+const confirmEnvSave = ref(false)
 const bulkOpen = ref(false)
 const bulkText = ref('')
 async function loadEnv() {
@@ -40,6 +42,7 @@ async function loadEnv() {
     const data = await api.get(`/projects/${props.slug}/env`)
     envKeys.value = data.keys || []
   } catch (e) {
+    envPhase.value = 'failed'
     if (e.status !== 401) envMsg.value = e.message || 'Failed to load env keys.'
   }
 }
@@ -98,11 +101,18 @@ async function saveEnv() {
   const vars = {}
   for (const row of envVars.value) { const k = row.key.trim(); if (k) vars[k] = row.value }
   if (!Object.keys(vars).length) return (envMsg.value = 'Add at least one KEY=value pair.')
+  if (!confirmEnvSave.value) {
+    confirmEnvSave.value = true
+    return
+  }
   envSaving.value = true
+  envPhase.value = 'saving'
   try {
     const data = await api.put(`/projects/${props.slug}/env`, { vars })
     envKeys.value = data.keys || envKeys.value
     envVars.value = [{ key: '', value: '' }]
+    envPhase.value = 'restarting'
+    confirmEnvSave.value = false
     envMsg.value = 'Saved — other variables kept. The container is restarting.'
     emit('reload')
   } catch (e) {
@@ -166,6 +176,14 @@ async function setVisibility(v) {
 const primarySaving = ref(false)
 const primaryMsg = ref('')
 const confirmingPrimary = ref(false)
+const primaryBlockers = computed(() => {
+  const blockers = []
+  if (props.system.visibility === 'private') blockers.push('Private systems have no public route.')
+  if (props.system.status !== 'running') blockers.push('The container is not running.')
+  if (!props.system.route_published) blockers.push('The public route is not published.')
+  if (props.system.health_state && props.system.health_state !== 'healthy') blockers.push(`Health is ${props.system.health_state}.`)
+  return blockers
+})
 async function setPrimary(val) {
   primaryMsg.value = ''
   primarySaving.value = true
@@ -216,7 +234,7 @@ async function provisionDb() {
 </script>
 
 <template>
-  <div class="hint">Saving restarts the container. Stored values are encrypted and aren't shown again.</div>
+  <div class="hint">Saving restarts the container. Stored values are encrypted and masked; omitted existing keys stay unchanged.</div>
   <div v-if="error" class="error-box">{{ error }}</div>
 
   <div class="card stack">
@@ -224,7 +242,7 @@ async function provisionDb() {
     <div v-if="!envKeys.length" class="muted small">No environment variables set.</div>
     <div v-else class="row flex-wrap" style="gap:8px">
       <span v-for="k in envKeys" :key="k" class="chip">
-        {{ k }}
+        {{ k }} = ********
         <button class="chip-x" :aria-label="`Remove ${k}`" :disabled="envSaving" @click="removingKey = k">✕</button>
       </span>
     </div>
@@ -266,6 +284,19 @@ async function provisionDb() {
       <div>Empty values will be saved for: <span class="mono">{{ envEmptyValues.join(', ') }}</span>.</div>
     </div>
     <div v-else-if="envDirty" class="small" style="color:var(--warn)">Unsaved changes · saving restarts the container and briefly interrupts traffic.</div>
+    <div v-if="confirmEnvSave" class="callout warn" style="margin:0">
+      <div class="co-bar"></div>
+      <div class="stack" style="gap:8px">
+        <div>Save these environment changes and restart the container? Active traffic may be interrupted. Existing keys not listed here remain unchanged; listed empty values are saved as empty strings.</div>
+        <div class="row gap-sm">
+          <button class="btn btn-sm" :disabled="envSaving" @click="confirmEnvSave = false">Cancel</button>
+          <button class="btn btn-sm btn-primary" :disabled="envSaving" @click="saveEnv">
+            <span v-if="envSaving" class="spinner"></span><span v-else>Confirm save & restart</span>
+          </button>
+        </div>
+      </div>
+    </div>
+    <div v-if="envPhase" class="small muted">State: {{ envPhase }}</div>
     <div v-if="envMsg" class="notice">{{ envMsg }}</div>
     <button class="btn btn-primary btn-block" :disabled="!canSaveEnv" @click="saveEnv">
       <span v-if="envSaving" class="spinner"></span><span v-else>Save &amp; restart</span>
@@ -307,6 +338,16 @@ async function provisionDb() {
     </div>
     <div v-if="system.visibility === 'private'" class="hint">Make the system public or password-protected first — a private system has no public route to serve.</div>
 
+    <div v-if="primaryBlockers.length" class="callout warn" style="margin:0">
+      <div class="co-bar"></div>
+      <div>
+        <div>Resolve before assigning the root domain:</div>
+        <ul style="margin:6px 0 0; padding-left:18px">
+          <li v-for="b in primaryBlockers" :key="b">{{ b }}</li>
+        </ul>
+      </div>
+    </div>
+
     <!-- Already primary: stop serving (low-impact, immediate). -->
     <button
       v-else-if="system.is_primary"
@@ -332,8 +373,8 @@ async function provisionDb() {
           </div>
         </div>
       </div>
-      <button v-else class="btn btn-primary btn-block" :disabled="primarySaving" @click="confirmingPrimary = true">
-        Serve at {{ BASE_DOMAIN }}
+      <button v-else class="btn btn-primary btn-block" :disabled="primarySaving || primaryBlockers.length" @click="confirmingPrimary = true">
+        Assign root domain
       </button>
     </template>
     <div v-if="primaryMsg" class="notice">{{ primaryMsg }}</div>

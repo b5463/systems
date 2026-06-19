@@ -120,6 +120,25 @@ function statusLabel(s) {
   }
 }
 function statusTone(s) { return s === 'connected' ? 'ok' : s === 'unavailable' ? 'error' : 'idle' }
+function endpointText(s) {
+  if (!s) return ''
+  if (s.visibility === 'private') return 'Private - no public endpoint'
+  return s.route_published ? hostFor(s.slug, s.port) : `Planned endpoint: ${hostFor(s.slug, s.port)}`
+}
+function routeText(s) {
+  if (s.route_published) return 'Published'
+  if (s.visibility === 'private') return 'Not requested'
+  return 'Planned, not published'
+}
+function healthText(s) {
+  if (!s.health_state) return 'Not measured'
+  if (s.health_state === 'healthy') return s.health_status ? `Healthy / HTTP ${s.health_status}` : 'Healthy'
+  return s.health_status ? `${s.health_state} / HTTP ${s.health_status}` : s.health_state
+}
+function runtimeText(s) {
+  if (!s.container_id) return s.image_id ? 'No container observed' : 'No built image'
+  return s.status === 'running' ? 'Container running' : 'Container exists'
+}
 
 onMounted(async () => {
   await Promise.all([load(), loadServer()])
@@ -196,7 +215,7 @@ onBeforeUnmount(() => clearInterval(timer))
       <div v-if="latest" class="card card-tap" role="button" tabindex="0" @click="open(latest)" @keydown.enter="open(latest)" @keydown.space.prevent="open(latest)">
         <div class="section-label">Latest deploy</div>
         <div class="spread">
-          <div style="min-width:0"><div class="sc-name">{{ latest.name }}</div><div class="mono small dim">{{ hostFor(latest.slug, latest.port) }}</div></div>
+          <div style="min-width:0"><div class="sc-name">{{ latest.name }}</div><div class="mono small dim">{{ endpointText(latest) }}</div></div>
           <div class="row gap-sm"><span class="small muted">{{ fmtAgo(latest.updated_at || latest.created_at) }}</span><StatusBadge :project="latest" /></div>
         </div>
       </div>
@@ -226,15 +245,16 @@ onBeforeUnmount(() => clearInterval(timer))
         <div class="sc-top">
           <div style="min-width:0">
             <div class="sc-name">{{ s.name }}</div>
-            <div class="sc-host mono">{{ hostFor(s.slug, s.port) }}</div>
+            <div class="sc-host mono">{{ endpointText(s) }}</div>
           </div>
           <StatusBadge :project="s" />
         </div>
 
         <div class="sc-facts">
-          <span><i>Route</i>{{ s.route_published ? 'Active' : (s.visibility === 'private' ? 'Private' : 'None') }}</span>
-          <span><i>Health</i>{{ s.health_state ? (s.health_state === 'healthy' ? 'Healthy' : s.health_state) : 'Not measured' }}</span>
+          <span><i>Route</i>{{ routeText(s) }}</span>
+          <span><i>Health</i>{{ healthText(s) }}</span>
           <span><i>Visibility</i>{{ (s.visibility || 'public').charAt(0).toUpperCase() + (s.visibility || 'public').slice(1) }}</span>
+          <span><i>Runtime</i>{{ runtimeText(s) }}</span>
           <span><i>Last deploy</i>{{ fmtAgo(s.updated_at || s.created_at) }}</span>
         </div>
 

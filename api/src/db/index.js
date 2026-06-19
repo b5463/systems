@@ -75,6 +75,9 @@ try { db.exec(`ALTER TABLE projects ADD COLUMN route_published INTEGER NOT NULL 
 // Last deploy/runtime failure (stage + message), surfaced on the system detail
 // page so a failure says what failed, not just "error". Cleared on success.
 try { db.exec(`ALTER TABLE projects ADD COLUMN last_error TEXT`); } catch {}
+try { db.exec(`ALTER TABLE projects ADD COLUMN last_error_stage TEXT`); } catch {}
+try { db.exec(`ALTER TABLE projects ADD COLUMN last_error_hint TEXT`); } catch {}
+try { db.exec(`ALTER TABLE projects ADD COLUMN last_error_excerpt TEXT`); } catch {}
 
 // Auth: token_version invalidates outstanding JWTs (sign-out-everywhere on
 // password change / admin reset / explicit revoke). TOTP two-factor (opt-in).

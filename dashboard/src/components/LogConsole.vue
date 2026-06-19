@@ -24,6 +24,11 @@ const errMsg = ref('')
 const noOutput = ref(false)
 const paused = ref(false)
 const hasLog = ref(false)
+const followLogs = ref(true)
+const wrapLines = ref(true)
+const searchQuery = ref('')
+const importantLines = ref([])
+const sourceFilter = ref('all')
 
 let term = null
 let fit = null
@@ -35,6 +40,8 @@ let idleTimer = null
 let lastOutputAt = 0
 let logBuffer = ''
 let pausedBuffer = ''
+let pendingLine = ''
+let suppressedBuffer = ''
 
 const STATUS_LABEL = {
   connecting: 'Connecting…',
@@ -52,6 +59,20 @@ const statusTone = computed(() => {
   return 'idle'
 })
 const canReconnect = computed(() => status.value === 'ended' || status.value === 'error')
+const searchMatches = computed(() => {
+  const q = searchQuery.value.trim().toLowerCase()
+  if (!q) return []
+  return logBuffer
+    .split(/\r?\n/)
+    .map((line, index) => ({ line, index }))
+    .filter((entry) => entry.line.toLowerCase().includes(q))
+    .slice(-25)
+})
+const sourceOptions = [
+  { value: 'all', label: 'All' },
+  { value: 'stdout', label: 'stdout' },
+  { value: 'stderr', label: 'stderr' },
+]
 
 // Neutral, brand-aligned terminal palette (no cyan).
 const theme = {
@@ -61,16 +82,73 @@ const theme = {
   selectionBackground: 'rgba(255,255,255,0.18)'
 }
 
-function writeLine(data) {
+function classifyLine(line) {
+  const text = String(line || '')
+  if (/\b(error|failed|failure|exception|traceback|fatal|panic|permission denied|eaddrinuse|cannot|refused|timed out|exited with code)\b/i.test(text)) {
+    return 'error'
+  }
+  if (/\b(warn|warning|deprecated|retry|reconnecting|unhealthy|timeout)\b/i.test(text)) {
+    return 'warn'
+  }
+  return ''
+}
+
+function stripAnsi(text) {
+  return String(text || '').replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, '')
+}
+
+function ansiForTone(tone) {
+  if (tone === 'error') return ['\x1b[91m', '\x1b[0m']
+  if (tone === 'warn') return ['\x1b[93m', '\x1b[0m']
+  return ['', '']
+}
+
+function formatForTerminal(data) {
+  return String(data)
+    .split(/(\r?\n)/)
+    .map((part) => {
+      if (/^\r?\n$/.test(part)) return part
+      const tone = classifyLine(stripAnsi(part))
+      const [open, close] = ansiForTone(tone)
+      return tone ? `${open}${part}${close}` : part
+    })
+    .join('')
+}
+
+function collectImportant(data) {
+  const parts = String(data).split(/(\r?\n)/)
+  for (const part of parts) {
+    if (/^\r?\n$/.test(part)) {
+      const line = stripAnsi(pendingLine).trim()
+      const tone = classifyLine(line)
+      if (line && tone) {
+        importantLines.value = [...importantLines.value, { tone, text: line, at: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }].slice(-8)
+      }
+      pendingLine = ''
+    } else {
+      pendingLine += part
+    }
+  }
+}
+
+function writeLine(data, source = 'stdout') {
   if (!term || data == null) return
   const text = String(data)
   logBuffer += text
+  collectImportant(text)
   if (text) hasLog.value = true
-  if (paused.value) {
-    pausedBuffer += text
+  if (props.mode === 'logs' && sourceFilter.value !== 'all' && source !== sourceFilter.value) {
+    suppressedBuffer += text
     return
   }
-  term.write(text.replace(/\r?\n/g, '\r\n'))
+  const rendered = formatForTerminal(text)
+  if (paused.value) {
+    pausedBuffer += rendered
+    return
+  }
+  term.write(rendered.replace(/\r?\n/g, '\r\n'), () => {
+    if (followLogs.value) term.scrollToBottom()
+  })
 }
 
 function markOutput() {
@@ -121,7 +199,7 @@ function connect() {
       if (typeof msg === 'string') { markOutput(); writeLine(msg); return }
       if (msg.type === 'log' || msg.type === 'output') {
         markOutput()
-        writeLine(msg.data)
+        writeLine(msg.data, msg.stream || 'stdout')
       } else if (msg.type === 'status') {
         writeLine(`\n[build ${msg.status}]\n`)
         if (msg.status === 'done' || msg.status === 'error') {
@@ -172,6 +250,9 @@ function reconnect() {
   if (term) term.clear()
   logBuffer = ''
   pausedBuffer = ''
+  suppressedBuffer = ''
+  pendingLine = ''
+  importantLines.value = []
   hasLog.value = false
   connect()
 }
@@ -181,12 +262,25 @@ function togglePause() {
   if (!paused.value && pausedBuffer) {
     const text = pausedBuffer
     pausedBuffer = ''
-    if (term) term.write(text.replace(/\r?\n/g, '\r\n'))
+    suppressedBuffer = ''
+    if (term) term.write(text.replace(/\r?\n/g, '\r\n'), () => {
+      if (followLogs.value) term.scrollToBottom()
+    })
   }
 }
 
 function clearView() {
   if (term) term.clear()
+}
+
+async function copyLine(text) {
+  if (!text || !navigator.clipboard) return
+  try { await navigator.clipboard.writeText(text) } catch { /* clipboard unavailable */ }
+}
+
+function jumpLatest() {
+  followLogs.value = true
+  if (term) term.scrollToBottom()
 }
 
 async function copyAll() {
@@ -225,7 +319,8 @@ onMounted(() => {
     fontSize: 12,
     fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
     theme,
-    scrollback: 5000
+    scrollback: 5000,
+    allowTransparency: true,
   })
   fit = new FitAddon()
   term.loadAddon(fit)
@@ -250,6 +345,8 @@ watch(
     if (term) term.clear()
     logBuffer = ''
     pausedBuffer = ''
+    pendingLine = ''
+    importantLines.value = []
     hasLog.value = false
     connect()
   }
@@ -271,6 +368,8 @@ defineExpose({ refit: doFit })
       <span>{{ mode === 'build' ? 'Build log' : 'Live logs' }}</span>
       <div class="row" style="gap: 10px; align-items: center">
         <span class="lc-status"><span class="sdot" :class="statusTone"></span>{{ statusLabel }}</span>
+        <button class="btn btn-sm btn-ghost" :aria-pressed="followLogs" @click="followLogs = !followLogs">{{ followLogs ? 'Following' : 'Follow logs' }}</button>
+        <button v-if="!followLogs" class="btn btn-sm btn-ghost" @click="jumpLatest">Jump latest</button>
         <button class="btn btn-sm btn-ghost" @click="togglePause">{{ paused ? 'Resume' : 'Pause' }}</button>
         <button v-if="canReconnect" class="btn btn-sm btn-ghost" @click="reconnect">Reconnect</button>
         <button class="btn btn-sm btn-ghost" :disabled="!hasLog" @click="copyAll">Copy all</button>
@@ -290,11 +389,50 @@ defineExpose({ refit: doFit })
         </button>
       </div>
     </div>
+    <div class="log-tools">
+      <label class="log-search">
+        <span>Search</span>
+        <input v-model="searchQuery" type="search" placeholder="Find in buffered logs" autocomplete="off" />
+      </label>
+      <label class="checkrow">
+        <input v-model="wrapLines" type="checkbox" />
+        <span>Wrap long lines</span>
+      </label>
+      <div v-if="mode === 'logs'" class="source-filter" aria-label="Log source filter">
+        <button v-for="opt in sourceOptions" :key="opt.value" type="button" :class="{ active: sourceFilter === opt.value }" @click="sourceFilter = opt.value">{{ opt.label }}</button>
+      </div>
+      <span v-if="searchQuery.trim()" class="small muted">{{ searchMatches.length }} match{{ searchMatches.length === 1 ? '' : 'es' }} in buffer</span>
+    </div>
     <div v-if="noOutput" class="hint" style="margin:0">
       No output for 30s — {{ mode === 'build' ? 'the worker may still be preparing the build.' : 'the container may be idle.' }}
     </div>
     <div v-if="paused" class="hint" style="margin:0">Paused locally. Incoming output is buffered and will appear when resumed.</div>
-    <div ref="wrap" class="term-wrap"></div>
+    <div v-if="sourceFilter !== 'all' && suppressedBuffer" class="hint" style="margin:0">Showing {{ sourceFilter }} only. Other log lines are still buffered for search, copy, and download.</div>
+    <div v-if="importantLines.length" class="log-issues">
+      <div class="issue-head">Detected issues</div>
+      <div v-for="(line, i) in importantLines" :key="i" class="issue-line" :class="line.tone">
+        <span class="issue-tone">{{ line.tone }}</span>
+        <span class="issue-text">{{ line.text }}</span>
+        <span class="issue-time">{{ line.at }}</span>
+        <button class="btn btn-sm btn-ghost" @click="copyLine(line.text)">Copy</button>
+      </div>
+    </div>
+    <div v-if="searchQuery.trim()" class="log-matches">
+      <div v-if="searchMatches.length" class="match-list">
+        <button
+          v-for="match in searchMatches.slice(-6)"
+          :key="match.index"
+          class="match-line"
+          type="button"
+          @click="copyLine(match.line)"
+        >
+          <span class="mono">#{{ match.index + 1 }}</span>
+          <span>{{ match.line }}</span>
+        </button>
+      </div>
+      <div v-else class="hint" style="margin:0">No buffered log lines match that search.</div>
+    </div>
+    <div ref="wrap" class="term-wrap" :class="{ 'no-wrap': !wrapLines }"></div>
     <div v-if="errMsg" class="error-box">{{ errMsg }}</div>
   </div>
 </template>
@@ -302,4 +440,136 @@ defineExpose({ refit: doFit })
 <style scoped>
 .lc-status { display: inline-flex; align-items: center; gap: 7px; }
 .lc-status .sdot { width: 7px; height: 7px; }
+.log-tools {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.log-search {
+  flex: 1;
+  min-width: min(100%, 260px);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.log-search span {
+  color: var(--muted);
+  font-size: 12px;
+}
+.log-search input {
+  min-height: 36px;
+}
+.checkrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.checkrow input {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--text);
+}
+.source-filter {
+  display: inline-flex;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.source-filter button {
+  min-height: 32px;
+  padding: 0 10px;
+  border: 0;
+  border-right: 1px solid var(--border-soft);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+.source-filter button:last-child { border-right: 0; }
+.source-filter button.active {
+  background: var(--bg-elevated);
+  color: var(--text);
+}
+.log-issues,
+.log-matches {
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.025);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+}
+.issue-head {
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+.issue-line,
+.match-line {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  gap: 10px;
+  align-items: center;
+  padding: 7px 0;
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+.issue-line:first-of-type,
+.match-line:first-child {
+  border-top: 0;
+}
+.issue-tone {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0;
+}
+.issue-line.error .issue-tone { color: var(--danger); }
+.issue-line.warn .issue-tone { color: var(--warn); }
+.issue-text,
+.match-line span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text);
+}
+.issue-time {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
+}
+.match-list {
+  display: flex;
+  flex-direction: column;
+}
+.match-line {
+  width: 100%;
+  grid-template-columns: auto minmax(0, 1fr);
+  text-align: left;
+  color: inherit;
+  background: transparent;
+  border-left: 0;
+  border-right: 0;
+  border-bottom: 0;
+  cursor: pointer;
+}
+.match-line:hover span:last-child {
+  color: var(--text-strong);
+}
+.term-wrap.no-wrap :deep(.xterm-rows span) {
+  white-space: pre !important;
+}
+@media (max-width: 720px) {
+  .issue-line {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+  .issue-line .btn {
+    grid-column: 2 / -1;
+    justify-self: start;
+  }
+}
 </style>

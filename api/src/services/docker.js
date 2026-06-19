@@ -401,6 +401,7 @@ function createDemuxer(onData) {
   let remainingPayload = 0;
   let payloadBuf = Buffer.alloc(0);
   let inPayload = false;
+  let streamType = 'stdout';
 
   return function demux(chunk) {
     let buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
@@ -414,6 +415,7 @@ function createDemuxer(onData) {
         pos += take;
 
         if (headerBuf.length === 8) {
+          streamType = headerBuf[0] === 2 ? 'stderr' : 'stdout';
           remainingPayload = headerBuf.readUInt32BE(4);
           headerBuf = Buffer.alloc(0);
           inPayload = true;
@@ -425,7 +427,7 @@ function createDemuxer(onData) {
         pos += take;
 
         if (payloadBuf.length === remainingPayload) {
-          onData && onData(payloadBuf.toString('utf8'));
+          onData && onData(payloadBuf.toString('utf8'), streamType);
           inPayload = false;
           remainingPayload = 0;
           payloadBuf = Buffer.alloc(0);

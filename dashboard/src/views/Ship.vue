@@ -45,6 +45,9 @@ const deployedSlug = ref('')
 const deployedPort = ref(null)
 const phase = ref('form') // form | building
 const buildResult = ref('')
+const analysis = ref(null)
+const analyzing = ref(false)
+const analysisError = ref('')
 
 // Where the just-shipped system is actually reachable (localhost:port locally).
 const deployedUrl = computed(() => urlFor(deployedSlug.value, deployedPort.value))
@@ -158,6 +161,17 @@ const hostBlocks = computed(() =>
   firstDeploy.value ? hostReadiness.value.filter((r) => r.required && !r.ok) : []
 )
 const planFacts = computed(() => {
+  if (analysis.value) {
+    const a = analysis.value
+    return [
+      { label: 'Detection', value: `${a.projectType}${a.rootFolder && a.rootFolder !== '.' ? ' in ' + a.rootFolder : ''}` },
+      { label: 'Entry point', value: a.entryPoint || 'No explicit entry point detected' },
+      { label: 'Build command', value: a.buildCommand || 'No build command detected' },
+      { label: 'Output folder', value: a.outputFolder || 'Not applicable or detected at build time' },
+      { label: 'Expected port', value: String(a.expectedPort || 3000) },
+      { label: 'Evidence', value: (a.filesUsed || []).length ? a.filesUsed.join(', ') : `${a.fileCount || 0} files inspected` },
+    ]
+  }
   if (!plan.value) {
     return [
       { label: 'Detection', value: 'Waiting for a valid slug' },
@@ -191,6 +205,7 @@ const readiness = computed(() => [
   { label: 'Valid slug & route plan', ok: slugValid.value && !!plan.value && plan.value.valid !== false },
   { label: 'ZIP archive selected', ok: !!file.value },
   { label: 'Within upload limit', ok: archiveWithinLimit.value },
+  { label: 'Archive detection reviewed', ok: !!analysis.value && !(analysis.value.blockers || []).length },
 ])
 const canDeploy = computed(() =>
   readiness.value.every((r) => r.ok) && !hostBlocks.value.length && !planChecking.value && !uploading.value
@@ -199,7 +214,8 @@ const canDeploy = computed(() =>
 function setFile(f) {
   if (!f) return
   if (!/\.zip$/i.test(f.name)) { error.value = 'Please select a .zip archive.'; return }
-  error.value = ''; file.value = f
+  error.value = ''; file.value = f; analysis.value = null; analysisError.value = ''
+  analyzeSelectedArchive()
 }
 function onDrop(e) { dragOver.value = false; setFile(e.dataTransfer.files && e.dataTransfer.files[0]) }
 function onPick(e) { setFile(e.target.files && e.target.files[0]) }
@@ -207,6 +223,22 @@ function fmtSize(n) {
   if (n < 1024) return `${n} B`
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`
   return `${(n / 1024 / 1024).toFixed(1)} MB`
+}
+
+async function analyzeSelectedArchive() {
+  if (!file.value) return
+  analyzing.value = true
+  analysisError.value = ''
+  try {
+    const data = await api.upload('/deploy/analyze', { files: { file: file.value } })
+    analysis.value = data.analysis || null
+    if (analysis.value?.blockers?.length) analysisError.value = analysis.value.blockers.join(' ')
+  } catch (e) {
+    analysis.value = null
+    analysisError.value = e.message || 'Could not analyze archive.'
+  } finally {
+    analyzing.value = false
+  }
 }
 
 async function submit() {
@@ -236,6 +268,7 @@ async function submit() {
 function reset() {
   name.value = ''; slug.value = ''; slugEdited.value = false
   file.value = null; progress.value = 0; deployedSlug.value = ''; deployedPort.value = null
+  analysis.value = null; analysisError.value = ''
   phase.value = 'form'; error.value = ''; visibility.value = 'public'; buildResult.value = ''
   envVarPairs.value = []
 }
@@ -353,11 +386,16 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
         <div class="section-label">Deployment plan</div>
         <div class="plan-note">Dry-run values below are known before upload. Build detection happens after SYSTEMS. extracts the archive.</div>
         <div class="detect-row">
-          <span class="kv"><span class="k">Type</span><span class="v dim">{{ file ? 'auto-detected at build time' : 'choose an archive above' }}</span></span>
+          <span class="kv"><span class="k">Type</span><span class="v dim">{{ analysis ? analysis.projectType : (analyzing ? 'analyzing archive...' : (file ? 'waiting for analysis' : 'choose an archive above')) }}</span></span>
           <span class="kv"><span class="k">Container</span><span class="v mono small">{{ plan ? plan.containerName : (slug ? 'systems-' + slug : 'systems-{slug}') }}</span></span>
           <span class="kv"><span class="k">Network</span><span class="v mono small">systems</span></span>
           <span class="kv"><span class="k">Proxy</span><span class="v dim">{{ plan ? plan.proxy : '—' }}</span></span>
           <span class="kv"><span class="k">Route</span><span class="v dim">{{ plan ? (plan.routePublished ? 'Caddy route generated after upload' : 'none (private)') : '—' }}</span></span>
+        </div>
+        <div v-if="analysisError" class="error-box">{{ analysisError }}</div>
+        <div v-if="analysis?.warnings?.length" class="callout warn" style="margin:0">
+          <div class="co-bar"></div>
+          <div>{{ analysis.warnings.join(' ') }}</div>
         </div>
         <div class="plan-facts">
           <div v-for="fact in planFacts" :key="fact.label" class="plan-fact">

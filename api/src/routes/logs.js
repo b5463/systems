@@ -38,20 +38,20 @@ async function logsRoutes(fastify, options) {
     let logStream = null;
     let closed = false;
 
-    const onData = (chunk) => {
+    const onData = (chunk, stream = 'stdout') => {
       if (closed || socket.readyState !== socket.OPEN) return;
       // chunk may contain multiple lines
       const lines = chunk.split('\n');
       for (const line of lines) {
         if (socket.readyState !== socket.OPEN) break;
-        socket.send(JSON.stringify({ type: 'log', data: line + (line.endsWith('\n') ? '' : '\n') }));
+        socket.send(JSON.stringify({ type: 'log', stream, data: line + (line.endsWith('\n') ? '' : '\n') }));
       }
     };
 
     const onEnd = () => {
       if (closed) return;
       if (socket.readyState === socket.OPEN) {
-        socket.send(JSON.stringify({ type: 'end', message: 'Log stream ended' }));
+        socket.send(JSON.stringify({ type: 'end', reason: 'docker_stream_end', message: 'Docker log stream ended' }));
         socket.close();
       }
     };

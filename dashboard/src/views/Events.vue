@@ -1,16 +1,19 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { api } from '../api/client'
 import SelectMenu from '../components/SelectMenu.vue'
 
+const route = useRoute()
+const router = useRouter()
 const entries = ref([])
 const total = ref(0)
 const loading = ref(true)
 const refreshing = ref(false)
 const lastChecked = ref(null)
 const error = ref('')
-const viewMode = ref(localStorage.getItem('events:view') || 'timeline')
-const page = ref(1)
+const viewMode = ref(String(route.query.view || localStorage.getItem('events:view') || 'timeline'))
+const page = ref(Number(route.query.page) || 1)
 const perPage = 25
 
 const ACTION_LABELS = {
@@ -64,14 +67,15 @@ const severityMenuOptions = [
   { value: 'error', label: 'Failure' },
 ]
 
-const filterCategory = ref('')
-const filterAction = ref('')
-const filterSeverity = ref('')
-const filterTarget = ref('')
-const filterUser = ref('')
-const filterFrom = ref('')
-const filterTo = ref('')
+const filterCategory = ref(String(route.query.category || ''))
+const filterAction = ref(String(route.query.action || ''))
+const filterSeverity = ref(String(route.query.result || ''))
+const filterTarget = ref(String(route.query.target || ''))
+const filterUser = ref(String(route.query.actor || ''))
+const filterFrom = ref(String(route.query.from || ''))
+const filterTo = ref(String(route.query.to || ''))
 let textDebounce = null
+let syncingQuery = false
 
 const filteredActionOptions = computed(() => {
   const base = filterCategory.value ? (ACTION_CATEGORIES[filterCategory.value] || []) : Object.keys(ACTION_LABELS)
@@ -194,6 +198,9 @@ function setDateShortcut(kind) {
     filterFrom.value = isoDate(start)
     filterTo.value = isoDate(now)
   }
+  page.value = 1
+  syncQuery()
+  load()
 }
 
 async function load() {
@@ -226,7 +233,22 @@ function clearFilters() {
   filterCategory.value = ''; filterAction.value = ''; filterSeverity.value = ''
   filterTarget.value = ''; filterUser.value = ''
   filterFrom.value = ''; filterTo.value = ''
-  page.value = 1; load()
+  page.value = 1; syncQuery(); load()
+}
+
+function syncQuery() {
+  if (syncingQuery) return
+  const query = {}
+  if (viewMode.value !== 'timeline') query.view = viewMode.value
+  if (page.value > 1) query.page = String(page.value)
+  if (filterCategory.value) query.category = filterCategory.value
+  if (filterAction.value) query.action = filterAction.value
+  if (filterSeverity.value) query.result = filterSeverity.value
+  if (filterTarget.value.trim()) query.target = filterTarget.value.trim()
+  if (filterUser.value.trim()) query.actor = filterUser.value.trim()
+  if (filterFrom.value) query.from = filterFrom.value
+  if (filterTo.value) query.to = filterTo.value
+  router.replace({ query })
 }
 
 function exportCSV() {
@@ -244,22 +266,41 @@ function exportCSV() {
 
 function goPage(n) {
   if (n < 1 || n > pageCount.value) return
-  page.value = n; load()
+  page.value = n; syncQuery(); load()
 }
 
 watch(filterCategory, () => {
+  if (syncingQuery) return
   if (filterAction.value && filterCategory.value) {
     const allowed = ACTION_CATEGORIES[filterCategory.value] || []
     if (!allowed.includes(filterAction.value)) filterAction.value = ''
   }
-  page.value = 1; load()
+  page.value = 1; syncQuery(); load()
 })
-watch([filterAction, filterSeverity], () => { page.value = 1; load() })
-watch(viewMode, (v) => localStorage.setItem('events:view', v))
+watch([filterAction, filterSeverity], () => { if (syncingQuery) return; page.value = 1; syncQuery(); load() })
+watch(viewMode, (v) => { if (syncingQuery) return; localStorage.setItem('events:view', v); syncQuery() })
 watch([filterTarget, filterUser, filterFrom, filterTo], () => {
+  if (syncingQuery) return
   clearTimeout(textDebounce)
-  textDebounce = setTimeout(() => { page.value = 1; load() }, 300)
+  textDebounce = setTimeout(() => { page.value = 1; syncQuery(); load() }, 300)
 })
+watch(
+  () => route.query,
+  (q) => {
+    syncingQuery = true
+    viewMode.value = String(q.view || localStorage.getItem('events:view') || 'timeline')
+    page.value = Number(q.page) || 1
+    filterCategory.value = String(q.category || '')
+    filterAction.value = String(q.action || '')
+    filterSeverity.value = String(q.result || '')
+    filterTarget.value = String(q.target || '')
+    filterUser.value = String(q.actor || '')
+    filterFrom.value = String(q.from || '')
+    filterTo.value = String(q.to || '')
+    syncingQuery = false
+    load()
+  }
+)
 
 onMounted(load)
 onBeforeUnmount(() => clearTimeout(textDebounce))

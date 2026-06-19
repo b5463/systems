@@ -54,6 +54,12 @@
   --mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
 }
 
+:root.density-compact {
+  --radius: 6px;
+  --radius-sm: 5px;
+  --nav-height: 52px;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -1034,6 +1040,24 @@ select.is-invalid {
   margin: 0 auto;
   padding: 36px clamp(28px, 3.5vw, 56px) 80px;
 }
+
+:root.density-compact body { font-size: 14px; }
+:root.density-compact .content-inner { padding-top: 24px; padding-bottom: 56px; }
+:root.density-compact .card { padding: 12px; }
+:root.density-compact .stack { gap: 10px; }
+:root.density-compact .btn { min-height: 38px; padding-inline: 12px; font-size: 13px; }
+:root.density-compact .btn-sm { min-height: 32px; padding-inline: 10px; font-size: 12.5px; }
+:root.density-compact input,
+:root.density-compact textarea,
+:root.density-compact select { padding: 9px 11px; }
+:root.density-compact .select-trigger { min-height: 38px; }
+:root.density-compact .nav-link { min-height: 38px; padding: 7px 10px; font-size: 13px; }
+:root.density-compact .sidebar-nav { gap: 1px; }
+:root.density-compact .conn-row { padding: 11px 13px; }
+:root.density-compact .metric { padding: 11px 12px; }
+:root.density-compact .metric .m-value { font-size: 20px; }
+:root.density-compact .truth .t-cell { padding: 10px 12px; }
+:root.density-compact .term-wrap { height: 300px; }
 
 @media (min-width: 2200px) {
   :root { --content-max: 2160px; }
