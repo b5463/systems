@@ -242,7 +242,7 @@ onMounted(() => { load(); loadCleanup(); })
     </div>
 
     <!-- Infrastructure (locked target stack) -->
-    <div class=”section-label”>Infrastructure</div>
+    <div class="section-label">Infrastructure</div>
     <div class="card" style="padding:0; margin-bottom: 22px">
       <div class="conn-row">
         <span class="conn-ico"><svg viewBox="0 0 24 24"><rect x="3" y="9" width="4" height="4" /><rect x="8" y="9" width="4" height="4" /><rect x="13" y="9" width="4" height="4" /><path d="M3 16h15a4 4 0 0 0 4-4" /></svg></span>

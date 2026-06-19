@@ -23,8 +23,8 @@
   --text-disabled: #525862;
 
   /* Focus — white glow, matches login identity. Not cyan. */
-  --focus-border: rgba(255, 255, 255, 0.65);
-  --focus-ring: rgba(255, 255, 255, 0.1);
+  --focus-border: rgba(255, 255, 255, 0.92);
+  --focus-ring: rgba(255, 255, 255, 0.14);
 
   /* Accent — decorative use only (logo dot, dropzone drag-over). Never for focus/interaction. */
   --accent: #5fb0d4;
@@ -44,9 +44,9 @@
   --radius-sm: 6px;
   --radius-xs: 4px;
   --nav-height: 56px;
-  --sidebar-width: 256px;
+  --sidebar-width: 260px;
   --sidebar-collapsed: 64px;
-  --content-max: 1320px;
+  --content-max: 1400px;
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-top: env(safe-area-inset-top, 0px);
 
@@ -907,7 +907,6 @@ select.is-invalid {
 .shell {
   min-height: 100vh;
   display: flex;
-  border-top: 1px solid var(--border);
 }
 
 .sidebar {
@@ -943,7 +942,8 @@ select.is-invalid {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 9px 11px;
+  min-height: 44px;
+  padding: 9px 12px;
   border-radius: var(--radius-sm);
   color: var(--text-muted);
   font-size: 14px;
@@ -1095,7 +1095,7 @@ select.is-invalid {
   width: 24px;
   height: 2px;
   border-radius: 0 0 3px 3px;
-  background: var(--accent);
+  background: var(--text);
 }
 
 @media (max-width: 899px) {
@@ -1116,7 +1116,7 @@ select.is-invalid {
   flex-wrap: wrap;
 }
 .page-head h1 {
-  font-size: clamp(1.625rem, 1.4rem + 0.3vw, 2rem);
+  font-size: clamp(1.75rem, 1.5rem + 0.4vw, 2rem);
   font-weight: 700;
   letter-spacing: -0.02em;
   margin: 0;

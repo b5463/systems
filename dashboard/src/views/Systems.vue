@@ -14,6 +14,8 @@ const { showToast } = useToast()
 
 const systems = ref([])
 const loading = ref(true)
+const refreshing = ref(false)
+const loadedAt = ref(null)
 const error = ref('')
 const stats = ref({})
 const server = ref(null)
@@ -25,10 +27,11 @@ async function load(silent = false) {
   // Skip overlapping runs: a slow stats fan-out shouldn't let 5s ticks stack up.
   if (loading_inflight) return
   loading_inflight = true
-  if (!silent) error.value = ''
+  if (!silent) { error.value = ''; refreshing.value = true }
   try {
     const data = await api.get('/projects')
     systems.value = data.projects || []
+    loadedAt.value = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     for (const s of systems.value) {
       const prev = prevStatuses.value[s.slug]
       // Only alert on a genuine crash (running → error); a running → stopped
@@ -47,6 +50,7 @@ async function load(silent = false) {
   } finally {
     loading_inflight = false
     loading.value = false
+    refreshing.value = false
   }
 }
 
@@ -130,7 +134,10 @@ onBeforeUnmount(() => clearInterval(timer))
       </div>
     </div>
     <div class="head-actions">
-      <button class="btn btn-sm btn-ghost" data-refresh @click="load()">Refresh</button>
+      <span v-if="loadedAt && (active.length || deleted.length)" class="small dim" style="align-self:center">Updated {{ loadedAt }}</span>
+      <button class="btn btn-sm btn-ghost" data-refresh :disabled="refreshing" @click="load()">
+        <span v-if="refreshing" class="spinner"></span><span v-else>Refresh</span>
+      </button>
       <RouterLink v-if="active.length || deleted.length" class="btn btn-sm btn-primary" :to="{ name: 'ship' }">Ship a system</RouterLink>
     </div>
   </div>
@@ -147,11 +154,11 @@ onBeforeUnmount(() => clearInterval(timer))
 
   <!-- Empty -->
   <div v-else-if="!active.length && !deleted.length" class="empty-block">
-    <div class="eb-title">No systems yet.</div>
+    <div class="eb-title">Deploy your first system</div>
     <div class="eb-sub">
-      Upload a zip and SYSTEMS. builds it, routes it, and puts it live at <span class="mono">slug.{{ BASE_DOMAIN }}</span> over HTTPS.
+      Upload a ZIP containing a static, Vue/Vite, Node.js or Dockerfile project. SYSTEMS. validates the deployment plan before publishing it at <span class="mono">slug.{{ BASE_DOMAIN }}</span> over HTTPS.
     </div>
-    <div class="eb-actions"><RouterLink class="btn btn-primary" :to="{ name: 'ship' }">Ship your first system</RouterLink></div>
+    <div class="eb-actions"><RouterLink class="btn btn-primary" :to="{ name: 'ship' }">Prepare deployment</RouterLink></div>
   </div>
 
   <template v-else>

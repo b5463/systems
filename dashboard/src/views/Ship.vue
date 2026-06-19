@@ -103,6 +103,23 @@ const slugStatus = computed(() => {
   return { tone: 'ok', label: 'Available' }
 })
 
+// Effective upload limit (in MB) — single authoritative value from the server.
+const effectiveMaxMb = computed(() => largeUploads.value ? v2UploadMaxMb.value : uploadMaxMb.value)
+const archiveWithinLimit = computed(() =>
+  !file.value || file.value.size <= effectiveMaxMb.value * 1024 * 1024
+)
+
+// Deployment readiness — each gate the deploy depends on, surfaced as a checklist.
+const readiness = computed(() => [
+  { label: 'System name', ok: !!name.value.trim() },
+  { label: 'Valid slug & route plan', ok: slugValid.value && !!plan.value && plan.value.valid !== false },
+  { label: 'ZIP archive selected', ok: !!file.value },
+  { label: 'Within upload limit', ok: archiveWithinLimit.value },
+])
+const canDeploy = computed(() =>
+  readiness.value.every((r) => r.ok) && !planChecking.value && !uploading.value
+)
+
 function setFile(f) {
   if (!f) return
   if (!/\.zip$/i.test(f.name)) { error.value = 'Please select a .zip archive.'; return }
@@ -244,15 +261,15 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
         <div class="dropzone" :class="{ over: dragOver, 'has-file': !!file }" @click="fileInput && fileInput.click()" @dragover.prevent="dragOver = true" @dragleave.prevent="dragOver = false" @drop.prevent="onDrop">
           <svg class="dz-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5" /><path d="M3 19h18" /></svg>
           <div v-if="file"><strong style="font-size: 15px">{{ file.name }}</strong><div class="small dim">{{ fmtSize(file.size) }} · click to change</div></div>
-          <div v-else><strong>Drop a .zip to ship</strong><div class="small dim">or click to choose a file</div></div>
+          <div v-else><strong>Drop a ZIP archive</strong><div class="small dim">or click to choose a file</div></div>
           <input ref="fileInput" type="file" accept=".zip,application/zip" style="display:none" @change="onPick" />
         </div>
-        <div v-if="willChunk" class="hint">Large archive — streaming in chunks (up to {{ v2UploadMaxMb }} MB).</div>
-        <div v-else-if="largeUploads" class="hint">Archives over {{ uploadMaxMb }} MB stream in chunks (up to {{ v2UploadMaxMb }} MB).</div>
+        <div v-if="willChunk" class="hint">Large archive — streaming in chunks (limit {{ effectiveMaxMb }} MB).</div>
+        <div v-else class="hint">Upload limit {{ effectiveMaxMb }} MB.<template v-if="largeUploads"> Archives over {{ uploadMaxMb }} MB stream in chunks.</template></div>
       </div>
 
       <div class="card stack">
-        <div class="section-label">Detection &amp; plan</div>
+        <div class="section-label">Deployment plan</div>
         <div class="detect-row">
           <span class="kv"><span class="k">Type</span><span class="v dim">{{ file ? 'auto-detected at build time' : 'choose an archive above' }}</span></span>
           <span class="kv"><span class="k">Container</span><span class="v mono small">{{ plan ? plan.containerName : (slug ? 'systems-' + slug : 'systems-{slug}') }}</span></span>
@@ -274,15 +291,20 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
             <span v-if="i < LIFECYCLE.length - 1" class="lc-link"></span>
           </template>
         </div>
+        <ul class="readiness">
+          <li v-for="r in readiness" :key="r.label" :class="{ ok: r.ok }">
+            <span class="rd-mark" aria-hidden="true">{{ r.ok ? '✓' : '○' }}</span>{{ r.label }}
+          </li>
+        </ul>
         <div v-if="error" class="error-box">{{ error }}</div>
         <div v-if="uploading" class="stack">
           <div class="progress"><span :style="{ width: progress + '%' }"></span></div>
           <div class="small muted center">{{ willChunk ? 'Streaming' : 'Uploading' }}… {{ progress }}%</div>
         </div>
-        <button class="btn btn-primary btn-block" type="submit" :disabled="uploading || !file || (plan && plan.valid === false)">
+        <button class="btn btn-primary btn-block" type="submit" :disabled="!canDeploy">
           <span v-if="uploading" class="spinner"></span><span v-else>Deploy system</span>
         </button>
-        <div class="hint">Build progress streams into the log after upload.</div>
+        <div class="hint">{{ canDeploy ? 'Build progress streams into the log after upload.' : 'Complete the checklist above to deploy.' }}</div>
       </div>
     </div>
   </form>
@@ -312,4 +334,9 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
 .env-val { flex: 1; min-width: 0; font-family: var(--mono); font-size: 13px; }
 .env-remove { background: none; border: none; cursor: pointer; color: var(--text-dim); font-size: 18px; line-height: 1; padding: 0 4px; }
 .env-remove:hover { color: var(--danger); }
+.readiness { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.readiness li { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-dim); }
+.readiness li.ok { color: var(--text-muted); }
+.readiness .rd-mark { width: 14px; flex-shrink: 0; text-align: center; color: var(--text-disabled); font-weight: 700; }
+.readiness li.ok .rd-mark { color: var(--ok); }
 </style>

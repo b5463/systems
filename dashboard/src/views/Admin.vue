@@ -12,6 +12,18 @@ const router = useRouter()
 const UPLOAD_MAX_MB = import.meta.env.VITE_UPLOAD_MAX_MB || '100'
 const RELEASE_RETENTION = import.meta.env.VITE_RELEASE_RETENTION || '3'
 
+// Effective limits come from the server, not the build-time env fallback.
+const serverInfo = ref(null)
+async function loadServerInfo() {
+  try { serverInfo.value = await api.get('/server/info') } catch { /* fall back to build-time values */ }
+}
+const uploadLimitMb = computed(() => {
+  const f = serverInfo.value?.features
+  if (f) return f.largeUploads ? f.v2UploadMaxMb : f.uploadMaxMb
+  return serverInfo.value?.platform?.uploadMaxMb ?? UPLOAD_MAX_MB
+})
+const releaseRetentionVal = computed(() => serverInfo.value?.platform?.releaseRetention ?? RELEASE_RETENTION)
+
 const loggingOut = ref(false)
 async function logout() {
   loggingOut.value = true
@@ -174,6 +186,14 @@ async function loadUsers() {
 const otherAdmins = computed(() => users.value.filter((u) => u.id !== auth.user?.id))
 const atCap = computed(() => users.value.length >= 2) // two admins max — no public signup
 
+// Security posture summary — surfaced as warnings near the top of the page.
+const securityWarnings = computed(() => {
+  const w = []
+  if (!twoFAEnabled.value) w.push('Two-factor authentication is disabled — anyone with your password can sign in.')
+  if (!usersLoading.value && users.value.length < 2) w.push('Only one administrator exists — add a second so access isn’t tied to one login.')
+  return w
+})
+
 const newUsername = ref('')
 const newUserPassword = ref('')
 const addingUser = ref(false)
@@ -212,12 +232,23 @@ async function deleteUser(u) {
   }
 }
 
-onMounted(loadUsers)
+onMounted(() => { loadUsers(); loadServerInfo() })
 </script>
 
 <template>
   <div class="page-head">
     <h1>Admin</h1>
+  </div>
+
+  <!-- Security posture summary -->
+  <div v-if="securityWarnings.length" class="callout warn" style="margin-bottom:20px; flex-direction:column; gap:8px">
+    <div class="row gap-sm" style="align-items:center">
+      <div class="co-bar" style="width:3px; align-self:stretch"></div>
+      <strong style="font-size:13px; color:var(--warn)">Security checklist</strong>
+    </div>
+    <ul style="margin:0; padding-left:18px; display:flex; flex-direction:column; gap:4px">
+      <li v-for="w in securityWarnings" :key="w" class="small">{{ w }}</li>
+    </ul>
   </div>
 
   <div class="grid grid-2" style="align-items:start">
@@ -411,10 +442,10 @@ onMounted(loadUsers)
       <!-- Limits & retention -->
       <div class="card stack">
         <div class="section-label">Limits &amp; retention</div>
-        <div class="kv"><span class="k">Max upload size</span><span class="v mono">{{ UPLOAD_MAX_MB }} MB</span></div>
-        <div class="kv"><span class="k">Release retention</span><span class="v mono">{{ RELEASE_RETENTION }} releases</span></div>
+        <div class="kv"><span class="k">Max upload size</span><span class="v mono">{{ uploadLimitMb }} MB</span></div>
+        <div class="kv"><span class="k">Release retention</span><span class="v mono">{{ releaseRetentionVal }} releases</span></div>
         <div class="hint">
-          Configured in <span class="mono">.env</span>. Per-system overrides are planned.
+          Effective values reported by the server. Configured in <span class="mono">.env</span>.
         </div>
       </div>
 
