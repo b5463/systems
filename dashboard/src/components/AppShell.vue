@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, onMounted, watch } from 'vue'
+import { computed, ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { api } from '../api/client'
@@ -7,6 +7,7 @@ import { BASE_DOMAIN } from '../config'
 import SystemsLogo from './SystemsLogo.vue'
 import NavIcon from './NavIcon.vue'
 import KeyboardShortcuts from './KeyboardShortcuts.vue'
+import CommandPalette from './CommandPalette.vue'
 
 const auth = useAuthStore()
 const route = useRoute()
@@ -40,6 +41,13 @@ onMounted(() => {
   compactDensity.value = localStorage.getItem('density') === 'compact'
   document.documentElement.classList.toggle('density-compact', compactDensity.value)
   loadHealth()
+  // The command palette drives these via events so it doesn't need shell state.
+  window.addEventListener('app:toggle-sidebar', toggleSidebar)
+  window.addEventListener('app:toggle-density', toggleDensity)
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('app:toggle-sidebar', toggleSidebar)
+  window.removeEventListener('app:toggle-density', toggleDensity)
 })
 watch(sidebarCollapsed, v => localStorage.setItem('sb-col', v ? '1' : ''))
 watch(compactDensity, v => {
@@ -166,6 +174,7 @@ async function loadHealth() {
     </nav>
 
     <KeyboardShortcuts />
+    <CommandPalette />
   </div>
 </template>
 

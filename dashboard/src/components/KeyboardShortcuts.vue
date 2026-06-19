@@ -93,6 +93,7 @@ onBeforeUnmount(() => {
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
             </button>
           </div>
+          <div class="ks-row"><span>Command palette</span><span><kbd>Ctrl</kbd> <kbd>K</kbd></span></div>
           <div class="ks-row"><span>Focus search</span><kbd>/</kbd></div>
           <div class="ks-row"><span>Refresh the list</span><kbd>r</kbd></div>
           <div class="ks-row"><span>Go to Systems</span><span><kbd>g</kbd> then <kbd>s</kbd></span></div>
