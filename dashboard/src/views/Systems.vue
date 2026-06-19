@@ -68,6 +68,51 @@ function detailLink(s, tab = 'Overview') {
   }
 }
 
+/* ---------- Bulk selection (P2 #7) ---------- */
+const selectMode = ref(false)
+const selected = ref([])           // slugs (survives the 5s auto-refresh)
+const bulkBusy = ref('')           // '' | 'stop' | 'restart' | 'delete'
+const confirmBulkDelete = ref(false)
+function isSelected(slug) { return selected.value.includes(slug) }
+function toggleSelect(slug) {
+  selected.value = isSelected(slug) ? selected.value.filter((s) => s !== slug) : [...selected.value, slug]
+}
+function enterSelect() { selectMode.value = true }
+function exitSelect() { selectMode.value = false; selected.value = []; confirmBulkDelete.value = false }
+// In selection mode a card click toggles selection; otherwise it opens the system.
+function cardClick(s) { if (selectMode.value) toggleSelect(s.slug); else open(s) }
+const selectedSystems = computed(() => active.value.filter((s) => selected.value.includes(s.slug)))
+const bulkStoppable = computed(() => selectedSystems.value.filter((s) => s.status === 'running').length)
+const bulkRestartable = computed(() => selectedSystems.value.filter((s) => s.status === 'running' || isCrashed(s)).length)
+
+async function bulkRun(action) {
+  const targets = selectedSystems.value.filter((s) =>
+    action === 'restart' ? (s.status === 'running' || isCrashed(s)) : s.status === 'running'
+  )
+  if (!targets.length) return
+  bulkBusy.value = action
+  const results = await Promise.allSettled(targets.map((s) => api.post(`/projects/${s.slug}/${action}`)))
+  const ok = results.filter((r) => r.status === 'fulfilled').length
+  const failed = results.length - ok
+  showToast(`${action === 'stop' ? 'Stopped' : 'Restarted'} ${ok}${failed ? ` · ${failed} failed` : ''}`, failed ? 'error' : 'ok')
+  bulkBusy.value = ''
+  exitSelect()
+  load()
+}
+
+async function bulkDelete() {
+  const targets = [...selectedSystems.value]
+  if (!targets.length) return
+  bulkBusy.value = 'delete'
+  const results = await Promise.allSettled(targets.map((s) => api.del(`/projects/${s.slug}`)))
+  const ok = results.filter((r) => r.status === 'fulfilled').length
+  const failed = results.length - ok
+  showToast(`Deleted ${ok}${failed ? ` · ${failed} failed` : ''}`, failed ? 'error' : 'ok')
+  bulkBusy.value = ''
+  exitSelect()
+  load()
+}
+
 const active = computed(() => systems.value.filter((s) => s.status !== 'deleted'))
 const deleted = computed(() => systems.value.filter((s) => s.status === 'deleted'))
 
@@ -234,14 +279,18 @@ onBeforeUnmount(() => clearInterval(timer))
     <!-- All systems -->
     <div class="spread" style="margin-bottom:10px; gap:10px; flex-wrap:wrap">
       <div class="section-label" style="margin:0">All systems · {{ active.length }}</div>
-      <div v-if="active.length > 4" class="row gap-sm" style="flex-wrap:wrap">
-        <input v-model="query" class="sys-search" type="search" placeholder="Search name or slug" aria-label="Search systems" autocapitalize="none" autocorrect="off" />
-        <SelectMenu v-model="sortBy" :options="sortOptions" placeholder="Sort" style="width:140px" />
+      <div class="row gap-sm" style="flex-wrap:wrap">
+        <button v-if="active.length" class="btn btn-sm btn-ghost" @click="selectMode ? exitSelect() : enterSelect()">{{ selectMode ? 'Cancel' : 'Select' }}</button>
+        <template v-if="active.length > 4">
+          <input v-model="query" class="sys-search" type="search" placeholder="Search name or slug" aria-label="Search systems" autocapitalize="none" autocorrect="off" />
+          <SelectMenu v-model="sortBy" :options="sortOptions" placeholder="Sort" style="width:140px" />
+        </template>
       </div>
     </div>
     <div v-if="!visibleSystems.length" class="muted small" style="margin-bottom:18px">{{ query.trim() ? `No systems match “${query}”.` : 'No active systems.' }}</div>
     <div class="grid grid-auto">
-      <div v-for="s in visibleSystems" :key="s.id" class="card card-tap sys-card" role="button" tabindex="0" :aria-label="`Open ${s.name}`" @click="open(s)" @keydown.enter="open(s)" @keydown.space.prevent="open(s)">
+      <div v-for="s in visibleSystems" :key="s.id" class="card card-tap sys-card" :class="{ 'sys-selectable': selectMode, 'sys-selected': selectMode && isSelected(s.slug) }" role="button" tabindex="0" :aria-label="selectMode ? `Select ${s.name}` : `Open ${s.name}`" :aria-pressed="selectMode ? isSelected(s.slug) : null" @click="cardClick(s)" @keydown.enter="cardClick(s)" @keydown.space.prevent="cardClick(s)">
+        <span v-if="selectMode" class="sys-check" :class="{ on: isSelected(s.slug) }" aria-hidden="true">✓</span>
         <div class="sc-top">
           <div style="min-width:0">
             <div class="sc-name">{{ s.name }}</div>
@@ -278,6 +327,32 @@ onBeforeUnmount(() => clearInterval(timer))
         </div>
       </div>
     </template>
+
+    <!-- Bulk action bar (selection mode) -->
+    <div v-if="selectMode" class="bulk-bar">
+      <template v-if="confirmBulkDelete">
+        <span class="small">Delete {{ selected.length }} system{{ selected.length === 1 ? '' : 's' }}? Containers and routes are removed; records are kept until purged.</span>
+        <div class="row gap-sm">
+          <button class="btn btn-sm btn-ghost" :disabled="!!bulkBusy" @click="confirmBulkDelete = false">Cancel</button>
+          <button class="btn btn-sm btn-danger" :disabled="!!bulkBusy" @click="bulkDelete">
+            <span v-if="bulkBusy === 'delete'" class="spinner"></span><span v-else>Delete {{ selected.length }}</span>
+          </button>
+        </div>
+      </template>
+      <template v-else>
+        <span class="small">{{ selected.length }} selected</span>
+        <div class="row gap-sm" style="flex-wrap:wrap">
+          <button class="btn btn-sm" :disabled="!bulkStoppable || !!bulkBusy" @click="bulkRun('stop')">
+            <span v-if="bulkBusy === 'stop'" class="spinner"></span><span v-else>Stop{{ bulkStoppable ? ` (${bulkStoppable})` : '' }}</span>
+          </button>
+          <button class="btn btn-sm" :disabled="!bulkRestartable || !!bulkBusy" @click="bulkRun('restart')">
+            <span v-if="bulkBusy === 'restart'" class="spinner"></span><span v-else>Restart{{ bulkRestartable ? ` (${bulkRestartable})` : '' }}</span>
+          </button>
+          <button class="btn btn-sm btn-danger" :disabled="!selected.length || !!bulkBusy" @click="confirmBulkDelete = true">Delete</button>
+          <button class="btn btn-sm btn-ghost" :disabled="!!bulkBusy" @click="exitSelect">Done</button>
+        </div>
+      </template>
+    </div>
   </template>
 </template>
 
@@ -292,6 +367,44 @@ onBeforeUnmount(() => clearInterval(timer))
 .server-mini { display: flex; flex-direction: column; gap: 9px; font-size: 13px; color: var(--text-muted); }
 .server-mini span { display: inline-flex; align-items: center; gap: 8px; }
 .server-mini .sdot { width: 8px; height: 8px; border-radius: 50%; }
+
+/* Bulk selection */
+.sys-card { position: relative; }
+.sys-selectable { border-color: var(--border); }
+.sys-selected { border-color: var(--focus-border); box-shadow: 0 0 0 1px var(--focus-border) inset; }
+.sys-check {
+  position: absolute;
+  top: 10px; right: 10px;
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; line-height: 1;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-input);
+  color: transparent;
+}
+.sys-check.on { background: var(--ok); border-color: var(--ok); color: #06140b; }
+.bulk-bar {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 20px;
+  z-index: 45;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: calc(100vw - 32px);
+  padding: 10px 14px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.5);
+}
+@media (max-width: 899px) {
+  .bulk-bar { bottom: calc(var(--nav-height) + var(--safe-bottom) + 12px); }
+}
 
 .attention-grid {
   display: grid;
