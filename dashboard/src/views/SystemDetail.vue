@@ -9,7 +9,7 @@ import ExecTerminal from '../components/ExecTerminal.vue'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 import SystemSettings from '../components/SystemSettings.vue'
 import { useToast } from '../composables/useToast'
-import { hostFor, urlFor } from '../config'
+import { hostFor, urlFor, LOCAL_MODE } from '../config'
 import { fmtDateTime } from '../utils/date'
 import { isCrashed } from '../utils/status'
 
@@ -77,6 +77,23 @@ const rollingBack = ref(false)
 const publicHost = computed(() => (system.value ? hostFor(system.value.slug, system.value.port) : ''))
 const publicUrl = computed(() => (system.value ? urlFor(system.value.slug, system.value.port) : '#'))
 const isRunning = computed(() => system.value?.status === 'running')
+
+// Capability model: which actions can actually succeed in the current state.
+// Drives the action matrix so we never offer an action that cannot work
+// (e.g. Start/Restart/Open/Check-health on a failed build with no container).
+const isBuilding = computed(() => system.value?.status === 'building')
+const isFailedBuild = computed(() => system.value?.status === 'error' && !system.value?.image_id)
+const hasContainer = computed(() => !!system.value?.image_id) // built at least once
+const canStart = computed(() => !!system.value && system.value.status === 'stopped' && !acting.value)
+const canStop = computed(() => isRunning.value && !acting.value)
+// Restart needs an existing container image (running or a stopped/crashed one).
+const canRestart = computed(() => (isRunning.value || (system.value?.status === 'error' && hasContainer.value)) && !acting.value)
+const canRedeploy = computed(() => !!system.value && !isBuilding.value && !redeploying.value)
+const canRollback = computed(() => !!system.value?.previous_image_id && !isBuilding.value && !rollingBack.value)
+// Health probes the public endpoint — only meaningful for a running, non-private system.
+const canHealthCheck = computed(() => isRunning.value && (system.value?.visibility !== 'private') && !checkingHealth.value)
+// Open only when there's a usable endpoint: a published route, or local testing (host port).
+const canOpen = computed(() => isRunning.value && (!!system.value?.route_published || LOCAL_MODE))
 
 /* ---- Truth model ---- */
 const truth = computed(() => {
@@ -314,11 +331,12 @@ onBeforeUnmount(() => {
           <StatusBadge :project="system" />
         </div>
         <h1 style="margin-top:10px">{{ system.name }}</h1>
-        <a class="mono small" :href="publicUrl" target="_blank" rel="noopener">{{ publicHost }}</a>
+        <a v-if="canOpen" class="mono small" :href="publicUrl" target="_blank" rel="noopener">{{ publicHost }}</a>
+        <span v-else class="mono small dim">{{ publicHost }}</span>
       </div>
       <div class="head-actions">
-        <button class="btn btn-sm btn-ghost" @click="copyUrl">Copy URL</button>
-        <a class="btn btn-sm" :href="publicUrl" target="_blank" rel="noopener">Open</a>
+        <button v-if="canOpen" class="btn btn-sm btn-ghost" @click="copyUrl">Copy URL</button>
+        <a v-if="canOpen" class="btn btn-sm" :href="publicUrl" target="_blank" rel="noopener">Open</a>
       </div>
     </div>
 
@@ -344,11 +362,12 @@ onBeforeUnmount(() => {
           </div>
           <div class="row gap-sm flex-wrap">
             <button class="btn btn-sm" @click="selectTab('Logs')">View logs</button>
-            <button v-if="isCrashed(system)" class="btn btn-sm" :disabled="!!acting" @click="lifecycle('restart')">Restart</button>
+            <button v-if="canRestart" class="btn btn-sm" :disabled="!!acting" @click="lifecycle('restart')">Restart</button>
             <button class="btn btn-sm" :disabled="redeploying" @click="pickRedeploy">Redeploy…</button>
-            <button v-if="system.previous_image_id" class="btn btn-sm" :disabled="rollingBack" @click="doRollback">
+            <button v-if="canRollback" class="btn btn-sm" :disabled="rollingBack" @click="doRollback">
               <span v-if="rollingBack" class="spinner"></span><span v-else>Roll back</span>
             </button>
+            <button class="btn btn-sm" @click="selectTab('Settings')">Edit configuration</button>
           </div>
         </div>
       </div>
@@ -371,32 +390,34 @@ onBeforeUnmount(() => {
       <div>
         <div class="section-label">Actions</div>
 
-        <div class="action-group">
+        <!-- For error/building states the contextual callout above is the action
+             surface; here we only show actions that can succeed right now. -->
+        <div v-if="system.status !== 'error' && !isBuilding" class="action-group">
           <div class="ag-label">Primary</div>
           <div class="btn-row">
-            <button v-if="!isRunning" class="btn btn-primary" :disabled="!!acting || system.status === 'building'" @click="lifecycle('start')">
+            <button v-if="canStart" class="btn btn-primary" :disabled="!!acting" @click="lifecycle('start')">
               <span v-if="acting === 'start'" class="spinner"></span><span v-else>Start</span>
             </button>
-            <button v-else class="btn" :disabled="!!acting" @click="lifecycle('stop')">
+            <button v-if="canStop" class="btn" :disabled="!!acting" @click="lifecycle('stop')">
               <span v-if="acting === 'stop'" class="spinner"></span><span v-else>Stop</span>
             </button>
-            <button class="btn" :disabled="redeploying" title="Upload a new .zip — it builds and replaces the running container" @click="pickRedeploy">
+            <button class="btn" :disabled="!canRedeploy" title="Upload a new .zip — it builds and replaces the running container" @click="pickRedeploy">
               <span v-if="redeploying" class="spinner"></span><span v-else>Redeploy…</span>
             </button>
           </div>
           <div class="hint">Redeploy uploads a new <span class="mono">.zip</span>; the previous release is kept for rollback.</div>
         </div>
 
-        <div class="action-group">
+        <div v-if="system.status !== 'error' && !isBuilding && (canRestart || canRollback || canHealthCheck)" class="action-group">
           <div class="ag-label">Secondary</div>
           <div class="btn-row">
-            <button class="btn" :disabled="!!acting || system.status === 'building'" @click="lifecycle('restart')">
+            <button v-if="canRestart" class="btn" :disabled="!!acting" @click="lifecycle('restart')">
               <span v-if="acting === 'restart'" class="spinner"></span><span v-else>Restart</span>
             </button>
-            <button v-if="system.previous_image_id" class="btn" :disabled="rollingBack" @click="doRollback">
+            <button v-if="canRollback" class="btn" :disabled="rollingBack" @click="doRollback">
               <span v-if="rollingBack" class="spinner"></span><span v-else>Roll back</span>
             </button>
-            <button v-if="system.visibility !== 'private'" class="btn" :disabled="checkingHealth" @click="runHealthCheck">
+            <button v-if="canHealthCheck" class="btn" :disabled="checkingHealth" @click="runHealthCheck">
               <span v-if="checkingHealth" class="spinner"></span><span v-else>Check health</span>
             </button>
           </div>
@@ -407,6 +428,7 @@ onBeforeUnmount(() => {
           <div class="btn-row">
             <button class="btn btn-danger" @click="openDelete">Delete system</button>
           </div>
+          <div class="hint">Deleting stops and removes the container and route. The deployment record is kept until you purge it.</div>
         </div>
       </div>
 
@@ -415,7 +437,7 @@ onBeforeUnmount(() => {
       <!-- Metadata -->
       <div class="card">
         <div v-if="isRunning && overviewStat" class="kv"><span class="k">CPU / RAM</span><span class="v mono">{{ (overviewStat.cpu_percent ?? 0).toFixed(1) }}% · {{ (overviewStat.memory_mb ?? 0).toFixed(0) }} MB</span></div>
-        <div class="kv"><span class="k">Port</span><span class="v mono">{{ system.port ?? '–' }}</span></div>
+        <div class="kv"><span class="k">{{ hasContainer ? 'Port' : 'Planned port' }}</span><span class="v mono">{{ system.port ?? '–' }}</span></div>
         <div class="kv"><span class="k">Container</span><span class="v mono small">{{ system.container_id ? String(system.container_id).slice(0,12) : '–' }}</span></div>
         <div class="kv"><span class="k">Image</span><span class="v mono small">{{ system.image_id ? String(system.image_id).replace('sha256:','').slice(0,12) : '–' }}</span></div>
         <div class="kv"><span class="k">Created</span><span class="v small">{{ fmtDateTime(system.created_at) }}</span></div>
