@@ -182,12 +182,18 @@ async function serverRoutes(fastify, options) {
     return { ok: true, path: result.path, pruned: result.pruned };
   });
 
-  // Disk-cleanup preview: what would be removed without touching anything.
+  // Disk-cleanup preview: orphaned images/releases + a Docker storage breakdown
+  // (build cache, dangling layers, stopped containers) so the page always shows
+  // a concrete reclaim target, not just "0 images".
   fastify.get('/api/server/cleanup/preview', {
     preHandler: [fastify.authenticate],
   }, async () => {
     const diskhygiene = require('../services/diskhygiene');
-    return diskhygiene.previewCleanup();
+    const [preview, storage] = await Promise.all([
+      diskhygiene.previewCleanup(),
+      diskhygiene.storageBreakdown(),
+    ]);
+    return { ...preview, storage };
   });
 
   // Run disk cleanup: remove unreferenced managed images + orphaned release dirs.
@@ -200,6 +206,20 @@ async function serverRoutes(fastify, options) {
     const result = await diskhygiene.runCleanup();
     auditLog({ user_id: request.user.id, action: 'disk_cleanup', ip: request.ip,
       detail: `images:${result.imagesPruned} releases:${result.releasesPruned} ~${result.imagesSizeMb}MB` });
+    return result;
+  });
+
+  // Reclaim Docker space: stopped containers, dangling images, build cache.
+  // Never removes volumes (they may hold app data).
+  fastify.post('/api/server/cleanup/prune', {
+    preHandler: [fastify.authenticate],
+    config: { rateLimit: { max: 3, timeWindow: '1 minute' } },
+  }, async (request, reply) => {
+    const diskhygiene = require('../services/diskhygiene');
+    const { auditLog } = require('../db');
+    const result = await diskhygiene.pruneSystem();
+    auditLog({ user_id: request.user.id, action: 'disk_cleanup', ip: request.ip,
+      detail: `prune ~${result.reclaimedMb}MB` });
     return result;
   });
 

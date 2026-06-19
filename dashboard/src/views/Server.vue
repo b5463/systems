@@ -113,6 +113,38 @@ async function doCleanup() {
   }
 }
 
+const pruning = ref(false)
+const pruneMsg = ref('')
+async function doPrune() {
+  pruneMsg.value = ''
+  pruning.value = true
+  try {
+    const result = await api.post('/server/cleanup/prune')
+    pruneMsg.value = result.reclaimedMb
+      ? `Reclaimed ~${result.reclaimedMb} MB (stopped containers, dangling images, build cache).`
+      : 'Nothing to reclaim.'
+    await loadCleanup()
+  } catch (e) {
+    pruneMsg.value = e.message || 'Prune failed.'
+  } finally {
+    pruning.value = false
+  }
+}
+
+const diagCopied = ref(false)
+async function copyDiag() {
+  try {
+    await navigator.clipboard.writeText('docker system df -v')
+    diagCopied.value = true
+    setTimeout(() => { diagCopied.value = false }, 1500)
+  } catch { /* clipboard unavailable */ }
+}
+const reclaimableMb = computed(() => {
+  const s = cleanupInfo.value?.storage
+  if (!s) return 0
+  return (s.buildCacheMb || 0) + (s.danglingImagesMb || 0) + (s.unusedVolumesMb || 0)
+})
+
 const testingNotify = ref(false)
 const notifyMsg = ref('')
 async function testNotify() {
@@ -368,6 +400,13 @@ onMounted(() => { load(); loadCleanup(); })
     <!-- Disk cleanup -->
     <div v-if="cleanupInfo" class="section-label">Disk cleanup</div>
     <div v-if="cleanupInfo" class="card stack" style="margin-bottom: 22px">
+      <!-- Docker storage breakdown — shows where space is actually used -->
+      <template v-if="cleanupInfo.storage && cleanupInfo.storage.available">
+        <div class="kv"><span class="k">Build cache (reclaimable)</span><span class="v mono">~{{ cleanupInfo.storage.buildCacheMb }} MB</span></div>
+        <div class="kv"><span class="k">Dangling image layers</span><span class="v mono">~{{ cleanupInfo.storage.danglingImagesMb }} MB</span></div>
+        <div class="kv"><span class="k">Stopped containers</span><span class="v mono">{{ cleanupInfo.storage.stoppedContainers }}</span></div>
+        <div v-if="cleanupInfo.storage.unusedVolumesMb > 0" class="kv"><span class="k">Unused volumes</span><span class="v mono">~{{ cleanupInfo.storage.unusedVolumesMb }} MB <span class="dim">(kept — may hold data)</span></span></div>
+      </template>
       <div class="kv">
         <span class="k">Orphaned images</span>
         <span class="v mono">{{ cleanupInfo.images.count }} image{{ cleanupInfo.images.count !== 1 ? 's' : '' }}
@@ -378,19 +417,28 @@ onMounted(() => { load(); loadCleanup(); })
         <span class="k">Orphaned release dirs</span>
         <span class="v mono">{{ cleanupInfo.releases.count }}</span>
       </div>
-      <div class="hint">Images no longer referenced by any system (current or rollback) are safe to remove. Rollback targets are always kept.</div>
-      <div class="row gap-sm" style="align-items:center">
+      <div class="hint">Reclaim removes stopped containers, dangling layers and build cache. Rollback images and volumes are always kept.</div>
+      <div class="row gap-sm flex-wrap" style="align-items:center">
+        <button
+          class="btn btn-sm btn-primary"
+          :disabled="pruning || (reclaimableMb === 0 && (!cleanupInfo.storage || cleanupInfo.storage.stoppedContainers === 0))"
+          @click="doPrune"
+        >
+          <span v-if="pruning" class="spinner"></span>
+          <span v-else>Free up space<template v-if="reclaimableMb > 0"> (~{{ reclaimableMb }} MB)</template></span>
+        </button>
         <button
           class="btn btn-sm"
-          style="align-self:flex-start"
           :disabled="cleaningUp || (cleanupInfo.images.count === 0 && cleanupInfo.releases.count === 0)"
           @click="doCleanup"
         >
           <span v-if="cleaningUp" class="spinner"></span>
-          <span v-else>Clean up now</span>
+          <span v-else>Remove orphans</span>
         </button>
-        <span v-if="cleanupMsg" class="notice" style="margin:0">{{ cleanupMsg }}</span>
+        <button class="btn btn-sm btn-ghost" @click="copyDiag">{{ diagCopied ? 'Copied' : 'Copy diagnostic' }}</button>
       </div>
+      <span v-if="pruneMsg" class="notice" style="margin:0">{{ pruneMsg }}</span>
+      <span v-if="cleanupMsg" class="notice" style="margin:0">{{ cleanupMsg }}</span>
     </div>
 
     <!-- Backup and restore -->

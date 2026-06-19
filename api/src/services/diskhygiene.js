@@ -47,6 +47,56 @@ async function managedImages() {
   );
 }
 
+// Where Docker is actually using disk (read-only). The orphaned-image count is
+// often 0 while build cache / dangling layers hold gigabytes — this surfaces
+// that so "disk critical" always comes with a concrete reclaim target.
+async function storageBreakdown() {
+  const out = { buildCacheMb: 0, danglingImagesMb: 0, stoppedContainers: 0, unusedVolumesMb: 0, available: false };
+  try {
+    const df = await docker.df();
+    out.available = true;
+    if (Array.isArray(df.BuildCache)) {
+      out.buildCacheMb = Math.round(df.BuildCache.filter((b) => !b.InUse).reduce((s, b) => s + (b.Size || 0), 0) / 1048576);
+    }
+    if (Array.isArray(df.Images)) {
+      out.danglingImagesMb = Math.round(df.Images
+        .filter((i) => !i.RepoTags || i.RepoTags.length === 0 || i.RepoTags[0] === '<none>:<none>')
+        .reduce((s, i) => s + (i.Size || 0), 0) / 1048576);
+    }
+    if (Array.isArray(df.Containers)) {
+      out.stoppedContainers = df.Containers.filter((c) => (c.State || '').toLowerCase() !== 'running').length;
+    }
+    if (Array.isArray(df.Volumes)) {
+      out.unusedVolumesMb = Math.round(df.Volumes
+        .filter((v) => v.UsageData && v.UsageData.RefCount === 0)
+        .reduce((s, v) => s + ((v.UsageData && v.UsageData.Size) || 0), 0) / 1048576);
+    }
+  } catch { /* docker unavailable */ }
+  return out;
+}
+
+// Reclaim safe-to-remove Docker space: stopped containers, dangling images, and
+// build cache. Never touches volumes (they may hold app data).
+async function pruneSystem() {
+  const result = { reclaimedMb: 0, errors: [] };
+  try {
+    const c = await docker.pruneContainers();
+    result.reclaimedMb += Math.round((c.SpaceReclaimed || 0) / 1048576);
+  } catch (e) { result.errors.push(`Containers: ${e.message}`); }
+  try {
+    const i = await docker.pruneImages({ filters: { dangling: { true: true } } });
+    result.reclaimedMb += Math.round((i.SpaceReclaimed || 0) / 1048576);
+  } catch (e) { result.errors.push(`Images: ${e.message}`); }
+  try {
+    if (typeof docker.pruneBuilder === 'function') {
+      const b = await docker.pruneBuilder();
+      result.reclaimedMb += Math.round((b.SpaceReclaimed || 0) / 1048576);
+    }
+  } catch (e) { result.errors.push(`Build cache: ${e.message}`); }
+  if (!result.errors.length) delete result.errors;
+  return result;
+}
+
 // Returns how much could be reclaimed without actually removing anything.
 async function previewCleanup() {
   const result = { images: { count: 0, sizeMb: 0 }, releases: { count: 0 } };
@@ -129,4 +179,4 @@ async function runCleanup() {
   };
 }
 
-module.exports = { previewCleanup, runCleanup };
+module.exports = { previewCleanup, runCleanup, storageBreakdown, pruneSystem };
