@@ -13,20 +13,29 @@ const refreshing = ref(false)
 const lastChecked = ref(null)
 const error = ref('')
 const viewMode = ref(String(route.query.view || localStorage.getItem('events:view') || 'timeline'))
+// Whether the view was deliberately chosen (query/localStorage) — if not, the
+// first load defaults to the denser table on desktop once there are many events.
+const viewExplicit = !!(route.query.view || localStorage.getItem('events:view'))
+let firstLoad = true
 const page = ref(Number(route.query.page) || 1)
 const perPage = 25
 
 const ACTION_LABELS = {
-  deploy: 'Shipped system', redeploy: 'Redeployed', redeploy_fail: 'Redeploy failed',
+  deploy: 'Deployed system', deploy_fail: 'Deploy failed', redeploy: 'Redeployed', redeploy_fail: 'Redeploy failed',
   rollback: 'Rolled back', restart: 'Restarted', stop: 'Stopped', start: 'Started',
-  github_push: 'GitHub push deploy',
+  github_push: 'GitHub push deploy', exec_open: 'Console opened',
+  delete: 'Deleted system', purge: 'Purged system',
+  visibility_change: 'Changed visibility', route_publish: 'Published route',
+  repo_set: 'Set repo mapping', primary_set: 'Set root domain', db_provisioned: 'Provisioned database',
+  health_ok: 'Health check passed', health_fail: 'Health check failed',
   login: 'Signed in', login_fail: 'Failed sign-in', login_locked: 'Sign-in locked out',
   logout: 'Signed out', sessions_revoked: 'Signed out other sessions', session_revoked: 'Revoked a session',
   '2fa_enabled': 'Enabled two-factor', '2fa_disabled': 'Disabled two-factor',
-  env_update: 'Updated env vars', delete: 'Deleted system',
+  env_update: 'Updated env vars',
   user_create: 'Added admin', user_delete: 'Removed admin',
   password_change: 'Changed password', password_reset: 'Reset password',
   backup_succeeded: 'Backup succeeded', backup_failed: 'Backup failed',
+  disk_cleanup: 'Disk cleanup', reconcile: 'Status reconciled', build_stuck: 'Build recovered',
   restore_started: 'Restore started', restore_completed: 'Restore completed',
   update_started: 'Update started', update_failed: 'Update failed',
   update_completed: 'Update completed', caddy_validate_failed: 'Caddy config invalid',
@@ -104,13 +113,14 @@ function targetKind(e) {
 function dotClass(action) {
   switch (action) {
     case 'deploy': case 'redeploy': case 'start': case 'restart': case 'login': case '2fa_enabled':
-    case 'github_push': case 'backup_succeeded': case 'update_completed': case 'restore_completed': return 'ok'
+    case 'github_push': case 'route_publish': case 'db_provisioned': case 'health_ok':
+    case 'backup_succeeded': case 'update_completed': case 'restore_completed': return 'ok'
     case 'stop': case 'logout': return 'idle'
-    case 'login_fail': case 'login_locked': case 'delete': case 'user_delete': case 'error':
-    case 'redeploy_fail': case 'backup_failed': case 'update_failed': case 'caddy_validate_failed':
-    case 'docker_unavailable': case 'postgres_unavailable': return 'error'
+    case 'login_fail': case 'login_locked': case 'delete': case 'purge': case 'user_delete': case 'error':
+    case 'deploy_fail': case 'redeploy_fail': case 'health_fail': case 'backup_failed': case 'update_failed':
+    case 'caddy_validate_failed': case 'docker_unavailable': case 'postgres_unavailable': return 'error'
     case 'env_update': case 'rollback': case 'disk_warning': case 'backup_overdue': case 'sessions_revoked':
-    case 'session_revoked': case '2fa_disabled':
+    case 'session_revoked': case '2fa_disabled': case 'visibility_change': case 'primary_set': case 'build_stuck':
     case 'resource_warning': case 'restore_started': case 'update_started': return 'warn'
     default: return 'idle'
   }
@@ -221,6 +231,13 @@ async function load() {
     entries.value = data.entries || []
     total.value = data.total ?? entries.value.length
     lastChecked.value = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    // On a fresh desktop visit with many events, prefer the denser table view.
+    if (firstLoad) {
+      firstLoad = false
+      if (!viewExplicit && total.value > 30 && window.matchMedia('(min-width: 900px)').matches) {
+        viewMode.value = 'table'
+      }
+    }
   } catch (e) {
     if (e.status !== 401) error.value = e.message || 'Failed to load events.'
   } finally {
