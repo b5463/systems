@@ -261,10 +261,18 @@ async function runBuildPipeline(slug, zipPath, extractDir, port, userId, ip, env
     try {
       const r = await proxy.publishRoute({ slug, port, visibility, basicUser: project?.basic_user, basicHash: project?.basic_hash, apex: !!project?.is_primary });
       published = r.published;
-      if (r.reload && r.reload.ok === false && !['no_route', 'caddy_not_found'].includes(r.reload.reason)) {
+      // "no proxy on this host" is an expected local/dev condition, not a warning.
+      const benign = ['no_route', 'caddy_not_found', 'nginx_not_found', 'conf_dir_missing'];
+      if (r.reload && r.reload.ok === false && !benign.includes(r.reload.reason)) {
         appendBuildLog(slug, `[deploy] WARNING: proxy reload reported: ${r.reload.reason}\n`);
       }
-      appendBuildLog(slug, published ? `[deploy] Route published.\n` : `[deploy] No public route (private).\n`);
+      if (published) {
+        appendBuildLog(slug, `[deploy] Route published.\n`);
+      } else if (visibility === 'private') {
+        appendBuildLog(slug, `[deploy] No public route (private system).\n`);
+      } else {
+        appendBuildLog(slug, `[deploy] No public route — reverse proxy not available on this host. The system is running and reachable on its host port (${port}).\n`);
+      }
     } catch (e) {
       appendBuildLog(slug, `[deploy] WARNING: route publish failed: ${e.message}\n`);
     }

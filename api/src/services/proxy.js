@@ -28,7 +28,11 @@ async function publishRoute(o) {
     await nginx.removeProjectRoute(o.slug).catch(() => {});
     return { proxy: 'nginx', published: false };
   }
-  await nginx.addProjectRoute(o.slug, o.port);
+  const r = await nginx.addProjectRoute(o.slug, o.port);
+  if (!r.published) {
+    // No proxy/host path available — report cleanly, don't claim published.
+    return { proxy: 'nginx', published: false, reload: { ok: false, reason: r.reason } };
+  }
   await nginx.reloadNginx();
   return { proxy: 'nginx', published: true };
 }

@@ -231,12 +231,19 @@ async function authRoutes(fastify, options) {
     return { message: 'Other sessions signed out.', token: rotateSoleSession(fastify, updated, request) };
   });
 
-  // Refresh token: rotate the current session's jti, leaving other sessions alone.
+  // Refresh token: re-sign for the SAME session (stable jti). Rotating the jti
+  // here would orphan the token held by other tabs / in-flight requests and
+  // 401 them into a logout, so the session id is kept for the life of the login.
   fastify.post('/api/auth/refresh', {
     preHandler: [fastify.authenticate],
   }, async (request) => {
     const user = db.prepare('SELECT id, username, token_version FROM users WHERE id = ?').get(request.user.id);
-    if (request.user.jti) db.prepare('DELETE FROM sessions WHERE jti = ?').run(request.user.jti);
+    const jti = request.user.jti;
+    if (jti) {
+      db.prepare(`UPDATE sessions SET last_seen_at = datetime('now') WHERE jti = ?`).run(jti);
+      return { token: signToken(fastify, user, jti) };
+    }
+    // Legacy token without a jti — start a tracked session for it.
     return { token: createSession(fastify, user, request) };
   });
 
