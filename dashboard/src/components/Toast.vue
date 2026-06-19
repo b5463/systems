@@ -63,7 +63,7 @@ const { toasts, dismiss, pause, resume } = useToast()
   flex-shrink: 0;
   background: var(--accent);
 }
-.toast-msg { min-width: 0; flex: 1; }
+.toast-msg { min-width: 0; flex: 1; overflow-wrap: anywhere; }
 .toast-x {
   flex-shrink: 0;
   display: inline-flex;
