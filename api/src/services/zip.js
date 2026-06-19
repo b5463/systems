@@ -170,15 +170,21 @@ CMD ["python", "${entryPoint}"]
     await fsp.writeFile(path.join(dirPath, 'nginx.conf'), nginxConf);
 
     // `COPY . html` would otherwise publish secrets/VCS files from the archive.
-    // Keep them out of the build context (nginx.conf stays — it's COPYed first).
-    const dockerignore = `.git\n.gitignore\n.env\n.env.*\nnode_modules\nDockerfile\n.dockerignore\n`;
+    // Keep those out of the build context. NOTE: never list Dockerfile or
+    // .dockerignore here — dockerode builds via the classic Engine API, which
+    // applies .dockerignore to the Dockerfile lookup too, so self-excluding the
+    // Dockerfile makes the daemon fail with "Cannot locate specified Dockerfile".
+    // The build-helper files are instead removed from the web root below.
+    const dockerignore = `.git\n.gitignore\n.env\n.env.*\nnode_modules\n`;
     await fsp.writeFile(path.join(dirPath, '.dockerignore'), dockerignore);
 
     content = `FROM nginx:alpine
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY . /usr/share/nginx/html
-# nginx.conf is needed for the COPY above; drop it from the served web root
-RUN rm -f /usr/share/nginx/html/nginx.conf
+# Drop build-helper files from the served web root (they were needed for COPY).
+RUN rm -f /usr/share/nginx/html/nginx.conf \\
+          /usr/share/nginx/html/Dockerfile \\
+          /usr/share/nginx/html/.dockerignore
 EXPOSE 3000
 CMD ["nginx", "-g", "daemon off;"]
 `;
