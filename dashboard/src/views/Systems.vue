@@ -60,6 +60,13 @@ async function loadServer() {
 
 function tick() { if (document.visibilityState === 'visible') load(true) }
 function open(s) { router.push({ name: 'system-detail', params: { slug: s.slug } }) }
+function detailLink(s, tab = 'Overview') {
+  return {
+    name: 'system-detail',
+    params: { slug: s.slug },
+    query: tab === 'Overview' ? undefined : { tab },
+  }
+}
 
 const active = computed(() => systems.value.filter((s) => s.status !== 'deleted'))
 const deleted = computed(() => systems.value.filter((s) => s.status === 'deleted'))
@@ -165,11 +172,21 @@ onBeforeUnmount(() => clearInterval(timer))
     <!-- Needs attention -->
     <template v-if="needsAttention.length">
       <div class="section-label">Needs attention</div>
-      <div class="callout danger" style="margin-bottom: 20px">
-        <div class="co-bar"></div>
-        <div>
-          {{ needsAttention.length }} system{{ needsAttention.length === 1 ? '' : 's' }} not live —
-          <template v-for="(s, i) in needsAttention" :key="s.slug"><a href="#" @click.prevent="open(s)">{{ s.name }}</a>{{ i < needsAttention.length - 1 ? ', ' : '' }}</template>
+      <div class="attention-grid">
+        <div v-for="s in needsAttention" :key="s.slug" class="card attention-card">
+          <div class="spread" style="align-items:flex-start">
+            <div style="min-width:0">
+              <div class="sc-name">{{ s.name }}</div>
+              <div class="small muted">{{ s.status === 'error' ? (isCrashed(s) ? 'Runtime crashed' : 'Build failed') : 'Stopped' }}</div>
+            </div>
+            <StatusBadge :project="s" />
+          </div>
+          <div v-if="s.last_error" class="attention-error mono small">{{ s.last_error }}</div>
+          <div class="row gap-sm flex-wrap">
+            <RouterLink class="btn btn-sm" :to="detailLink(s)">View failure</RouterLink>
+            <RouterLink v-if="s.container_id" class="btn btn-sm btn-ghost" :to="detailLink(s, 'Logs')">View logs</RouterLink>
+            <RouterLink class="btn btn-sm btn-ghost" :to="detailLink(s, 'Settings')">Settings</RouterLink>
+          </div>
         </div>
       </div>
     </template>
@@ -255,6 +272,25 @@ onBeforeUnmount(() => clearInterval(timer))
 .server-mini { display: flex; flex-direction: column; gap: 9px; font-size: 13px; color: var(--text-muted); }
 .server-mini span { display: inline-flex; align-items: center; gap: 8px; }
 .server-mini .sdot { width: 8px; height: 8px; border-radius: 50%; }
+
+.attention-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.attention-card { display: flex; flex-direction: column; gap: 12px; }
+.attention-error {
+  padding: 8px 10px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 84px;
+  overflow: auto;
+}
 
 .sc-facts {
   display: grid;

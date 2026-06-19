@@ -117,6 +117,11 @@ async function testNotify() {
   }
 }
 
+async function copyDiagnostic(command) {
+  if (!command || !navigator.clipboard) return
+  try { await navigator.clipboard.writeText(command) } catch { /* clipboard unavailable */ }
+}
+
 // Honest status → tone + label. Never invents "online".
 function present(status) {
   switch (status) {
@@ -185,17 +190,17 @@ const criticals = computed(() => {
   const d = info.value.disk
   const b = info.value.backup
   if (d?.status === 'measured' && d.usedPct >= 90) {
-    alerts.push({ level: 'error', message: `Disk is ${d.usedPct}% full — only ${d.freeGb} GB free. Free space before deploying.` })
+    alerts.push({ level: 'error', message: `Disk is ${d.usedPct}% full — only ${d.freeGb} GB free. Free space before deploying.`, next: 'Review cleanup candidates below, then run cleanup if the list is safe.', command: 'docker system df' })
   } else if (d?.status === 'measured' && d.usedPct >= 75) {
-    alerts.push({ level: 'warn', message: `Disk is ${d.usedPct}% full (${d.freeGb} GB free). Consider running disk cleanup.` })
+    alerts.push({ level: 'warn', message: `Disk is ${d.usedPct}% full (${d.freeGb} GB free). Consider running disk cleanup.`, next: 'Check orphaned images and release directories before the next large deploy.', command: 'docker system df' })
   }
   if (b?.status === 'none') {
-    alerts.push({ level: 'warn', message: 'No backups found. Run a backup before deploying to production.' })
+    alerts.push({ level: 'warn', message: 'No backups found. Run a backup before deploying to production.', next: 'Use Back up now, then verify the backup destination contains the new snapshot.' })
   } else if (b?.status === 'overdue') {
-    alerts.push({ level: 'warn', message: `Backup overdue — last backup was ${b.ageHours}h ago (threshold: 168h).` })
+    alerts.push({ level: 'warn', message: `Backup overdue — last backup was ${b.ageHours}h ago (threshold: 168h).`, next: 'Run a fresh backup and check whether the scheduler is enabled on the host.' })
   }
   if (info.value.docker?.status === 'unavailable') {
-    alerts.push({ level: 'error', message: 'Docker is not reachable. Deploys will fail until Docker is running.' })
+    alerts.push({ level: 'error', message: 'Docker is not reachable. Deploys will fail until Docker is running.', next: 'Start Docker Desktop, confirm Linux containers are active, then refresh this page.', command: 'docker version' })
   }
   return alerts
 })
@@ -238,7 +243,11 @@ onMounted(() => { load(); loadCleanup(); })
         <line v-if="alert.level === 'error'" x1="10" y1="9" x2="10" y2="13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
         <circle v-if="alert.level === 'error'" cx="10" cy="15.5" r="0.75" fill="currentColor"/>
       </svg>
-      <span>{{ alert.message }}</span>
+      <div class="alert-body">
+        <strong>{{ alert.message }}</strong>
+        <span v-if="alert.next">{{ alert.next }}</span>
+        <button v-if="alert.command" class="btn btn-sm btn-ghost" @click="copyDiagnostic(alert.command)">Copy diagnostic command</button>
+      </div>
     </div>
 
     <!-- Infrastructure (locked target stack) -->
@@ -414,6 +423,20 @@ onMounted(() => { load(); loadCleanup(); })
 </template>
 
 <style scoped>
+.alert-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.alert-body strong {
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+.alert-body .btn {
+  align-self: flex-start;
+  margin-top: 2px;
+}
 .disk-bar {
   height: 3px;
   background: var(--bg-elevated);

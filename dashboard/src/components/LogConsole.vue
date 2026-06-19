@@ -22,6 +22,8 @@ const wrap = ref(null)
 const status = ref('connecting')
 const errMsg = ref('')
 const noOutput = ref(false)
+const paused = ref(false)
+const hasLog = ref(false)
 
 let term = null
 let fit = null
@@ -31,6 +33,8 @@ let terminalReached = false   // a terminal state was reached — do not reconne
 let reconnects = 0
 let idleTimer = null
 let lastOutputAt = 0
+let logBuffer = ''
+let pausedBuffer = ''
 
 const STATUS_LABEL = {
   connecting: 'Connecting…',
@@ -59,7 +63,14 @@ const theme = {
 
 function writeLine(data) {
   if (!term || data == null) return
-  term.write(String(data).replace(/\r?\n/g, '\r\n'))
+  const text = String(data)
+  logBuffer += text
+  if (text) hasLog.value = true
+  if (paused.value) {
+    pausedBuffer += text
+    return
+  }
+  term.write(text.replace(/\r?\n/g, '\r\n'))
 }
 
 function markOutput() {
@@ -157,8 +168,30 @@ function reconnect() {
   terminalReached = false
   reconnects = 0
   noOutput.value = false
+  paused.value = false
   if (term) term.clear()
+  logBuffer = ''
+  pausedBuffer = ''
+  hasLog.value = false
   connect()
+}
+
+function togglePause() {
+  paused.value = !paused.value
+  if (!paused.value && pausedBuffer) {
+    const text = pausedBuffer
+    pausedBuffer = ''
+    if (term) term.write(text.replace(/\r?\n/g, '\r\n'))
+  }
+}
+
+function clearView() {
+  if (term) term.clear()
+}
+
+async function copyAll() {
+  if (!logBuffer || !navigator.clipboard) return
+  try { await navigator.clipboard.writeText(logBuffer) } catch { /* clipboard unavailable */ }
 }
 
 function doFit() {
@@ -213,7 +246,11 @@ watch(
     terminalReached = false
     reconnects = 0
     noOutput.value = false
+    paused.value = false
     if (term) term.clear()
+    logBuffer = ''
+    pausedBuffer = ''
+    hasLog.value = false
     connect()
   }
 )
@@ -234,7 +271,10 @@ defineExpose({ refit: doFit })
       <span>{{ mode === 'build' ? 'Build log' : 'Live logs' }}</span>
       <div class="row" style="gap: 10px; align-items: center">
         <span class="lc-status"><span class="sdot" :class="statusTone"></span>{{ statusLabel }}</span>
+        <button class="btn btn-sm btn-ghost" @click="togglePause">{{ paused ? 'Resume' : 'Pause' }}</button>
         <button v-if="canReconnect" class="btn btn-sm btn-ghost" @click="reconnect">Reconnect</button>
+        <button class="btn btn-sm btn-ghost" :disabled="!hasLog" @click="copyAll">Copy all</button>
+        <button class="btn btn-sm btn-ghost" @click="clearView">Clear</button>
         <button
           v-if="mode === 'logs'"
           class="iconbtn"
@@ -253,6 +293,7 @@ defineExpose({ refit: doFit })
     <div v-if="noOutput" class="hint" style="margin:0">
       No output for 30s — {{ mode === 'build' ? 'the worker may still be preparing the build.' : 'the container may be idle.' }}
     </div>
+    <div v-if="paused" class="hint" style="margin:0">Paused locally. Incoming output is buffered and will appear when resumed.</div>
     <div ref="wrap" class="term-wrap"></div>
     <div v-if="errMsg" class="error-box">{{ errMsg }}</div>
   </div>

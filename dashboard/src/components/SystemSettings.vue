@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { api } from '../api/client'
 import { BASE_DOMAIN, hostFor } from '../config'
 import CopyButton from './CopyButton.vue'
@@ -24,13 +24,17 @@ onMounted(async () => {
   repoInput.value = props.system.repo || ''
   branchInput.value = props.system.deploy_branch || 'main'
   loadEnv()
+  window.addEventListener('beforeunload', beforeUnload)
 })
+onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
 
 /* Env */
 const envKeys = ref([])
 const envVars = ref([{ key: '', value: '' }])
 const envSaving = ref(false)
 const envMsg = ref('')
+const bulkOpen = ref(false)
+const bulkText = ref('')
 async function loadEnv() {
   try {
     const data = await api.get(`/projects/${props.slug}/env`)
@@ -64,7 +68,31 @@ const envIssues = computed(() => {
   }
   return issues
 })
+const envEmptyValues = computed(() => envVars.value.filter((r) => r.key.trim() && r.value === '').map((r) => r.key.trim()))
 const canSaveEnv = computed(() => envDirty.value && !envIssues.value.length && !envSaving.value)
+function beforeUnload(e) {
+  if (!envDirty.value || envSaving.value) return
+  e.preventDefault()
+  e.returnValue = ''
+}
+function pasteEnvText() {
+  const rows = bulkText.value.split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith('#'))
+    .map((line) => {
+      const eq = line.indexOf('=')
+      if (eq === -1) return null
+      return { key: line.slice(0, eq).trim(), value: line.slice(eq + 1) }
+    })
+    .filter(Boolean)
+  if (!rows.length) {
+    envMsg.value = 'Paste KEY=value lines to import variables.'
+    return
+  }
+  envVars.value = envDirty.value ? [...envVars.value.filter((r) => r.key.trim() || r.value.trim()), ...rows] : rows
+  bulkText.value = ''
+  bulkOpen.value = false
+}
 async function saveEnv() {
   envMsg.value = ''
   const vars = {}
@@ -222,10 +250,21 @@ async function provisionDb() {
       <input v-model="row.value" aria-label="Value" placeholder="Value" autocorrect="off" spellcheck="false" />
       <button class="iconbtn" aria-label="Remove row" title="Remove row" @click="removeEnvRow(i)">✕</button>
     </div>
-    <button class="btn btn-sm" style="align-self:flex-start" @click="addEnvRow">+ Add row</button>
+    <div class="row gap-sm flex-wrap">
+      <button class="btn btn-sm" @click="addEnvRow">+ Add row</button>
+      <button class="btn btn-sm btn-ghost" @click="bulkOpen = !bulkOpen">{{ bulkOpen ? 'Close bulk paste' : 'Paste .env' }}</button>
+    </div>
+    <div v-if="bulkOpen" class="bulk-env">
+      <textarea v-model="bulkText" rows="6" placeholder="KEY=value&#10;ANOTHER=value" spellcheck="false"></textarea>
+      <button class="btn btn-sm" style="align-self:flex-start" @click="pasteEnvText">Import lines</button>
+    </div>
     <ul v-if="envIssues.length" class="env-issues">
       <li v-for="msg in envIssues" :key="msg">{{ msg }}</li>
     </ul>
+    <div v-else-if="envEmptyValues.length" class="callout warn" style="margin:0">
+      <div class="co-bar"></div>
+      <div>Empty values will be saved for: <span class="mono">{{ envEmptyValues.join(', ') }}</span>.</div>
+    </div>
     <div v-else-if="envDirty" class="small" style="color:var(--warn)">Unsaved changes · saving restarts the container and briefly interrupts traffic.</div>
     <div v-if="envMsg" class="notice">{{ envMsg }}</div>
     <button class="btn btn-primary btn-block" :disabled="!canSaveEnv" @click="saveEnv">
@@ -350,5 +389,14 @@ async function provisionDb() {
   gap: 3px;
   font-size: 12.5px;
   color: var(--danger);
+}
+.bulk-env {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.bulk-env textarea {
+  font-family: var(--mono);
+  font-size: 13px;
 }
 </style>

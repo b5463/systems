@@ -157,6 +157,33 @@ const hostReadiness = computed(() => {
 const hostBlocks = computed(() =>
   firstDeploy.value ? hostReadiness.value.filter((r) => r.required && !r.ok) : []
 )
+const planFacts = computed(() => {
+  if (!plan.value) {
+    return [
+      { label: 'Detection', value: 'Waiting for a valid slug' },
+      { label: 'Route effect', value: 'No route plan yet' },
+      { label: 'Build plan', value: file.value ? 'Detected after upload' : 'Choose an archive first' },
+    ]
+  }
+  return [
+    {
+      label: 'Detection',
+      value: file.value
+        ? 'Project type, build command, output folder, and port are detected inside the build worker after upload.'
+        : 'Project detection requires the archive contents.',
+    },
+    {
+      label: 'Route effect',
+      value: plan.value.routePublished
+        ? `A public route will be written for ${plan.value.host}.`
+        : 'No public route will be published; the container runs privately.',
+    },
+    {
+      label: 'Rollback',
+      value: 'First deploy creates the initial release; rollback points start after redeploys.',
+    },
+  ]
+})
 
 // Deployment readiness — each gate the deploy depends on, surfaced as a checklist.
 const readiness = computed(() => [
@@ -324,12 +351,19 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
 
       <div class="card stack">
         <div class="section-label">Deployment plan</div>
+        <div class="plan-note">Dry-run values below are known before upload. Build detection happens after SYSTEMS. extracts the archive.</div>
         <div class="detect-row">
           <span class="kv"><span class="k">Type</span><span class="v dim">{{ file ? 'auto-detected at build time' : 'choose an archive above' }}</span></span>
           <span class="kv"><span class="k">Container</span><span class="v mono small">{{ plan ? plan.containerName : (slug ? 'systems-' + slug : 'systems-{slug}') }}</span></span>
           <span class="kv"><span class="k">Network</span><span class="v mono small">systems</span></span>
           <span class="kv"><span class="k">Proxy</span><span class="v dim">{{ plan ? plan.proxy : '—' }}</span></span>
           <span class="kv"><span class="k">Route</span><span class="v dim">{{ plan ? (plan.routePublished ? 'Caddy route generated after upload' : 'none (private)') : '—' }}</span></span>
+        </div>
+        <div class="plan-facts">
+          <div v-for="fact in planFacts" :key="fact.label" class="plan-fact">
+            <span>{{ fact.label }}</span>
+            <strong>{{ fact.value }}</strong>
+          </div>
         </div>
         <details v-if="plan && plan.route" style="margin-top:8px">
           <summary class="small muted" style="cursor:pointer">Caddy route preview (dry-run)</summary>
@@ -385,6 +419,28 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
 .detect-row { display: flex; flex-direction: column; gap: 0; }
 .detect-row .kv { display: flex; justify-content: space-between; padding: 9px 0; border-bottom: 1px solid var(--border-soft); font-size: 13px; }
 .detect-row .kv:last-child { border-bottom: none; }
+.plan-note {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+.plan-facts {
+  display: grid;
+  gap: 8px;
+  padding-top: 2px;
+}
+.plan-fact {
+  display: grid;
+  grid-template-columns: 96px 1fr;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  background: var(--bg-input);
+  font-size: 12.5px;
+}
+.plan-fact span { color: var(--text-dim); }
+.plan-fact strong { color: var(--text-muted); font-weight: 550; line-height: 1.4; }
 .plan-route {
   margin: 8px 0 0; padding: 10px 12px; background: var(--bg-input);
   border: 1px solid var(--border-soft); border-radius: var(--radius-sm);

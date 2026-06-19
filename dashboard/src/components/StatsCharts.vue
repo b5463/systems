@@ -43,6 +43,17 @@ function fmtBytes(n) {
 }
 
 const labels = computed(() => props.history.map((p) => p.label))
+const hasHistory = computed(() => props.history.length > 0)
+
+function avg(values) {
+  const valid = values.filter((v) => Number.isFinite(v))
+  if (!valid.length) return null
+  return valid.reduce((sum, v) => sum + v, 0) / valid.length
+}
+function peak(values) {
+  const valid = values.filter((v) => Number.isFinite(v))
+  return valid.length ? Math.max(...valid) : null
+}
 
 // Each chart gets its own options object — Chart.js mutates options internally,
 // so sharing one instance across both charts causes scale/tooltip cross-talk.
@@ -61,7 +72,7 @@ function makeOptions() {
       y: {
         beginAtZero: true,
         grid: { color: 'rgba(255,255,255,0.06)' },
-        ticks: { color: '#8b949e', maxTicksLimit: 4 }
+        ticks: { color: '#b2b6bf', maxTicksLimit: 4 }
       }
     },
     elements: { point: { radius: 0 } }
@@ -76,8 +87,8 @@ const cpuData = computed(() => ({
     {
       label: 'CPU %',
       data: props.history.map((p) => p.cpu),
-      borderColor: '#5fb0d4',
-      backgroundColor: 'rgba(95,176,212,0.12)',
+      borderColor: 'rgba(242,243,245,0.9)',
+      backgroundColor: 'rgba(242,243,245,0.08)',
       borderWidth: 2,
       fill: true,
       tension: 0.3
@@ -112,18 +123,57 @@ const memVal = computed(() => {
 })
 const rxVal = computed(() => (props.latest ? fmtBytes(props.latest.rx_bytes) : '–'))
 const txVal = computed(() => (props.latest ? fmtBytes(props.latest.tx_bytes) : '–'))
+const cpuAvg = computed(() => {
+  const v = avg(props.history.map((p) => p.cpu))
+  return v == null ? '–' : `${v.toFixed(1)}%`
+})
+const cpuPeak = computed(() => {
+  const v = peak(props.history.map((p) => p.cpu))
+  return v == null ? '–' : `${v.toFixed(1)}%`
+})
+const memAvg = computed(() => {
+  const v = avg(props.history.map((p) => p.mem))
+  return v == null ? '–' : `${v.toFixed(0)} MB`
+})
+const memPeak = computed(() => {
+  const v = peak(props.history.map((p) => p.mem))
+  return v == null ? '–' : `${v.toFixed(0)} MB`
+})
+const memLimit = computed(() =>
+  props.latest?.memory_limit_mb != null ? `${props.latest.memory_limit_mb.toFixed(0)} MB` : '–'
+)
 </script>
 
 <template>
   <div class="stack">
+    <div class="metric-grid">
+      <div class="metric">
+        <div class="m-label">CPU current</div>
+        <div class="m-value mono">{{ cpuVal }}</div>
+      </div>
+      <div class="metric">
+        <div class="m-label">CPU avg / peak</div>
+        <div class="m-value mono">{{ cpuAvg }} / {{ cpuPeak }}</div>
+      </div>
+      <div class="metric">
+        <div class="m-label">Memory current</div>
+        <div class="m-value mono">{{ memVal }}</div>
+      </div>
+      <div class="metric">
+        <div class="m-label">Memory avg / peak / limit</div>
+        <div class="m-value mono">{{ memAvg }} / {{ memPeak }} / {{ memLimit }}</div>
+      </div>
+    </div>
+
     <div class="card">
       <div class="spread" style="margin-bottom: 10px">
         <span class="label" style="margin: 0">CPU</span>
-        <strong class="mono" style="color: var(--accent)">{{ cpuVal }}</strong>
+        <strong class="mono">{{ cpuVal }}</strong>
       </div>
-      <div style="height: 140px">
+      <div v-if="hasHistory" style="height: 140px">
         <Line :data="cpuData" :options="cpuOptions" />
       </div>
+      <div v-else class="chart-empty">CPU history is not available yet. Current usage will appear after the next collection interval.</div>
     </div>
 
     <div class="card">
@@ -131,9 +181,10 @@ const txVal = computed(() => (props.latest ? fmtBytes(props.latest.tx_bytes) : '
         <span class="label" style="margin: 0">Memory</span>
         <strong class="mono">{{ memVal }}</strong>
       </div>
-      <div style="height: 140px">
+      <div v-if="hasHistory" style="height: 140px">
         <Line :data="memData" :options="memOptions" />
       </div>
+      <div v-else class="chart-empty">Memory history is not available yet. Current usage will appear after the next collection interval.</div>
     </div>
 
     <div class="card">
@@ -150,3 +201,23 @@ const txVal = computed(() => (props.latest ? fmtBytes(props.latest.tx_bytes) : '
     </div>
   </div>
 </template>
+
+<style scoped>
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+.chart-empty {
+  min-height: 140px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 18px;
+  border: 1px dashed var(--border-soft);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 13px;
+}
+</style>

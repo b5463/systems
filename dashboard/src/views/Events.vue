@@ -9,7 +9,7 @@ const loading = ref(true)
 const refreshing = ref(false)
 const lastChecked = ref(null)
 const error = ref('')
-const viewMode = ref('timeline')
+const viewMode = ref(localStorage.getItem('events:view') || 'timeline')
 const page = ref(1)
 const perPage = 25
 
@@ -167,10 +167,34 @@ const expandedId = ref(null)
 function toggleRow(id) { expandedId.value = expandedId.value === id ? null : id }
 
 const pageCount = computed(() => Math.max(1, Math.ceil(total.value / perPage)))
-const hasActiveFilters = computed(() =>
-  !!(filterCategory.value || filterAction.value || filterSeverity.value || filterTarget.value.trim() ||
-     filterUser.value.trim() || filterFrom.value || filterTo.value)
+const activeFilterCount = computed(() =>
+  [filterCategory.value, filterAction.value, filterSeverity.value, filterTarget.value.trim(),
+    filterUser.value.trim(), filterFrom.value, filterTo.value].filter(Boolean).length
 )
+const hasActiveFilters = computed(() =>
+  activeFilterCount.value > 0
+)
+
+function isoDate(d) {
+  return d.toISOString().slice(0, 10)
+}
+
+function setDateShortcut(kind) {
+  const now = new Date()
+  const start = new Date(now)
+  if (kind === 'today') {
+    filterFrom.value = isoDate(now)
+    filterTo.value = isoDate(now)
+  } else if (kind === '7d') {
+    start.setDate(start.getDate() - 6)
+    filterFrom.value = isoDate(start)
+    filterTo.value = isoDate(now)
+  } else if (kind === '30d') {
+    start.setDate(start.getDate() - 29)
+    filterFrom.value = isoDate(start)
+    filterTo.value = isoDate(now)
+  }
+}
 
 async function load() {
   error.value = ''
@@ -231,6 +255,7 @@ watch(filterCategory, () => {
   page.value = 1; load()
 })
 watch([filterAction, filterSeverity], () => { page.value = 1; load() })
+watch(viewMode, (v) => localStorage.setItem('events:view', v))
 watch([filterTarget, filterUser, filterFrom, filterTo], () => {
   clearTimeout(textDebounce)
   textDebounce = setTimeout(() => { page.value = 1; load() }, 300)
@@ -287,7 +312,11 @@ onBeforeUnmount(() => clearTimeout(textDebounce))
       <div style="flex:1"></div>
       <div class="row gap-sm" style="padding-bottom: 2px; flex-wrap: wrap">
         <span class="small muted">{{ total }} event{{ total === 1 ? '' : 's' }}</span>
+        <span v-if="activeFilterCount" class="chip">{{ activeFilterCount }} filter{{ activeFilterCount === 1 ? '' : 's' }}</span>
         <span v-if="lastChecked" class="small dim">Checked {{ lastChecked }}</span>
+        <button class="btn btn-sm btn-ghost" @click="setDateShortcut('today')">Today</button>
+        <button class="btn btn-sm btn-ghost" @click="setDateShortcut('7d')">7 days</button>
+        <button class="btn btn-sm btn-ghost" @click="setDateShortcut('30d')">30 days</button>
         <button v-if="hasActiveFilters" class="btn btn-sm btn-ghost" @click="clearFilters">Clear filters</button>
       </div>
     </div>
@@ -328,8 +357,28 @@ onBeforeUnmount(() => clearTimeout(textDebounce))
 
   <!-- TABLE VIEW -->
   <template v-else-if="viewMode === 'table'">
+    <div class="ev-card-list">
+      <button v-for="e in entries" :key="e.id" class="ev-card" :aria-expanded="expandedId === e.id" @click="toggleRow(e.id)">
+        <span class="ev-card-top">
+          <span class="row gap-sm" style="min-width:0">
+            <span class="sdot" :class="dotClass(e.action)"></span>
+            <strong>{{ humanize(e.action) }}</strong>
+          </span>
+          <span class="mono small dim">{{ fmtDateTime(e.created_at) }}</span>
+        </span>
+        <span class="ev-card-meta">
+          <span v-if="e.target" class="chip"><span class="dim">{{ targetKind(e) }}</span>{{ e.target }}</span>
+          <span class="mono">{{ actorLabel(e) }}</span>
+          <span v-if="e.ip" class="mono">{{ e.ip }}</span>
+        </span>
+        <span v-if="expandedId === e.id" class="ev-card-detail">
+          <span v-if="e.detail">{{ e.detail }}</span>
+          <span class="mono dim small">{{ e.action }} · {{ e.created_at }}</span>
+        </span>
+      </button>
+    </div>
     <div class="card" style="padding: 0; overflow: hidden">
-      <div style="overflow-x: auto">
+      <div class="ev-table-scroll">
         <table class="ev-table">
           <thead>
             <tr>
@@ -451,6 +500,40 @@ onBeforeUnmount(() => clearTimeout(textDebounce))
 .ev-detail { display: flex; flex-direction: column; gap: 2px; padding: 4px 0 2px; }
 .ev-detail .kv { padding: 5px 0; border-bottom: 1px solid var(--border-soft); }
 .ev-detail .kv:last-child { border-bottom: none; }
+.ev-card-list { display: none; }
+.ev-card {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  text-align: left;
+  padding: 12px 14px;
+  margin: 0;
+  background: var(--bg-card);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
+  color: var(--text);
+  cursor: pointer;
+}
+.ev-card + .ev-card { margin-top: 10px; }
+.ev-card-top,
+.ev-card-meta,
+.ev-card-detail {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.ev-card-top { justify-content: space-between; }
+.ev-card-meta { flex-wrap: wrap; color: var(--text-muted); font-size: 12px; }
+.ev-card-detail {
+  align-items: flex-start;
+  flex-direction: column;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-soft);
+  color: var(--text-muted);
+  font-size: 13px;
+}
 @media (prefers-reduced-motion: reduce) { .ev-caret span { transition: none; } }
 .ev-pagination {
   display: flex;
@@ -460,5 +543,9 @@ onBeforeUnmount(() => clearTimeout(textDebounce))
   margin-top: 20px;
   padding-top: 16px;
   border-top: 1px solid var(--border-soft);
+}
+@media (max-width: 599px) {
+  .ev-card-list { display: block; }
+  .ev-table-scroll { display: none; }
 }
 </style>

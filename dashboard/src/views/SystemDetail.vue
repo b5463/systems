@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { api } from '../api/client'
 import StatusBadge from '../components/StatusBadge.vue'
 import StatsCharts from '../components/StatsCharts.vue'
@@ -16,9 +16,15 @@ import { isCrashed } from '../utils/status'
 const { showToast } = useToast()
 const props = defineProps({ slug: { type: String, required: true } })
 const router = useRouter()
+const route = useRoute()
 
 const TABS = ['Overview', 'Deployments', 'Logs', 'Metrics', 'Console', 'Settings']
 const tab = ref('Overview')
+
+function normalizeTab(value) {
+  const match = TABS.find((t) => t.toLowerCase() === String(value || '').toLowerCase())
+  return match || 'Overview'
+}
 
 const system = ref(null)
 const loading = ref(true)
@@ -82,7 +88,6 @@ const isRunning = computed(() => system.value?.status === 'running')
 // Drives the action matrix so we never offer an action that cannot work
 // (e.g. Start/Restart/Open/Check-health on a failed build with no container).
 const isBuilding = computed(() => system.value?.status === 'building')
-const isFailedBuild = computed(() => system.value?.status === 'error' && !system.value?.image_id)
 const hasContainer = computed(() => !!system.value?.image_id) // built at least once
 const canStart = computed(() => !!system.value && system.value.status === 'stopped' && !acting.value)
 const canStop = computed(() => isRunning.value && !acting.value)
@@ -281,6 +286,7 @@ async function copyUrl() {
 // side-effects reliably fire on every tab change.
 function selectTab(t) {
   tab.value = t
+  router.replace({ query: { ...route.query, tab: t === 'Overview' ? undefined : t } })
   if (t === 'Metrics') startStats(); else stopStats()
   if (t === 'Deployments') loadDeployHistory()
 }
@@ -296,7 +302,10 @@ async function fetchOverviewStat() {
 }
 
 onMounted(async () => {
+  tab.value = normalizeTab(route.query.tab)
   await loadSystem()
+  if (tab.value === 'Metrics') startStats()
+  if (tab.value === 'Deployments') loadDeployHistory()
   fetchOverviewStat()
   document.addEventListener('visibilitychange', onVisibility)
 })
