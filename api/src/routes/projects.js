@@ -202,6 +202,42 @@ async function projectsRoutes(fastify, options) {
     return { project: pub(db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug)), warnings: errors.length ? errors : undefined };
   });
 
+  // Retry publishing the public route (e.g. after the reverse proxy comes up).
+  // Re-runs publishRoute with the system's current visibility and updates
+  // route_published. Rejected for private/non-running systems.
+  fastify.post('/api/projects/:slug/publish-route', {
+    preHandler: [fastify.authenticate],
+  }, async (request, reply) => {
+    const { slug } = request.params;
+    const project = loadOr404(reply, slug);
+    if (!project) return;
+    if (project.status === 'deleted') return reply.code(409).send({ error: 'System is deleted.' });
+    if (project.visibility === 'private') return reply.code(400).send({ error: 'Private systems have no public route to publish.' });
+    if (project.status !== 'running') return reply.code(409).send({ error: 'The system must be running to publish a route.' });
+
+    let published = false;
+    let reason;
+    try {
+      const r = await proxy.publishRoute({ slug, port: project.port, visibility: project.visibility, basicUser: project.basic_user, basicHash: project.basic_hash, apex: !!project.is_primary });
+      published = r.published;
+      reason = r.reload && r.reload.ok === false ? r.reload.reason : undefined;
+    } catch (err) {
+      return reply.code(502).send({ error: `Route publish failed: ${err.message}` });
+    }
+    db.prepare(`UPDATE projects SET route_published = ?, updated_at = datetime('now') WHERE slug = ?`).run(published ? 1 : 0, slug);
+    auditLog({ user_id: request.user.id, action: 'route_publish', target: slug, detail: published ? 'published' : (reason || 'not_published'), ip: request.ip });
+
+    if (!published) {
+      const msg = (reason === 'nginx_not_found' || reason === 'caddy_not_found')
+        ? 'The reverse proxy is not running on this host, so no public route could be created.'
+        : reason === 'conf_dir_missing'
+          ? 'The proxy config directory is not available on this host.'
+          : 'The route could not be published.';
+      return reply.code(409).send({ error: msg, reason });
+    }
+    return { project: pub(db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug)) };
+  });
+
   // Run a real health + HTTPS check against the public URL and store the result.
   fastify.post('/api/projects/:slug/health', {
     preHandler: [fastify.authenticate],

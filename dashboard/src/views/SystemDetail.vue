@@ -100,6 +100,29 @@ const canRollback = computed(() => !!system.value?.previous_image_id && !isBuild
 const canHealthCheck = computed(() => isRunning.value && (system.value?.visibility !== 'private') && !checkingHealth.value)
 // Open only when there's a usable endpoint: a published route, or local testing (host port).
 const canOpen = computed(() => isRunning.value && (!!system.value?.route_published || LOCAL_MODE))
+// What the Open control actually opens — be explicit so it's never ambiguous.
+const opensPublic = computed(() => isRunning.value && !!system.value?.route_published)
+const openLabel = computed(() => (opensPublic.value ? 'Open public URL' : 'Open local endpoint'))
+// Running, meant to be public, but no public route exists yet.
+const routeUnpublished = computed(() =>
+  isRunning.value && (system.value?.visibility !== 'private') && !system.value?.route_published
+)
+
+const publishingRoute = ref(false)
+const publishMsg = ref('')
+async function retryPublish() {
+  publishingRoute.value = true
+  publishMsg.value = ''
+  try {
+    const data = await api.post(`/projects/${props.slug}/publish-route`)
+    if (data && data.project) system.value = data.project
+    showToast('Public route published.', 'ok')
+  } catch (e) {
+    publishMsg.value = e.message || 'Could not publish the route.'
+  } finally {
+    publishingRoute.value = false
+  }
+}
 const publicEndpointLabel = computed(() => {
   const s = system.value
   if (!s) return ''
@@ -135,7 +158,7 @@ const truth = computed(() => {
 
   return [
     { key: 'Container', tone: containerTone, val: containerLabel },
-    { key: 'Route', tone: routePublished ? 'ok' : 'idle', val: routePublished ? 'Active' : (vis === 'private' ? 'None (private)' : 'None') },
+    { key: 'Route', tone: routePublished ? 'ok' : (vis === 'private' ? 'idle' : 'warn'), val: routePublished ? 'Published' : (vis === 'private' ? 'None (private)' : 'Not published') },
     { key: 'HTTPS', tone: hs ? (health.tone === 'error' ? 'error' : 'ok') : 'idle', val: vis === 'private' ? '—' : (hs ? (health.tone === 'error' ? 'Failed' : 'Valid') : 'Not measured yet') },
     { key: 'Health', tone: health.tone, val: health.val },
     { key: 'Visibility', tone: 'idle', val: vis.charAt(0).toUpperCase() + vis.slice(1) },
@@ -357,8 +380,8 @@ onBeforeUnmount(() => {
         <span v-else class="mono small dim">{{ publicEndpointLabel }}</span>
       </div>
       <div class="head-actions">
-        <button v-if="canOpen" class="btn btn-sm btn-ghost" @click="copyUrl">Copy URL</button>
-        <a v-if="canOpen" class="btn btn-sm" :href="publicUrl" target="_blank" rel="noopener">Open</a>
+        <button v-if="canOpen" class="btn btn-sm btn-ghost" @click="copyUrl">{{ opensPublic ? 'Copy URL' : 'Copy local URL' }}</button>
+        <a v-if="canOpen" class="btn btn-sm" :href="publicUrl" target="_blank" rel="noopener">{{ openLabel }}</a>
       </div>
     </div>
 
@@ -404,6 +427,26 @@ onBeforeUnmount(() => {
       </div>
       <div v-else-if="system.status === 'building'" class="callout warn">
         <div class="co-bar"></div><div>This system is building — this can take a minute. Live output appears in the build log below.</div>
+      </div>
+
+      <!-- Running, public intent, but no public route yet -->
+      <div v-else-if="routeUnpublished" class="callout warn">
+        <div class="co-bar"></div>
+        <div class="stack" style="gap:10px">
+          <div>
+            <strong>Running, but not published.</strong>
+            The container is up and reachable on its host port<template v-if="system.port"> (<span class="mono">localhost:{{ system.port }}</span>)</template>,
+            but no public route exists yet — so <span class="mono">{{ hostFor(system.slug) }}</span> won't resolve.
+          </div>
+          <div class="row gap-sm flex-wrap">
+            <button class="btn btn-sm btn-primary" :disabled="publishingRoute" @click="retryPublish">
+              <span v-if="publishingRoute" class="spinner"></span><span v-else>Retry route publish</span>
+            </button>
+            <a v-if="canOpen" class="btn btn-sm" :href="publicUrl" target="_blank" rel="noopener">{{ openLabel }}</a>
+            <RouterLink class="btn btn-sm btn-ghost" :to="{ name: 'server' }">Server routing setup</RouterLink>
+          </div>
+          <div v-if="publishMsg" class="small" style="color:var(--warn)">{{ publishMsg }}</div>
+        </div>
       </div>
 
       <!-- Truth model -->
