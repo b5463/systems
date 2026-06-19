@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
@@ -18,25 +18,77 @@ const props = defineProps({
 const emit = defineEmits(['finished'])
 
 const wrap = ref(null)
-const status = ref('connecting') // connecting | streaming | ended | error
+// connecting | waiting | streaming | reconnecting | ended | error
+const status = ref('connecting')
 const errMsg = ref('')
+const noOutput = ref(false)
 
 let term = null
 let fit = null
 let ws = null
 let resizeObserver = null
+let terminalReached = false   // a terminal state was reached — do not reconnect
+let reconnects = 0
+let idleTimer = null
+let lastOutputAt = 0
 
+const STATUS_LABEL = {
+  connecting: 'Connecting…',
+  waiting: props.mode === 'build' ? 'Waiting for build output…' : 'Waiting for output…',
+  streaming: 'Streaming',
+  reconnecting: 'Reconnecting…',
+  ended: 'Stream ended',
+  error: 'Error'
+}
+const statusLabel = computed(() => STATUS_LABEL[status.value] || status.value)
+const statusTone = computed(() => {
+  if (status.value === 'error') return 'error'
+  if (status.value === 'reconnecting' || status.value === 'waiting') return 'warn'
+  if (status.value === 'streaming') return 'ok'
+  return 'idle'
+})
+const canReconnect = computed(() => status.value === 'ended' || status.value === 'error')
+
+// Neutral, brand-aligned terminal palette (no cyan).
 const theme = {
   background: '#000000',
   foreground: '#e6edf3',
-  cursor: '#5fb0d4',
-  selectionBackground: 'rgba(95,176,212,0.3)'
+  cursor: '#e6edf3',
+  selectionBackground: 'rgba(255,255,255,0.18)'
 }
 
 function writeLine(data) {
   if (!term || data == null) return
-  // Normalise newlines to CRLF for xterm.
   term.write(String(data).replace(/\r?\n/g, '\r\n'))
+}
+
+function markOutput() {
+  lastOutputAt = Date.now()
+  noOutput.value = false
+  if (status.value === 'waiting' || status.value === 'reconnecting') status.value = 'streaming'
+}
+
+function startIdleWatch() {
+  stopIdleWatch()
+  idleTimer = setInterval(() => {
+    if (terminalReached) return
+    if ((status.value === 'waiting' || status.value === 'streaming') && Date.now() - lastOutputAt > 30000) {
+      noOutput.value = true
+    }
+  }, 5000)
+}
+function stopIdleWatch() {
+  if (idleTimer) { clearInterval(idleTimer); idleTimer = null }
+}
+
+function detach() {
+  if (ws) {
+    ws.onmessage = null
+    ws.onclose = null
+    ws.onerror = null
+    try { ws.close() } catch { /* already closing */ }
+    ws = null
+  }
 }
 
 function connect() {
@@ -45,51 +97,72 @@ function connect() {
       ? `/api/deploy/${props.slug}/build-log`
       : `/api/projects/${props.slug}/logs`
 
-  status.value = 'connecting'
+  status.value = reconnects > 0 ? 'reconnecting' : 'connecting'
   errMsg.value = ''
+  lastOutputAt = Date.now()
 
   ws = openWs(path, {
     onOpen() {
-      status.value = 'streaming'
+      status.value = 'waiting'
+      lastOutputAt = Date.now()
     },
     onMessage(msg) {
-      if (typeof msg === 'string') {
-        writeLine(msg)
-        return
-      }
+      if (typeof msg === 'string') { markOutput(); writeLine(msg); return }
       if (msg.type === 'log' || msg.type === 'output') {
+        markOutput()
         writeLine(msg.data)
       } else if (msg.type === 'status') {
         writeLine(`\n[build ${msg.status}]\n`)
         if (msg.status === 'done' || msg.status === 'error') {
+          terminalReached = true
           status.value = msg.status === 'done' ? 'ended' : 'error'
           emit('finished', msg.status)
         }
       } else if (msg.type === 'end') {
+        terminalReached = true
         status.value = 'ended'
         writeLine('\n[stream ended]\n')
       } else if (msg.type === 'error') {
+        terminalReached = true
         status.value = 'error'
         errMsg.value = msg.message || 'Stream error'
         writeLine(`\n[error] ${msg.message || ''}\n`)
       }
     },
     onClose() {
-      if (status.value === 'streaming') status.value = 'ended'
+      if (terminalReached) return
+      // Unexpected close. Build streams may still be running on the server, so
+      // try to reconnect a few times before giving up.
+      if (props.mode === 'build' && reconnects < 3) {
+        reconnects += 1
+        status.value = 'reconnecting'
+        writeLine(`\n[reconnecting… attempt ${reconnects}]\n`)
+        setTimeout(() => { if (!terminalReached) connect() }, 1000 * reconnects)
+      } else {
+        status.value = 'ended'
+        if (reconnects > 0) writeLine('\n[stream interrupted — could not reconnect]\n')
+      }
     },
     onError() {
-      status.value = 'error'
-      errMsg.value = 'Connection failed'
+      if (terminalReached) return
+      if (status.value === 'connecting' || status.value === 'reconnecting') {
+        errMsg.value = 'Connection failed'
+      }
     }
   })
 }
 
+function reconnect() {
+  detach()
+  terminalReached = false
+  reconnects = 0
+  noOutput.value = false
+  if (term) term.clear()
+  connect()
+}
+
 function doFit() {
-  try {
-    fit && fit.fit()
-  } catch {
-    /* ignore fit errors when detached */
-  }
+  try { fit && fit.fit() } catch { /* ignore fit errors when detached */ }
 }
 
 async function downloadLogs() {
@@ -129,34 +202,25 @@ onMounted(() => {
   resizeObserver = new ResizeObserver(() => doFit())
   resizeObserver.observe(wrap.value)
 
+  startIdleWatch()
   connect()
 })
 
 watch(
   () => props.slug,
   () => {
-    // Detach the old socket's handlers before closing so its late onclose/onerror
-    // can't flip the freshly-connecting stream's status to "ended".
-    if (ws) {
-      ws.onmessage = null
-      ws.onclose = null
-      ws.onerror = null
-      ws.close()
-      ws = null
-    }
+    detach()
+    terminalReached = false
+    reconnects = 0
+    noOutput.value = false
     if (term) term.clear()
     connect()
   }
 )
 
 onBeforeUnmount(() => {
-  if (ws) {
-    ws.onmessage = null
-    ws.onclose = null
-    ws.onerror = null
-    ws.close()
-    ws = null
-  }
+  detach()
+  stopIdleWatch()
   if (resizeObserver) resizeObserver.disconnect()
   if (term) term.dispose()
 })
@@ -169,7 +233,8 @@ defineExpose({ refit: doFit })
     <div class="spread small muted">
       <span>{{ mode === 'build' ? 'Build log' : 'Live logs' }}</span>
       <div class="row" style="gap: 10px; align-items: center">
-        <span>{{ status }}</span>
+        <span class="lc-status"><span class="sdot" :class="statusTone"></span>{{ statusLabel }}</span>
+        <button v-if="canReconnect" class="btn btn-sm btn-ghost" @click="reconnect">Reconnect</button>
         <button
           v-if="mode === 'logs'"
           class="iconbtn"
@@ -185,7 +250,15 @@ defineExpose({ refit: doFit })
         </button>
       </div>
     </div>
+    <div v-if="noOutput" class="hint" style="margin:0">
+      No output for 30s — {{ mode === 'build' ? 'the worker may still be preparing the build.' : 'the container may be idle.' }}
+    </div>
     <div ref="wrap" class="term-wrap"></div>
     <div v-if="errMsg" class="error-box">{{ errMsg }}</div>
   </div>
 </template>
+
+<style scoped>
+.lc-status { display: inline-flex; align-items: center; gap: 7px; }
+.lc-status .sdot { width: 7px; height: 7px; }
+</style>

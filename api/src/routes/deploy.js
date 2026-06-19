@@ -92,11 +92,42 @@ function finishBuild(slug, status) {
   }, 5 * 60 * 1000);
 }
 
+// Per-stage failure context: a human-readable label and a concrete next step.
+// Keyed by the pipeline stage that was in progress when the error was thrown.
+const STAGE_INFO = {
+  extract: { label: 'extracting the archive', hint: 'The archive may be corrupt or empty. Re-export the .zip and redeploy.' },
+  detect: { label: 'detecting the project type', hint: 'Make sure your project files are at the root of the archive (index.html, package.json, requirements.txt, or a Dockerfile).' },
+  build: { label: 'building the image', hint: 'Check the build log above for the failing step (dependency install, compile, or Dockerfile error), fix it, and redeploy.' },
+  container: { label: 'starting the container', hint: 'The image built but the container did not start — check the runtime logs for the crash reason, then redeploy.' },
+  deploy: { label: 'deploying', hint: 'Check the log above and redeploy.' },
+};
+
+// Record a deploy/redeploy failure with the failing stage, a clear log message,
+// a recovery hint, an audit entry, a notification, and a persisted last_error so
+// the dashboard can show *what* failed rather than a bare "error".
+function failBuild({ slug, stage, err, userId, ip, tag = 'deploy' }) {
+  const info = STAGE_INFO[stage] || { label: stage || 'deploying', hint: '' };
+  const reason = `Failed while ${info.label}: ${err.message}`;
+  appendBuildLog(slug, `\n[${tag}] FAILED while ${info.label}: ${err.message}\n`);
+  if (info.hint) appendBuildLog(slug, `[${tag}] Next step: ${info.hint}\n`);
+  finishBuild(slug, 'error');
+  auditLog({ user_id: userId, action: `${tag}_fail`, target: slug, detail: `${stage}: ${err.message}`.slice(0, 300), ip });
+  notify.send({ kind: 'deploy_failed', slug, detail: reason }).catch(() => {});
+  try {
+    db.prepare(`UPDATE projects SET status = 'error', last_error = ?, updated_at = datetime('now') WHERE slug = ?`)
+      .run(reason.slice(0, 500), slug);
+  } catch (dbErr) {
+    console.error(`[${tag}] Failed to update status to error:`, dbErr);
+  }
+}
+
 async function runBuildPipeline(slug, zipPath, extractDir, port, userId, ip, envVars = {}) {
+  let stage = 'extract';
   try {
     appendBuildLog(slug, `[deploy] Extracting zip...\n`);
     await extractZip(zipPath, extractDir);
 
+    stage = 'detect';
     const projectType = await detectProjectType(extractDir);
     appendBuildLog(slug, `[deploy] Detected project type: ${projectType}\n`);
 
@@ -111,22 +142,25 @@ async function runBuildPipeline(slug, zipPath, extractDir, port, userId, ip, env
       await generateDockerfile(projectType, extractDir);
     }
 
+    stage = 'build';
     appendBuildLog(slug, `[deploy] Building Docker image...\n`);
     const imageId = await dockerService.buildImage(slug, extractDir, (line) => {
       appendBuildLog(slug, line);
     });
     appendBuildLog(slug, `[deploy] Image built: ${imageId}\n`);
 
+    stage = 'container';
     appendBuildLog(slug, `[deploy] Starting container on port ${port}...\n`);
     const containerId = await dockerService.runContainer(slug, imageId, port, envVars);
     appendBuildLog(slug, `[deploy] Container started: ${containerId}\n`);
 
+    stage = 'route';
     const project = db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug);
     const visibility = project?.visibility || 'public';
 
     db.prepare(`
       UPDATE projects
-      SET status = 'running', container_id = ?, image_id = ?, deploy_type = ?, updated_at = datetime('now')
+      SET status = 'running', container_id = ?, image_id = ?, deploy_type = ?, last_error = NULL, updated_at = datetime('now')
       WHERE slug = ?
     `).run(containerId, imageId, projectType, slug);
 
@@ -151,15 +185,7 @@ async function runBuildPipeline(slug, zipPath, extractDir, port, userId, ip, env
     notify.send({ kind: 'deploy', slug, detail: 'deployed' }).catch(() => {});
     finishBuild(slug, 'done');
   } catch (err) {
-    appendBuildLog(slug, `[deploy] ERROR: ${err.message}\n`);
-    finishBuild(slug, 'error');
-    auditLog({ user_id: userId, action: 'deploy_fail', target: slug, detail: err.message, ip });
-    notify.send({ kind: 'deploy_failed', slug, detail: err.message }).catch(() => {});
-    try {
-      db.prepare(`UPDATE projects SET status = 'error', updated_at = datetime('now') WHERE slug = ?`).run(slug);
-    } catch (dbErr) {
-      console.error('[deploy] Failed to update status to error:', dbErr);
-    }
+    failBuild({ slug, stage, err, userId, ip, tag: 'deploy' });
   } finally {
     try {
       await fsp.rm(zipPath, { force: true });
@@ -176,10 +202,12 @@ async function runRedeployPipeline(slug, zipPath, extractDir, userId, ip) {
   const oldImageId = project.image_id;
   const port = project.port;
 
+  let stage = 'extract';
   try {
     appendBuildLog(slug, `[redeploy] Extracting zip...\n`);
     await extractZip(zipPath, extractDir);
 
+    stage = 'detect';
     const projectType = await detectProjectType(extractDir);
     appendBuildLog(slug, `[redeploy] Detected project type: ${projectType}\n`);
 
@@ -205,12 +233,14 @@ async function runRedeployPipeline(slug, zipPath, extractDir, userId, ip) {
       console.error('[redeploy] Failed to record deploy history:', e);
     }
 
+    stage = 'build';
     appendBuildLog(slug, `[redeploy] Building new Docker image...\n`);
     const newImageId = await dockerService.buildImage(slug, extractDir, (line) => {
       appendBuildLog(slug, line);
     });
     appendBuildLog(slug, `[redeploy] Image built: ${newImageId}\n`);
 
+    stage = 'container';
     // Atomic swap: stop old → remove old → start new
     appendBuildLog(slug, `[redeploy] Stopping old container...\n`);
     if (oldContainerId) {
@@ -236,7 +266,7 @@ async function runRedeployPipeline(slug, zipPath, extractDir, userId, ip) {
 
     db.prepare(`
       UPDATE projects
-      SET status = 'running', container_id = ?, image_id = ?, updated_at = datetime('now')
+      SET status = 'running', container_id = ?, image_id = ?, last_error = NULL, updated_at = datetime('now')
       WHERE slug = ?
     `).run(newContainerId, newImageId, slug);
 
@@ -248,15 +278,7 @@ async function runRedeployPipeline(slug, zipPath, extractDir, userId, ip) {
     notify.send({ kind: 'redeploy', slug, detail: 'redeployed' }).catch(() => {});
     finishBuild(slug, 'done');
   } catch (err) {
-    appendBuildLog(slug, `[redeploy] ERROR: ${err.message}\n`);
-    finishBuild(slug, 'error');
-    auditLog({ user_id: userId, action: 'redeploy_fail', target: slug, detail: err.message, ip });
-    notify.send({ kind: 'deploy_failed', slug, detail: err.message }).catch(() => {});
-    try {
-      db.prepare(`UPDATE projects SET status = 'error', updated_at = datetime('now') WHERE slug = ?`).run(slug);
-    } catch (dbErr) {
-      console.error('[redeploy] Failed to update status to error:', dbErr);
-    }
+    failBuild({ slug, stage, err, userId, ip, tag: 'redeploy' });
   } finally {
     try {
       await fsp.rm(zipPath, { force: true });

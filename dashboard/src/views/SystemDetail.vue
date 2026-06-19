@@ -360,6 +360,7 @@ onBeforeUnmount(() => {
             The last <strong>build failed</strong>, so nothing new went live. Check the build log,
             fix it, and redeploy{{ system.previous_image_id ? ' — or roll back to the last working release' : '' }}.
           </div>
+          <div v-if="system.last_error" class="mono small" style="padding:8px 10px; background:var(--bg-input); border:1px solid var(--border-soft); border-radius:var(--radius-sm); color:var(--text-muted); white-space:pre-wrap; word-break:break-word">{{ system.last_error }}</div>
           <div class="row gap-sm flex-wrap">
             <button class="btn btn-sm" @click="selectTab('Logs')">View logs</button>
             <button v-if="canRestart" class="btn btn-sm" :disabled="!!acting" @click="lifecycle('restart')">Restart</button>
