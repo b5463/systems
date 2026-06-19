@@ -3,6 +3,7 @@ import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '../api/client'
 import SelectMenu from '../components/SelectMenu.vue'
+import Icon from '../components/Icon.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -451,7 +452,7 @@ onBeforeUnmount(() => clearTimeout(textDebounce))
           <tbody>
             <template v-for="e in entries" :key="e.id">
               <tr class="ev-trow" :class="{ open: expandedId === e.id }" :aria-expanded="expandedId === e.id" @click="toggleRow(e.id)">
-                <td class="ev-caret"><span :class="{ rot: expandedId === e.id }">▸</span></td>
+                <td class="ev-caret"><span :class="{ rot: expandedId === e.id }"><Icon name="chevron-right" /></span></td>
                 <td class="mono small" style="white-space:nowrap; color:var(--text-dim)">{{ fmtDateTime(e.created_at) }}</td>
                 <td>
                   <span style="display:inline-flex; align-items:center; gap:8px; white-space:nowrap">
@@ -518,9 +519,9 @@ onBeforeUnmount(() => clearTimeout(textDebounce))
 
   <!-- Pagination -->
   <div v-if="!loading && !error && pageCount > 1" class="ev-pagination">
-    <button class="btn btn-sm btn-ghost" :disabled="page === 1" @click="goPage(page - 1)">← Prev</button>
+    <button class="btn btn-sm btn-ghost" :disabled="page === 1" @click="goPage(page - 1)"><Icon name="arrow-left" /> Prev</button>
     <span class="small muted">Page {{ page }} of {{ pageCount }}</span>
-    <button class="btn btn-sm btn-ghost" :disabled="page === pageCount" @click="goPage(page + 1)">Next →</button>
+    <button class="btn btn-sm btn-ghost" :disabled="page === pageCount" @click="goPage(page + 1)">Next <Icon name="arrow-right" /></button>
   </div>
 </template>
 

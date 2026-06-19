@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { api } from '../api/client'
 import StatusBadge from '../components/StatusBadge.vue'
 import SelectMenu from '../components/SelectMenu.vue'
+import Icon from '../components/Icon.vue'
 import { useToast } from '../composables/useToast'
 import { BASE_DOMAIN, LOCAL_MODE, hostFor, urlFor } from '../config'
 import { fmtAgo } from '../utils/date'
@@ -270,7 +271,7 @@ onBeforeUnmount(() => clearInterval(timer))
           <span><span class="sdot" :class="statusTone(server.docker.status)"></span>Docker {{ statusLabel(server.docker.status) }}</span>
           <span><span class="sdot" :class="statusTone(server.caddy.status)"></span>Caddy {{ statusLabel(server.caddy.status) }}</span>
           <span><span class="sdot" :class="statusTone(server.postgres.status)"></span>Postgres {{ statusLabel(server.postgres.status) }}</span>
-          <RouterLink class="small" :to="{ name: 'server' }">Details →</RouterLink>
+          <RouterLink class="small" :to="{ name: 'server' }">Details <Icon name="arrow-right" /></RouterLink>
         </div>
         <div v-else class="muted small">Server status unavailable.</div>
       </div>
@@ -290,7 +291,7 @@ onBeforeUnmount(() => clearInterval(timer))
     <div v-if="!visibleSystems.length" class="muted small" style="margin-bottom:18px">{{ query.trim() ? `No systems match “${query}”.` : 'No active systems.' }}</div>
     <div class="grid grid-auto">
       <div v-for="s in visibleSystems" :key="s.id" class="card card-tap sys-card" :class="{ 'sys-selectable': selectMode, 'sys-selected': selectMode && isSelected(s.slug) }" role="button" tabindex="0" :aria-label="selectMode ? `Select ${s.name}` : `Open ${s.name}`" :aria-pressed="selectMode ? isSelected(s.slug) : null" @click="cardClick(s)" @keydown.enter="cardClick(s)" @keydown.space.prevent="cardClick(s)">
-        <span v-if="selectMode" class="sys-check" :class="{ on: isSelected(s.slug) }" aria-hidden="true">✓</span>
+        <span v-if="selectMode" class="sys-check" :class="{ on: isSelected(s.slug) }" aria-hidden="true"><Icon v-if="isSelected(s.slug)" name="check" /></span>
         <div class="sc-top">
           <div style="min-width:0">
             <div class="sc-name">{{ s.name }}</div>
@@ -312,7 +313,7 @@ onBeforeUnmount(() => clearInterval(timer))
             CPU {{ (stats[s.slug].cpu_percent ?? 0).toFixed(1) }}% · RAM {{ (stats[s.slug].memory_mb ?? 0).toFixed(0) }} MB<span v-if="s.port"> · :{{ s.port }}</span>
           </span>
           <span v-else class="small dim">{{ s.status === 'building' ? 'Building…' : s.status === 'error' ? (isCrashed(s) ? 'Crashed' : 'Build failed') : 'Not running' }}</span>
-          <a v-if="s.status === 'running' && (s.route_published || LOCAL_MODE)" class="sc-open small" :href="urlFor(s.slug, s.port)" target="_blank" rel="noopener" @click.stop>{{ s.route_published ? 'Open ↗' : 'Open local ↗' }}</a>
+          <a v-if="s.status === 'running' && (s.route_published || LOCAL_MODE)" class="sc-open small" :href="urlFor(s.slug, s.port)" target="_blank" rel="noopener" @click.stop>{{ s.route_published ? 'Open' : 'Open local' }} <Icon name="arrow-up-right" /></a>
         </div>
       </div>
     </div>

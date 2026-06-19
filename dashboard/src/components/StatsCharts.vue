@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { Line } from 'vue-chartjs'
+import Icon from './Icon.vue'
 import {
   Chart as ChartJS,
   Title,
@@ -190,11 +191,11 @@ const memLimit = computed(() =>
     <div class="card">
       <div class="spread">
         <div>
-          <div class="label" style="margin: 0">Network ↓ Rx</div>
+          <div class="label" style="margin: 0">Network <Icon name="arrow-down" /> Rx</div>
           <strong class="mono">{{ rxVal }}</strong>
         </div>
         <div style="text-align: right">
-          <div class="label" style="margin: 0">Network ↑ Tx</div>
+          <div class="label" style="margin: 0">Network <Icon name="arrow-up" /> Tx</div>
           <strong class="mono">{{ txVal }}</strong>
         </div>
       </div>

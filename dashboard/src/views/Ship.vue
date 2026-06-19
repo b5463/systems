@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { api } from '../api/client'
 import LogConsole from '../components/LogConsole.vue'
 import FlowField from '../components/FlowField.vue'
+import Icon from '../components/Icon.vue'
 import { BASE_DOMAIN, SCHEME, LOCAL_MODE, urlFor } from '../config'
 
 const router = useRouter()
@@ -386,7 +387,7 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
           <div v-for="(pair, i) in envVarPairs" :key="i" class="env-row">
             <input v-model="pair.key" class="env-key" placeholder="KEY" autocapitalize="none" autocorrect="off" spellcheck="false" />
             <input v-model="pair.value" class="env-val" placeholder="value" autocorrect="off" spellcheck="false" />
-            <button type="button" class="env-remove" :aria-label="`Remove ${pair.key || 'env var'}`" @click="removeEnvPair(i)">×</button>
+            <button type="button" class="env-remove" :aria-label="`Remove ${pair.key || 'env var'}`" @click="removeEnvPair(i)"><Icon name="close" /></button>
           </div>
         </div>
         <button type="button" class="btn btn-sm btn-ghost" style="align-self:flex-start" @click="addEnvPair">+ Add variable</button>
@@ -461,7 +462,7 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
         </div>
         <ul class="readiness">
           <li v-for="r in readiness" :key="r.label" :class="{ ok: r.ok }">
-            <span class="rd-mark" aria-hidden="true">{{ r.ok ? '✓' : '○' }}</span>{{ r.label }}
+            <span class="rd-mark" aria-hidden="true"><Icon :name="r.ok ? 'check' : 'circle'" /></span>{{ r.label }}
           </li>
         </ul>
         <div v-if="error" class="error-box">{{ error }}</div>

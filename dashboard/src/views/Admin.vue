@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { api } from '../api/client'
 import CopyButton from '../components/CopyButton.vue'
+import Icon from '../components/Icon.vue'
 import { fmtDate } from '../utils/date'
 
 const auth = useAuthStore()
@@ -361,7 +362,7 @@ onMounted(() => { loadUsers(); loadServerInfo(); loadSessions() })
             </button>
           </div>
         </div>
-        <div v-if="capsOn" class="caps-warn small">⇪ Caps Lock is on</div>
+        <div v-if="capsOn" class="caps-warn small"><Icon name="caps-lock" /> Caps Lock is on</div>
         <div class="hint">At least 8 characters. Mixing case, digits and symbols makes it stronger.</div>
         <div v-if="pwError" class="error-box">{{ pwError }}</div>
         <div v-else-if="pwMsg" class="notice">{{ pwMsg }}</div>
@@ -534,11 +535,11 @@ onMounted(() => { loadUsers(); loadServerInfo(); loadSessions() })
         <div class="section-label" style="padding:14px 16px 6px">Security &amp; audit</div>
         <RouterLink class="conn-row sa-link" :to="{ name: 'events' }">
           <div style="flex:1"><div class="c-name">Audit log</div><div class="c-sub">Admin and system actions</div></div>
-          <span class="small dim">→</span>
+          <span class="small dim"><Icon name="arrow-right" /></span>
         </RouterLink>
         <RouterLink class="conn-row sa-link" :to="{ name: 'server' }">
           <div style="flex:1"><div class="c-name">SYSTEMS. health</div><div class="c-sub">Infrastructure and runtime</div></div>
-          <span class="small dim">→</span>
+          <span class="small dim"><Icon name="arrow-right" /></span>
         </RouterLink>
       </div>
     </div>
