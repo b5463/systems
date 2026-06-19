@@ -33,7 +33,9 @@ function openShortcuts() { window.dispatchEvent(new Event('app:shortcuts')) }
 /* Sidebar collapse — persisted in localStorage */
 const sidebarCollapsed = ref(false)
 onMounted(() => {
-  sidebarCollapsed.value = localStorage.getItem('sb-col') === '1'
+  sidebarCollapsed.value = window.matchMedia('(min-width: 1200px)').matches
+    ? false
+    : localStorage.getItem('sb-col') === '1'
   loadHealth()
 })
 watch(sidebarCollapsed, v => localStorage.setItem('sb-col', v ? '1' : ''))
@@ -62,7 +64,13 @@ async function loadHealth() {
     <!-- Desktop sidebar -->
     <aside class="sidebar">
       <div class="sidebar-head">
-        <SystemsLogo size="sm" />
+        <SystemsLogo class="sidebar-logo-full" size="sm" />
+        <img
+          class="sidebar-logo-compact"
+          src="/brand/systems-s-dot.svg"
+          alt="SYSTEMS."
+          decoding="async"
+        />
         <button
           class="sidebar-collapse-btn"
           :aria-label="sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
@@ -170,6 +178,12 @@ async function loadHealth() {
 }
 .su-info { min-width: 0; overflow: hidden; }
 
+.sidebar-head {
+  position: relative;
+  min-height: 72px;
+  transition: min-height 0.22s ease, padding 0.22s ease;
+}
+
 .sidebar-foot {
   border-top: 1px solid var(--border-soft);
   padding-top: 8px;
@@ -200,12 +214,26 @@ async function loadHealth() {
 }
 
 /* Collapse toggle button */
+.sidebar-logo-compact {
+  display: none;
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+}
+
 .sidebar-collapse-btn {
+  position: absolute;
+  top: 17px;
+  left: calc(var(--sidebar-width) - 52px);
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 34px;
+  height: 34px;
   border-radius: var(--radius-xs);
   background: none;
   border: 1px solid transparent;
@@ -213,6 +241,7 @@ async function loadHealth() {
   cursor: pointer;
   flex-shrink: 0;
   padding: 0;
+  transition: left 0.22s ease, top 0.22s ease, background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 .sidebar-collapse-btn:hover { background: var(--bg-hover); color: var(--text); border-color: var(--border-soft); }
 .sidebar-collapse-btn svg { width: 14px; height: 14px; }
@@ -245,8 +274,22 @@ async function loadHealth() {
 .shell.sb-collapsed .content { margin-left: var(--sidebar-collapsed); }
 
 /* Logo: hide byline and scale down mark */
-.shell.sb-collapsed .sidebar-head :deep(.lockup .by) { display: none; }
-.shell.sb-collapsed .sidebar-head :deep(.lockup .mark) { font-size: 14px; letter-spacing: -0.02em; }
+.shell.sb-collapsed .sidebar-head {
+  min-height: 94px;
+  padding: 0;
+}
+.shell.sb-collapsed .sidebar-logo-full { display: none; }
+.shell.sb-collapsed .sidebar-logo-compact { display: inline-flex; }
+.shell.sb-collapsed .sidebar-collapse-btn {
+  top: 50px;
+  left: 15px;
+  border-color: var(--border-soft);
+  background: var(--bg-elevated);
+}
+.shell.sb-collapsed .sidebar-collapse-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--border);
+}
 
 /* Nav: icon-only, centered */
 .shell.sb-collapsed .nav-label { display: none; }

@@ -5,8 +5,12 @@ const Fastify = require('fastify');
 // Build (but do not start) the configured Fastify app. Extracted from index.js
 // so tests can use app.inject() without binding a port or touching Docker.
 async function buildApp(opts = {}) {
+  const trustProxy = process.env.TRUST_PROXY === 'false'
+    ? false
+    : (process.env.TRUST_PROXY ? process.env.TRUST_PROXY === 'true' : true);
+
   const fastify = Fastify({
-    trustProxy: !!process.env.REVERSE_PROXY || process.env.TRUST_PROXY === 'true',
+    trustProxy,
     ...(opts.fastify || { logger: false }),
   });
 

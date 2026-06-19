@@ -55,15 +55,22 @@ const deployedHost = computed(() => deployedUrl.value.replace(/^https?:\/\//, ''
 const largeUploads = ref(false)
 const uploadMaxMb = ref(100)
 const v2UploadMaxMb = ref(2048)
+const serverInfo = ref(null)
+const systemsCount = ref(null)
 onMounted(async () => {
   try {
     const info = await api.get('/server/info')
+    serverInfo.value = info
     if (info && info.features) {
       largeUploads.value = !!info.features.largeUploads
       uploadMaxMb.value = info.features.uploadMaxMb || 100
       v2UploadMaxMb.value = info.features.v2UploadMaxMb || 2048
     }
   } catch { /* non-fatal — fall back to standard upload */ }
+  try {
+    const data = await api.get('/projects')
+    systemsCount.value = (data.projects || []).length
+  } catch { /* non-fatal - do not block deploy if the count cannot be loaded */ }
 })
 const willChunk = computed(() =>
   !!file.value && largeUploads.value && file.value.size > uploadMaxMb.value * 1024 * 1024
@@ -113,6 +120,43 @@ const effectiveMaxMb = computed(() => largeUploads.value ? v2UploadMaxMb.value :
 const archiveWithinLimit = computed(() =>
   !file.value || file.value.size <= effectiveMaxMb.value * 1024 * 1024
 )
+const firstDeploy = computed(() => systemsCount.value === 0)
+const hostReadiness = computed(() => {
+  const info = serverInfo.value
+  const dockerReady = info?.docker?.status === 'connected'
+  const diskReady = info?.disk?.status !== 'measured' || Number(info.disk.usedPct) < 90
+  const domainReady = LOCAL_MODE || !!info?.platform?.baseDomain
+  const proxyReady = LOCAL_MODE || info?.caddy?.status !== 'unavailable'
+  return [
+    {
+      label: 'Docker engine reachable',
+      ok: dockerReady,
+      required: true,
+      detail: dockerReady ? `${info.docker.running ?? 0}/${info.docker.managed ?? 0} managed containers running` : 'Start Docker Desktop or expose Docker to the API.',
+    },
+    {
+      label: LOCAL_MODE ? 'Local route mode' : 'Base domain configured',
+      ok: domainReady,
+      required: !LOCAL_MODE,
+      detail: LOCAL_MODE ? 'Deploys publish to localhost ports in this environment.' : (info?.platform?.baseDomain || 'Set BASE_DOMAIN before publishing public systems.'),
+    },
+    {
+      label: 'Proxy route readiness',
+      ok: proxyReady,
+      required: false,
+      detail: LOCAL_MODE ? 'Subdomain proxying is bypassed locally.' : `Caddy status: ${info?.caddy?.status || 'unknown'}`,
+    },
+    {
+      label: 'Data volume capacity',
+      ok: diskReady,
+      required: true,
+      detail: info?.disk?.status === 'measured' ? `${info.disk.freeGb} GB free, ${info.disk.usedPct}% used` : 'Disk usage could not be measured from the API.',
+    },
+  ]
+})
+const hostBlocks = computed(() =>
+  firstDeploy.value ? hostReadiness.value.filter((r) => r.required && !r.ok) : []
+)
 
 // Deployment readiness — each gate the deploy depends on, surfaced as a checklist.
 const readiness = computed(() => [
@@ -122,7 +166,7 @@ const readiness = computed(() => [
   { label: 'Within upload limit', ok: archiveWithinLimit.value },
 ])
 const canDeploy = computed(() =>
-  readiness.value.every((r) => r.ok) && !planChecking.value && !uploading.value
+  readiness.value.every((r) => r.ok) && !hostBlocks.value.length && !planChecking.value && !uploading.value
 )
 
 function setFile(f) {
@@ -294,6 +338,22 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
       </div>
 
       <div class="card stack">
+        <div class="section-label">Host readiness</div>
+        <div v-if="systemsCount === null" class="hint">Checking first-deploy host readiness...</div>
+        <div v-else-if="firstDeploy" class="host-ready">
+          <div v-for="r in hostReadiness" :key="r.label" class="host-ready-row">
+            <span class="sdot" :class="r.ok ? 'ok' : (r.required ? 'error' : 'warn')"></span>
+            <span>
+              <strong>{{ r.label }}</strong>
+              <span class="small muted">{{ r.detail }}</span>
+            </span>
+          </div>
+        </div>
+        <div v-else class="hint">Host readiness is enforced before the first deploy. Existing systems indicate initial rollout has already completed.</div>
+        <div v-if="hostBlocks.length" class="error-box">Resolve the required host checks before the first deploy.</div>
+      </div>
+
+      <div class="card stack">
         <div class="section-label">Ship</div>
         <div class="lifecycle">
           <template v-for="(step, i) in LIFECYCLE" :key="step">
@@ -349,4 +409,17 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
 .readiness li.ok { color: var(--text-muted); }
 .readiness .rd-mark { width: 14px; flex-shrink: 0; text-align: center; color: var(--text-disabled); font-weight: 700; }
 .readiness li.ok .rd-mark { color: var(--ok); }
+.host-ready { display: grid; gap: 8px; }
+.host-ready-row {
+  display: grid;
+  grid-template-columns: 10px 1fr;
+  gap: 10px;
+  align-items: start;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border-soft);
+}
+.host-ready-row:last-child { border-bottom: none; }
+.host-ready-row .sdot { margin-top: 6px; }
+.host-ready-row strong { display: block; font-size: 13.5px; }
+.host-ready-row .small { display: block; margin-top: 2px; line-height: 1.4; }
 </style>

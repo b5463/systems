@@ -41,6 +41,14 @@ const ACTION_CATEGORIES = {
     'docker_unavailable', 'postgres_unavailable', 'disk_warning', 'backup_overdue', 'resource_warning'],
 }
 
+const SYSTEM_TARGET_ACTIONS = new Set([
+  'deploy', 'redeploy', 'redeploy_fail', 'rollback', 'start', 'stop', 'restart', 'github_push',
+  'env_update', 'delete', 'purge', 'visibility_change', 'health_ok', 'health_fail',
+  'db_provisioned', 'repo_set', 'primary_set', 'reconcile', 'build_stuck'
+])
+const AUTH_TARGET_ACTIONS = new Set(['login', 'login_fail', 'login_locked'])
+const ADMIN_TARGET_ACTIONS = new Set(['user_create', 'user_delete', 'password_reset', 'password_change'])
+
 const categoryMenuOptions = [
   { value: '', label: 'All categories' },
   { value: 'deploy', label: 'Deploys & ops' },
@@ -73,6 +81,20 @@ const filteredActionOptions = computed(() => {
 function humanize(action) {
   if (!action) return 'Event'
   return ACTION_LABELS[action] || (action.charAt(0).toUpperCase() + action.slice(1).replace(/_/g, ' '))
+}
+
+function actorLabel(e) {
+  if (e.username) return e.username
+  if (AUTH_TARGET_ACTIONS.has(e.action)) return 'Anonymous'
+  return 'System'
+}
+
+function targetKind(e) {
+  if (!e.target) return ''
+  if (SYSTEM_TARGET_ACTIONS.has(e.action)) return 'System'
+  if (AUTH_TARGET_ACTIONS.has(e.action)) return 'Username'
+  if (ADMIN_TARGET_ACTIONS.has(e.action)) return 'Admin'
+  return 'Target'
 }
 
 function dotClass(action) {
@@ -184,9 +206,9 @@ function clearFilters() {
 }
 
 function exportCSV() {
-  const rows = [['Date/Time', 'Action', 'System', 'Admin', 'IP', 'Detail']]
+  const rows = [['Date/Time', 'Action', 'Target type', 'Target', 'Actor', 'IP', 'Detail']]
   for (const e of entries.value) {
-    rows.push([e.created_at, humanize(e.action), e.target || '', e.username || 'system', e.ip || '', e.detail || ''])
+    rows.push([e.created_at, humanize(e.action), targetKind(e), e.target || '', actorLabel(e), e.ip || '', e.detail || ''])
   }
   const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n')
   const blob = new Blob([csv], { type: 'text/csv' })
@@ -245,7 +267,7 @@ onBeforeUnmount(() => clearTimeout(textDebounce))
         <SelectMenu v-model="filterSeverity" :options="severityMenuOptions" placeholder="Any result" />
       </div>
       <div class="field-group" style="min-width:130px; flex:1">
-        <label class="field-label" for="ev-target">System</label>
+        <label class="field-label" for="ev-target">Target</label>
         <input id="ev-target" v-model="filterTarget" autocapitalize="none" autocorrect="off" />
       </div>
       <div class="field-group" style="min-width:130px; flex:1">
@@ -314,8 +336,8 @@ onBeforeUnmount(() => clearTimeout(textDebounce))
               <th style="width:1%"></th>
               <th>Time</th>
               <th>Action</th>
-              <th>System</th>
-              <th>Admin</th>
+              <th>Target</th>
+              <th>Actor</th>
               <th>IP</th>
             </tr>
           </thead>
@@ -330,8 +352,12 @@ onBeforeUnmount(() => clearTimeout(textDebounce))
                     {{ humanize(e.action) }}
                   </span>
                 </td>
-                <td><span v-if="e.target" class="chip">{{ e.target }}</span></td>
-                <td class="mono small muted">{{ e.username || 'system' }}</td>
+                <td>
+                  <span v-if="e.target" class="chip">
+                    <span class="dim">{{ targetKind(e) }}</span>{{ e.target }}
+                  </span>
+                </td>
+                <td class="mono small muted">{{ actorLabel(e) }}</td>
                 <td class="mono small dim">{{ e.ip || '—' }}</td>
               </tr>
               <tr v-if="expandedId === e.id" class="ev-detail-row">
@@ -340,8 +366,8 @@ onBeforeUnmount(() => clearTimeout(textDebounce))
                   <div class="ev-detail">
                     <div class="kv"><span class="k">When</span><span class="v mono small">{{ e.created_at }}</span></div>
                     <div class="kv"><span class="k">Event</span><span class="v">{{ humanize(e.action) }} <span class="mono dim small">({{ e.action }})</span></span></div>
-                    <div v-if="e.target" class="kv"><span class="k">System</span><span class="v mono small">{{ e.target }}</span></div>
-                    <div class="kv"><span class="k">Admin</span><span class="v mono small">{{ e.username || 'system' }}</span></div>
+                    <div v-if="e.target" class="kv"><span class="k">{{ targetKind(e) }}</span><span class="v mono small">{{ e.target }}</span></div>
+                    <div class="kv"><span class="k">Actor</span><span class="v mono small">{{ actorLabel(e) }}</span></div>
                     <div class="kv"><span class="k">IP address</span><span class="v mono small">{{ e.ip || '—' }}</span></div>
                     <div v-if="e.detail" class="kv"><span class="k">Detail</span><span class="v small">{{ e.detail }}</span></div>
                   </div>
@@ -368,13 +394,13 @@ onBeforeUnmount(() => clearTimeout(textDebounce))
             <div class="spread">
               <div class="row gap-sm" style="min-width:0">
                 <strong>{{ humanize(e.action) }}</strong>
-                <span v-if="e.target" class="chip">{{ e.target }}</span>
+                <span v-if="e.target" class="chip"><span class="dim">{{ targetKind(e) }}</span>{{ e.target }}</span>
               </div>
               <span class="dim small" style="white-space:nowrap">{{ fmtTime(e.created_at) }}</span>
             </div>
             <div v-if="e.detail" class="small muted" style="margin-top:6px">{{ e.detail }}</div>
             <div class="row small dim" style="margin-top:8px; gap:14px">
-              <span class="mono">{{ e.username || 'system' }}</span>
+              <span class="mono">{{ actorLabel(e) }}</span>
               <span v-if="e.ip" class="mono">{{ e.ip }}</span>
             </div>
           </div>
