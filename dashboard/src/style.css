@@ -1179,7 +1179,7 @@ select.is-invalid {
   color: var(--text-muted);
   margin-top: 4px;
 }
-.page-head .head-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.page-head .head-actions { display: flex; gap: var(--sp-2); flex-wrap: wrap; }
 
 /* ---------- Generic grid ---------- */
 .grid {
@@ -1447,9 +1447,9 @@ select.is-invalid {
 
 /* utility */
 .flex-wrap { flex-wrap: wrap; }
-.gap-sm { gap: 8px; }
-.mt-sm { margin-top: 8px; }
-.mt { margin-top: 16px; }
+.gap-sm { gap: var(--sp-2); }
+.mt-sm { margin-top: var(--sp-2); }
+.mt { margin-top: var(--sp-4); }
 .tnum { font-variant-numeric: tabular-nums; }
 
 /* ---------- Empty states carry a faint ASCII field ---------- */

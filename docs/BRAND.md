@@ -103,7 +103,10 @@ Rules: nothing readable below 12px; uppercase labels use letter-spacing
 ## 4. Spacing, radius, layout
 
 - **Spacing scale (4px base):** `--sp-1` 4 · `--sp-2` 8 · `--sp-3` 12 ·
-  `--sp-4` 16 · `--sp-5` 20 · `--sp-6` 24. Use these for padding/gaps.
+  `--sp-4` 16 · `--sp-5` 20 · `--sp-6` 24. Use these for padding/gaps in **new**
+  work. Note: a few base primitives intentionally sit off-scale (`.stack` 14px,
+  `.btn-row` 10px, `.card` 18px) — that bespoke rhythm is deliberate; don't
+  "normalize" them onto the scale (it would shift spacing app-wide).
 - **Radius:** `--radius` 8 (cards/panels) · `--radius-sm` 6 (controls) ·
   `--radius-xs` 4 (chips, small).
 - **Content widths:** `--content-max` 1760 cap; forms read best 720–960,
