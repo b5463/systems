@@ -146,14 +146,21 @@ async function runContainer(projectSlug, imageId, port, envVars = {}, opts = {})
 
   const Env = Object.entries(envVars).map(([k, v]) => `${k}=${v}`);
 
+  // The port the app listens on INSIDE the container. Generated Dockerfiles use
+  // 3000; a user-supplied Dockerfile can expose anything (e.g. 8080), so the
+  // caller passes the image's exposed port. Mapping host→3000 when the app is
+  // on 8080 leaves the endpoint dead, so honor the real container port.
+  const containerPort = Number(opts.containerPort) || 3000;
+  const portKey = `${containerPort}/tcp`;
+
   const container = await docker.createContainer({
     name: containerName,
     Image: imageId,
     Env,
-    ExposedPorts: { '3000/tcp': {} },
+    ExposedPorts: { [portKey]: {} },
     HostConfig: {
       PortBindings: {
-        '3000/tcp': [{ HostPort: String(port) }],
+        [portKey]: [{ HostPort: String(port) }],
       },
       NetworkMode: ISOLATED_NETWORK,
       CapDrop: ['ALL'],
@@ -169,6 +176,23 @@ async function runContainer(projectSlug, imageId, port, envVars = {}, opts = {})
 
   await container.start();
   return container.id;
+}
+
+// Read the first port a built image EXPOSEs (e.g. EXPOSE 8080 → 8080). Used to
+// bind the host port to the real container port. Returns null if none declared.
+async function imageExposedPort(imageId) {
+  try {
+    const data = await docker.getImage(imageId).inspect();
+    const exposed = (data && data.Config && data.Config.ExposedPorts)
+      || (data && data.ContainerConfig && data.ContainerConfig.ExposedPorts)
+      || {};
+    const ports = Object.keys(exposed)
+      .map((k) => parseInt(k, 10))
+      .filter((n) => Number.isInteger(n) && n > 0);
+    return ports.length ? ports[0] : null;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -453,6 +477,7 @@ module.exports = {
   execContainer,
   listManagedContainers,
   findFreePort,
+  imageExposedPort,
   isDockerUnavailableError,
   dockerOptions,
   createDocker: () => new Docker(dockerOptions()),

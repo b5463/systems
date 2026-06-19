@@ -239,8 +239,9 @@ async function runBuildPipeline(slug, zipPath, extractDir, port, userId, ip, env
     appendBuildLog(slug, `[deploy] Image built: ${imageId}\n`);
 
     stage = 'container';
-    appendBuildLog(slug, `[deploy] Starting container on port ${port}...\n`);
-    const containerId = await dockerService.runContainer(slug, imageId, port, envVars);
+    const containerPort = (await dockerService.imageExposedPort(imageId)) || 3000;
+    appendBuildLog(slug, `[deploy] Starting container — host ${port} → container ${containerPort}...\n`);
+    const containerId = await dockerService.runContainer(slug, imageId, port, envVars, { containerPort });
     appendBuildLog(slug, `[deploy] Container started: ${containerId}\n`);
 
     stage = 'route';
@@ -360,7 +361,9 @@ async function runRedeployPipeline(slug, zipPath, extractDir, userId, ip) {
       }
     }
 
-    const newContainerId = await dockerService.runContainer(slug, newImageId, port, envVars);
+    const containerPort = (await dockerService.imageExposedPort(newImageId)) || 3000;
+    appendBuildLog(slug, `[redeploy] Starting new container — host ${port} → container ${containerPort}...\n`);
+    const newContainerId = await dockerService.runContainer(slug, newImageId, port, envVars, { containerPort });
     appendBuildLog(slug, `[redeploy] Container started: ${newContainerId}\n`);
 
     db.prepare(`
