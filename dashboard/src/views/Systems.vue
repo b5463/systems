@@ -5,7 +5,7 @@ import { api } from '../api/client'
 import StatusBadge from '../components/StatusBadge.vue'
 import SelectMenu from '../components/SelectMenu.vue'
 import { useToast } from '../composables/useToast'
-import { BASE_DOMAIN, hostFor, urlFor } from '../config'
+import { BASE_DOMAIN, LOCAL_MODE, hostFor, urlFor } from '../config'
 import { fmtAgo } from '../utils/date'
 import { isCrashed } from '../utils/status'
 
@@ -180,7 +180,7 @@ onBeforeUnmount(() => clearInterval(timer))
         <div class="section-label">Latest deploy</div>
         <div class="spread">
           <div style="min-width:0"><div class="sc-name">{{ latest.name }}</div><div class="mono small dim">{{ hostFor(latest.slug, latest.port) }}</div></div>
-          <div class="row gap-sm"><span class="small muted">{{ fmtAgo(latest.updated_at || latest.created_at) }}</span><StatusBadge :status="latest.status" :crashed="isCrashed(latest)" /></div>
+          <div class="row gap-sm"><span class="small muted">{{ fmtAgo(latest.updated_at || latest.created_at) }}</span><StatusBadge :project="latest" /></div>
         </div>
       </div>
       <div class="card">
@@ -203,7 +203,7 @@ onBeforeUnmount(() => clearInterval(timer))
         <SelectMenu v-model="sortBy" :options="sortOptions" placeholder="Sort" style="width:140px" />
       </div>
     </div>
-    <div v-if="!visibleSystems.length" class="muted small" style="margin-bottom:18px">No systems match “{{ query }}”.</div>
+    <div v-if="!visibleSystems.length" class="muted small" style="margin-bottom:18px">{{ query.trim() ? `No systems match “${query}”.` : 'No active systems.' }}</div>
     <div class="grid grid-auto">
       <div v-for="s in visibleSystems" :key="s.id" class="card card-tap sys-card" role="button" tabindex="0" :aria-label="`Open ${s.name}`" @click="open(s)" @keydown.enter="open(s)" @keydown.space.prevent="open(s)">
         <div class="sc-top">
@@ -211,7 +211,7 @@ onBeforeUnmount(() => clearInterval(timer))
             <div class="sc-name">{{ s.name }}</div>
             <div class="sc-host mono">{{ hostFor(s.slug, s.port) }}</div>
           </div>
-          <StatusBadge :status="s.status" :crashed="isCrashed(s)" />
+          <StatusBadge :project="s" />
         </div>
 
         <div class="sc-facts">
@@ -226,7 +226,7 @@ onBeforeUnmount(() => clearInterval(timer))
             CPU {{ (stats[s.slug].cpu_percent ?? 0).toFixed(1) }}% · RAM {{ (stats[s.slug].memory_mb ?? 0).toFixed(0) }} MB<span v-if="s.port"> · :{{ s.port }}</span>
           </span>
           <span v-else class="small dim">{{ s.status === 'building' ? 'Building…' : s.status === 'error' ? (isCrashed(s) ? 'Crashed' : 'Build failed') : 'Not running' }}</span>
-          <a v-if="s.status === 'running'" class="sc-open small" :href="urlFor(s.slug, s.port)" target="_blank" rel="noopener" @click.stop>Open ↗</a>
+          <a v-if="s.status === 'running' && (s.route_published || LOCAL_MODE)" class="sc-open small" :href="urlFor(s.slug, s.port)" target="_blank" rel="noopener" @click.stop>Open ↗</a>
         </div>
       </div>
     </div>

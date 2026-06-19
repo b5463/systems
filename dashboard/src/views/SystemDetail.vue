@@ -311,7 +311,7 @@ onBeforeUnmount(() => {
             <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7" /><path d="M19 12H5" /></svg>
             Systems
           </RouterLink>
-          <StatusBadge :status="system.status" :crashed="isCrashed(system)" />
+          <StatusBadge :project="system" />
         </div>
         <h1 style="margin-top:10px">{{ system.name }}</h1>
         <a class="mono small" :href="publicUrl" target="_blank" rel="noopener">{{ publicHost }}</a>

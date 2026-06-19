@@ -392,6 +392,7 @@ select.is-invalid {
 .badge-running  { color: var(--ok); }
 .badge-stopped  { color: var(--text-dim); }
 .badge-error    { color: var(--danger); }
+.badge-warn     { color: var(--warn); }
 .badge-building {
   color: var(--warn);
   animation: pulse 1.4s ease-in-out infinite;
@@ -1196,7 +1197,9 @@ select.is-invalid {
 /* ---------- Truth model (system detail) ---------- */
 .truth {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  /* auto-fit (not auto-fill) so the cells stretch to fill the row instead of
+     leaving a dangling empty track on wide screens. */
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 1px;
   background: var(--border-soft);
   border: 1px solid var(--border-soft);
