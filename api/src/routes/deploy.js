@@ -455,7 +455,10 @@ async function deployRoutes(fastify, options) {
   fastify.get('/api/deploy/:slug/build-log', {
     websocket: true,
     preHandler: [fastify.authenticate],
-  }, (socket, request) => {
+  }, (connection, request) => {
+    // @fastify/websocket v8 passes a { socket } wrapper; newer majors pass the
+    // socket directly. Support both so the handler body is version-agnostic.
+    const socket = connection.socket || connection;
     const { slug } = request.params;
     const logs = buildLogs.get(slug) || [];
     const status = buildStatus.get(slug);

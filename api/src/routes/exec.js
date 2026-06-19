@@ -11,7 +11,10 @@ async function execRoutes(fastify, options) {
   fastify.get('/api/projects/:slug/exec', {
     websocket: true,
     preHandler: [fastify.authenticate],
-  }, async (socket, request) => {
+  }, async (connection, request) => {
+    // @fastify/websocket v8 passes a { socket } wrapper; newer majors pass the
+    // socket directly. Support both so the handler body is version-agnostic.
+    const socket = connection.socket || connection;
     const { slug } = request.params;
 
     if (!features().shellConsole) {
