@@ -244,7 +244,7 @@ async function provisionDb() {
     <div v-else class="row flex-wrap" style="gap:8px">
       <span v-for="k in envKeys" :key="k" class="chip">
         {{ k }} = ********
-        <button class="chip-x" :aria-label="`Remove ${k}`" :disabled="envSaving" @click="removingKey = k"><Icon name="close" /></button>
+        <button class="chip-x" :aria-label="`Remove ${k}`" :disabled="envSaving" @click="removingKey = k"><Icon name="close" :size="13" /></button>
       </span>
     </div>
     <div v-if="removingKey" class="callout warn" style="margin:0">
@@ -267,7 +267,7 @@ async function provisionDb() {
     <div v-for="(row, i) in envVars" :key="i" class="row">
       <input v-model="row.key" aria-label="Variable name" placeholder="Variable name" autocapitalize="characters" autocorrect="off" spellcheck="false" />
       <input v-model="row.value" aria-label="Value" placeholder="Value" autocorrect="off" spellcheck="false" />
-      <button class="iconbtn" aria-label="Remove row" title="Remove row" @click="removeEnvRow(i)"><Icon name="close" /></button>
+      <button class="iconbtn" aria-label="Remove row" title="Remove row" @click="removeEnvRow(i)"><Icon name="close" :size="16" /></button>
     </div>
     <div class="row gap-sm flex-wrap">
       <button class="btn btn-sm" @click="addEnvRow">+ Add row</button>

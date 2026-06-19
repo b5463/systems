@@ -373,9 +373,11 @@ onBeforeUnmount(() => clearInterval(timer))
 .sys-card { position: relative; }
 .sys-selectable { border-color: var(--border); }
 .sys-selected { border-color: var(--focus-border); box-shadow: 0 0 0 1px var(--focus-border) inset; }
+/* Reserve room on the top row so the corner checkbox never overlaps the badge. */
+.sys-selectable .sc-top { padding-right: 30px; }
 .sys-check {
   position: absolute;
-  top: 10px; right: 10px;
+  top: 14px; right: 14px;
   width: 20px; height: 20px;
   border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
@@ -383,8 +385,10 @@ onBeforeUnmount(() => clearInterval(timer))
   border: 1px solid var(--border-strong);
   background: var(--bg-input);
   color: transparent;
+  z-index: 1;
 }
 .sys-check.on { background: var(--ok); border-color: var(--ok); color: #06140b; }
+.sys-check .icon { width: 13px; height: 13px; }
 .bulk-bar {
   position: fixed;
   left: 50%;

@@ -387,7 +387,7 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
           <div v-for="(pair, i) in envVarPairs" :key="i" class="env-row">
             <input v-model="pair.key" class="env-key" placeholder="KEY" autocapitalize="none" autocorrect="off" spellcheck="false" />
             <input v-model="pair.value" class="env-val" placeholder="value" autocorrect="off" spellcheck="false" />
-            <button type="button" class="env-remove" :aria-label="`Remove ${pair.key || 'env var'}`" @click="removeEnvPair(i)"><Icon name="close" /></button>
+            <button type="button" class="env-remove" :aria-label="`Remove ${pair.key || 'env var'}`" @click="removeEnvPair(i)"><Icon name="close" :size="16" /></button>
           </div>
         </div>
         <button type="button" class="btn btn-sm btn-ghost" style="align-self:flex-start" @click="addEnvPair">+ Add variable</button>
