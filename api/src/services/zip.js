@@ -178,13 +178,20 @@ CMD ["python", "${entryPoint}"]
     const dockerignore = `.git\n.gitignore\n.env\n.env.*\nnode_modules\n`;
     await fsp.writeFile(path.join(dirPath, '.dockerignore'), dockerignore);
 
-    content = `FROM nginx:alpine
+    // nginx-unprivileged runs rootless (uid 101) and never chowns system dirs,
+    // so it starts cleanly under our hardening (CapDrop: ALL + no-new-privileges).
+    // Stock nginx:alpine chowns /var/cache/nginx at startup, which needs CAP_CHOWN
+    // and aborts ("Operation not permitted") once capabilities are dropped.
+    // USER root only for the build steps; runtime stays as the non-root 101.
+    content = `FROM nginxinc/nginx-unprivileged:alpine
+USER root
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY . /usr/share/nginx/html
 # Drop build-helper files from the served web root (they were needed for COPY).
 RUN rm -f /usr/share/nginx/html/nginx.conf \\
           /usr/share/nginx/html/Dockerfile \\
           /usr/share/nginx/html/.dockerignore
+USER 101
 EXPOSE 3000
 CMD ["nginx", "-g", "daemon off;"]
 `;
