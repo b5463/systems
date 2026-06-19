@@ -26,6 +26,9 @@ const confirmPassword = ref('')
 const pwSaving = ref(false)
 const pwMsg = ref('')
 const pwError = ref('')
+const showCurrentPw = ref(false)
+const showNewPw = ref(false)
+const showConfirmPw = ref(false)
 
 async function changePassword() {
   pwMsg.value = ''; pwError.value = ''
@@ -40,12 +43,32 @@ async function changePassword() {
     })
     pwMsg.value = data.message || 'Password updated.'
     currentPassword.value = ''; newPassword.value = ''; confirmPassword.value = ''
+    showCurrentPw.value = false; showNewPw.value = false; showConfirmPw.value = false
   } catch (e) {
     pwError.value = e.message || 'Failed to update password.'
   } finally {
     pwSaving.value = false
   }
 }
+
+const pwStrength = computed(() => {
+  const pw = newPassword.value
+  if (!pw) return 0
+  let score = 0
+  if (pw.length >= 8) score++
+  if (pw.length >= 12) score++
+  if (/[A-Z]/.test(pw)) score++
+  if (/[0-9]/.test(pw)) score++
+  if (/[^A-Za-z0-9]/.test(pw)) score++
+  return score
+})
+const pwStrengthInfo = computed(() => {
+  if (!newPassword.value) return null
+  const s = pwStrength.value
+  if (s <= 1) return { label: 'Weak', cls: 'pw-weak' }
+  if (s <= 3) return { label: 'Fair', cls: 'pw-fair' }
+  return { label: 'Strong', cls: 'pw-strong' }
+})
 
 /* ---------- Two-factor (TOTP) ---------- */
 const twoFAEnabled = computed(() => !!auth.user?.twoFactorEnabled)
@@ -203,15 +226,37 @@ onMounted(loadUsers)
         <div class="section-label">Change password</div>
         <div class="field-group">
           <label class="field-label" for="ap-cur-pw">Current password</label>
-          <input id="ap-cur-pw" v-model="currentPassword" type="password" autocomplete="current-password" />
+          <div class="input-wrap">
+            <input id="ap-cur-pw" v-model="currentPassword" :type="showCurrentPw ? 'text' : 'password'" autocomplete="current-password" />
+            <button type="button" class="pw-toggle" :aria-label="showCurrentPw ? 'Hide password' : 'Show password'" @click="showCurrentPw = !showCurrentPw">
+              <svg v-if="!showCurrentPw" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z"/><circle cx="12" cy="12" r="3"/></svg>
+              <svg v-else viewBox="0 0 24 24"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+            </button>
+          </div>
         </div>
         <div class="field-group">
           <label class="field-label" for="ap-new-pw">New password</label>
-          <input id="ap-new-pw" v-model="newPassword" type="password" autocomplete="new-password" />
+          <div class="input-wrap">
+            <input id="ap-new-pw" v-model="newPassword" :type="showNewPw ? 'text' : 'password'" autocomplete="new-password" />
+            <button type="button" class="pw-toggle" :aria-label="showNewPw ? 'Hide password' : 'Show password'" @click="showNewPw = !showNewPw">
+              <svg v-if="!showNewPw" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z"/><circle cx="12" cy="12" r="3"/></svg>
+              <svg v-else viewBox="0 0 24 24"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+            </button>
+          </div>
+          <div v-if="pwStrengthInfo" class="pw-strength">
+            <div class="pw-bar"><div class="pw-fill" :class="pwStrengthInfo.cls" :style="{ width: (pwStrength / 5 * 100) + '%' }"></div></div>
+            <span class="small pw-label" :class="pwStrengthInfo.cls">{{ pwStrengthInfo.label }}</span>
+          </div>
         </div>
         <div class="field-group">
           <label class="field-label" for="ap-conf-pw">Confirm new password</label>
-          <input id="ap-conf-pw" v-model="confirmPassword" type="password" autocomplete="new-password" />
+          <div class="input-wrap">
+            <input id="ap-conf-pw" v-model="confirmPassword" :type="showConfirmPw ? 'text' : 'password'" autocomplete="new-password" />
+            <button type="button" class="pw-toggle" :aria-label="showConfirmPw ? 'Hide password' : 'Show password'" @click="showConfirmPw = !showConfirmPw">
+              <svg v-if="!showConfirmPw" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z"/><circle cx="12" cy="12" r="3"/></svg>
+              <svg v-else viewBox="0 0 24 24"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+            </button>
+          </div>
         </div>
         <div v-if="pwError" class="error-box">{{ pwError }}</div>
         <div v-else-if="pwMsg" class="notice">{{ pwMsg }}</div>
@@ -363,3 +408,54 @@ onMounted(loadUsers)
     </div>
   </div>
 </template>
+
+<style scoped>
+.input-wrap { position: relative; }
+.input-wrap input { padding-right: 42px; }
+.pw-toggle {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: var(--radius-xs);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pw-toggle:hover { color: var(--text-muted); }
+.pw-toggle svg {
+  width: 16px; height: 16px;
+  stroke: currentColor; fill: none;
+  stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round;
+}
+.pw-strength {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+.pw-bar {
+  flex: 1;
+  height: 3px;
+  background: var(--bg-elevated);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.pw-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: var(--danger);
+  transition: width 0.2s ease, background 0.2s ease;
+}
+.pw-fill.pw-fair { background: var(--warn); }
+.pw-fill.pw-strong { background: var(--ok); }
+.pw-label { color: var(--text-dim); }
+.pw-label.pw-weak { color: var(--danger); }
+.pw-label.pw-fair { color: var(--warn); }
+.pw-label.pw-strong { color: var(--ok); }
+</style>

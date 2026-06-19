@@ -154,7 +154,14 @@ const backup = computed(() => {
   const b = info.value?.backup
   if (!b) return { tone: 'idle', label: 'Not measured yet', sub: '' }
   const p = present(b.status)
-  return { tone: p.tone, label: p.label, sub: b.last ? `${b.count} backup(s) · last ${b.ageHours}h ago` : 'no backups found' }
+  let sub = 'no backups found'
+  if (b.last) {
+    const age = b.ageHours != null
+      ? (b.ageHours < 1 ? 'under 1h ago' : b.ageHours < 24 ? `${b.ageHours}h ago` : `${Math.floor(b.ageHours / 24)}d ${Math.floor(b.ageHours % 24)}h ago`)
+      : ''
+    sub = `${b.count} backup${b.count !== 1 ? 's' : ''}${age ? ' · last ' + age : ''}`
+  }
+  return { tone: p.tone, label: p.label, sub }
 })
 
 const defaults = computed(() => {
@@ -281,7 +288,13 @@ onMounted(() => { load(); loadCleanup(); })
         <div class="conn-state"><span class="sdot" :class="present(info.health.deploymentWorker).tone"></span>{{ present(info.health.deploymentWorker).label }}</div>
       </div>
       <div class="conn-row">
-        <div style="flex:1"><div class="c-name">Disk</div><div class="c-sub">{{ disk.sub }}</div></div>
+        <div style="flex:1">
+          <div class="c-name">Disk</div>
+          <div class="c-sub">{{ disk.sub }}</div>
+          <div v-if="info.disk?.status === 'measured'" class="disk-bar" style="margin-top:5px">
+            <div class="disk-fill" :class="disk.tone" :style="{ width: info.disk.usedPct + '%' }"></div>
+          </div>
+        </div>
         <div class="conn-state"><span class="sdot" :class="disk.tone"></span>{{ disk.label }}</div>
       </div>
       <div class="conn-row">
@@ -399,3 +412,22 @@ onMounted(() => { load(); loadCleanup(); })
     </div>
   </template>
 </template>
+
+<style scoped>
+.disk-bar {
+  height: 3px;
+  background: var(--bg-elevated);
+  border-radius: 2px;
+  width: 160px;
+  max-width: 100%;
+  overflow: hidden;
+}
+.disk-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: var(--ok);
+  transition: width 0.3s ease;
+}
+.disk-fill.warn { background: var(--warn); }
+.disk-fill.error { background: var(--danger); }
+</style>

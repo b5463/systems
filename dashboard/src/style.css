@@ -119,6 +119,10 @@ textarea::-webkit-resizer {
   display: none;
 }
 
+*::-webkit-resizer {
+  display: none;
+}
+
 select {
   cursor: pointer;
   -webkit-appearance: none;
@@ -903,6 +907,7 @@ select.is-invalid {
 .shell {
   min-height: 100vh;
   display: flex;
+  border-top: 1px solid var(--border);
 }
 
 .sidebar {

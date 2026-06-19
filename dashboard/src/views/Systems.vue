@@ -131,7 +131,7 @@ onBeforeUnmount(() => clearInterval(timer))
     </div>
     <div class="head-actions">
       <button class="btn btn-sm btn-ghost" data-refresh @click="load()">Refresh</button>
-      <RouterLink class="btn btn-sm btn-primary" :to="{ name: 'ship' }">Ship a system</RouterLink>
+      <RouterLink v-if="active.length || deleted.length" class="btn btn-sm btn-primary" :to="{ name: 'ship' }">Ship a system</RouterLink>
     </div>
   </div>
 
@@ -149,9 +149,7 @@ onBeforeUnmount(() => clearInterval(timer))
   <div v-else-if="!active.length && !deleted.length" class="empty-block">
     <div class="eb-title">No systems yet.</div>
     <div class="eb-sub">
-      A <strong>system</strong> is an app SYSTEMS. builds and runs for you. Zip your
-      project (Vue/Vite or a static site — Node and Dockerfile too once enabled),
-      ship it, and it goes live at <span class="mono">slug.{{ BASE_DOMAIN }}</span> with HTTPS.
+      Upload a zip and SYSTEMS. builds it, routes it, and puts it live at <span class="mono">slug.{{ BASE_DOMAIN }}</span> over HTTPS.
     </div>
     <div class="eb-actions"><RouterLink class="btn btn-primary" :to="{ name: 'ship' }">Ship your first system</RouterLink></div>
   </div>
