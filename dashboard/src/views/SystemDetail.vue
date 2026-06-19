@@ -204,6 +204,9 @@ async function lifecycle(action) {
 /* ---- Metrics ---- */
 async function pollStats() {
   if (document.visibilityState !== 'visible') return
+  // Safety net: while a (re)deploy is building, keep the system row fresh so the
+  // status flips to running/error even if the build-stream event is missed.
+  if (system.value && system.value.status === 'building') loadSystem()
   try {
     const s = await api.get(`/projects/${props.slug}/stats`)
     latestStats.value = s
@@ -276,6 +279,13 @@ async function doRedeploy() {
     redeploying.value = false
     redeployFile.value = null
   }
+}
+// The build stream reports done/error — reload so status leaves "building"
+// without a manual refresh.
+async function onRedeployFinished(status) {
+  await loadSystem()
+  loadDeployHistory()
+  showToast(status === 'done' ? 'Redeploy complete.' : 'Redeploy failed — check the build log.', status === 'done' ? 'success' : 'error')
 }
 async function doRollback() {
   if (rollingBack.value) return
@@ -541,7 +551,7 @@ onBeforeUnmount(() => {
 
       <div v-if="showBuildLog" class="card">
         <div class="section-label">Redeploy build log</div>
-        <LogConsole :slug="system.slug" mode="build" />
+        <LogConsole :slug="system.slug" mode="build" @finished="onRedeployFinished" />
       </div>
     </div>
 
