@@ -9,6 +9,7 @@ const proxy = require('../services/proxy');
 const health = require('../services/health');
 const { confirmMatches } = require('../util/thresholds');
 const { pub, loadOr404 } = require('../util/project');
+const { DATA_DIR } = require('../util/paths');
 
 async function projectsRoutes(fastify, options) {
   fastify.get('/api/projects', {
@@ -139,7 +140,7 @@ async function projectsRoutes(fastify, options) {
     try { await proxy.removeRoute(slug); } catch (err) { errors.push(`Remove route: ${err.message}`); }
     // release files (best-effort, scoped to this slug)
     try {
-      const dir = process.env.DEPLOYMENTS_DIR || path.join(process.env.SYSTEMS_DATA_DIR || '/var/lib/systems', 'releases');
+      const dir = process.env.DEPLOYMENTS_DIR || path.join(DATA_DIR, 'releases');
       await fsp.rm(path.join(dir, slug), { recursive: true, force: true });
     } catch (err) { errors.push(`Remove releases: ${err.message}`); }
 

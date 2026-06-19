@@ -6,8 +6,7 @@ const path = require('path');
 // Lazy dockerode so this module can be imported (e.g. by the proxy abstraction
 // and unit tests) without the dependency present.
 function getDocker() {
-  const Docker = require('dockerode');
-  return new Docker({ socketPath: '/var/run/docker.sock' });
+  return require('./docker').createDocker();
 }
 
 const CONF_DIR = '/etc/nginx/conf.d';

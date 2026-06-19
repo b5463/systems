@@ -11,21 +11,21 @@
 const fsp = require('fs/promises');
 const path = require('path');
 const { isValidSlug } = require('../util/slug');
+const { DATA_DIR } = require('../util/paths');
 
 // dockerode is loaded lazily so the pure route-generation logic can be used
 // (and tested) without the Docker dependency present.
 function getDocker() {
-  const Docker = require('dockerode');
-  return new Docker({ socketPath: '/var/run/docker.sock' });
+  return require('./docker').createDocker();
 }
 
 function systemsDir() {
   return process.env.CADDY_SYSTEMS_DIR
-    || path.join(process.env.SYSTEMS_DATA_DIR || '/var/lib/systems', 'caddy', 'systems.d');
+    || path.join(DATA_DIR, 'caddy', 'systems.d');
 }
 function caddyfilePath() {
   return process.env.CADDY_CONFIG_PATH
-    || path.join(process.env.SYSTEMS_DATA_DIR || '/var/lib/systems', 'caddy', 'Caddyfile');
+    || path.join(DATA_DIR, 'caddy', 'Caddyfile');
 }
 function baseDomain() {
   return process.env.BASE_DOMAIN || 'acronym.sk';

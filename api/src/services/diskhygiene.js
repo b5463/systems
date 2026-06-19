@@ -1,20 +1,15 @@
 'use strict';
 
-const Docker = require('dockerode');
 const fsp = require('fs/promises');
 const path = require('path');
 const { db } = require('../db');
+const { createDocker } = require('./docker');
+const { DATA_DIR } = require('../util/paths');
 
-const docker = new Docker({ socketPath: '/var/run/docker.sock' });
+const docker = createDocker();
 
 function deploymentsDir() {
-  return (
-    process.env.DEPLOYMENTS_DIR ||
-    path.join(
-      process.env.SYSTEMS_DATA_DIR || process.env.DATA_DIR || '/var/lib/systems',
-      'releases'
-    )
-  );
+  return process.env.DEPLOYMENTS_DIR || path.join(DATA_DIR, 'releases');
 }
 
 // All image IDs currently referenced by any project (current + rollback).

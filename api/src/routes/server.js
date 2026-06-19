@@ -1,6 +1,5 @@
 'use strict';
 
-const Docker = require('dockerode');
 const net = require('net');
 const fs = require('fs');
 const fsp = require('fs/promises');
@@ -87,7 +86,7 @@ async function serverRoutes(fastify, options) {
 
     // Docker — the one component we can truly probe today.
     try {
-      const docker = new Docker({ socketPath: '/var/run/docker.sock' });
+      const docker = dockerService.createDocker();
       await docker.ping();
       info.docker.status = 'connected';
       info.health.dockerAccess = 'connected';

@@ -3,7 +3,18 @@
 const Docker = require('dockerode');
 const fs = require('fs');
 
-const docker = new Docker({ socketPath: '/var/run/docker.sock' });
+// Connect to the Docker Engine in a cross-platform way. Linux/macOS use the
+// unix socket; Windows Docker Desktop exposes a named pipe. Explicit overrides:
+//   DOCKER_SOCKET  — exact socketPath / pipe to use
+//   DOCKER_HOST    — tcp://host:port (dockerode reads it from the environment)
+function dockerOptions() {
+  if (process.env.DOCKER_SOCKET) return { socketPath: process.env.DOCKER_SOCKET };
+  if (process.env.DOCKER_HOST) return {}; // dockerode honors DOCKER_HOST itself
+  if (process.platform === 'win32') return { socketPath: '//./pipe/docker_engine' };
+  return { socketPath: '/var/run/docker.sock' };
+}
+
+const docker = new Docker(dockerOptions());
 
 const ISOLATED_NETWORK = 'acronym-isolated';
 
@@ -441,4 +452,6 @@ module.exports = {
   listManagedContainers,
   findFreePort,
   isDockerUnavailableError,
+  dockerOptions,
+  createDocker: () => new Docker(dockerOptions()),
 };

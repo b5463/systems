@@ -283,26 +283,35 @@ async function beginDeploy({ name, slug, visibility = 'public', zipPath, userId,
   // Serialize port allocation + INSERT: findFreePort awaits Docker, so two
   // concurrent deploys could otherwise pick the same port before either row
   // commits. The lock makes the chosen port visible to the next call's scan.
+  // findFreePort reaches the Docker daemon — if it's unreachable, fail with a
+  // clear 503 (not a generic 500) and create no project row.
   let port, project, conflict;
-  await withDeployLock(async () => {
-    if (db.prepare('SELECT id FROM projects WHERE slug = ? OR name = ?').get(slug, name)) { conflict = true; return; }
-    const dbPorts = db.prepare('SELECT port FROM projects WHERE port IS NOT NULL').all();
-    const usedPorts = new Set(dbPorts.map((r) => r.port));
-    port = await dockerService.findFreePort(4000, 5000, usedPorts);
-    db.prepare(`INSERT INTO projects (name, slug, port, status, visibility) VALUES (?, ?, ?, 'building', ?)`).run(name, slug, port, visibility);
-    project = db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug);
+  try {
+    await withDeployLock(async () => {
+      if (db.prepare('SELECT id FROM projects WHERE slug = ? OR name = ?').get(slug, name)) { conflict = true; return; }
+      const dbPorts = db.prepare('SELECT port FROM projects WHERE port IS NOT NULL').all();
+      const usedPorts = new Set(dbPorts.map((r) => r.port));
+      port = await dockerService.findFreePort(4000, 5000, usedPorts);
+      db.prepare(`INSERT INTO projects (name, slug, port, status, visibility) VALUES (?, ?, ?, 'building', ?)`).run(name, slug, port, visibility);
+      project = db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug);
 
-    // Persist encrypted env vars at deploy time if any were provided and ENV_SECRET is set
-    if (Object.keys(envVars).length > 0 && process.env.ENV_SECRET) {
-      try {
-        const { encryptEnvVars } = require('./env');
-        const encrypted = encryptEnvVars(envVars);
-        db.prepare('UPDATE projects SET env_vars = ? WHERE slug = ?').run(encrypted, slug);
-      } catch (e) {
-        console.error('[deploy] Failed to save env vars:', e);
+      // Persist encrypted env vars at deploy time if any were provided and ENV_SECRET is set
+      if (Object.keys(envVars).length > 0 && process.env.ENV_SECRET) {
+        try {
+          const { encryptEnvVars } = require('./env');
+          const encrypted = encryptEnvVars(envVars);
+          db.prepare('UPDATE projects SET env_vars = ? WHERE slug = ?').run(encrypted, slug);
+        } catch (e) {
+          console.error('[deploy] Failed to save env vars:', e);
+        }
       }
+    });
+  } catch (err) {
+    if (dockerService.isDockerUnavailableError(err)) {
+      return { ok: false, code: 503, error: 'Docker is not reachable. Start Docker and try again.' };
     }
-  });
+    throw err;
+  }
   if (conflict) return { ok: false, code: 409, error: 'A project with this name or slug already exists' };
 
   buildLogs.set(slug, []);
