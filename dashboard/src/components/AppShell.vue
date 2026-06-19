@@ -141,8 +141,8 @@ async function loadHealth() {
 
     <!-- Content column -->
     <div class="content">
+      <!-- Brand-only top bar — the page's own H1 is the title (no duplication). -->
       <header class="mobile-bar">
-        <span class="mb-title">{{ currentTitle }}</span>
         <SystemsLogo size="sm" :byline="false" />
       </header>
 

@@ -317,9 +317,12 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
       </div>
       <div class="lifecycle" style="margin-top: 22px">
         <template v-for="(step, i) in LIFECYCLE" :key="step">
-          <span class="lc-step" :class="{ active: buildResult === 'done', sweep: buildResult === '' }" :style="{ '--i': i }"><span class="lc-dot"></span>{{ step }}</span>
+          <span class="lc-step" :class="{ active: buildResult === 'done' }" :style="{ '--i': i }"><span class="lc-dot"></span>{{ step }}</span>
           <span v-if="i < LIFECYCLE.length - 1" class="lc-link"></span>
         </template>
+      </div>
+      <div v-if="buildResult === ''" class="small dim" style="margin-top:12px">
+        Pipeline reference — SYSTEMS. doesn't claim which step is live; watch the build log below for real progress.
       </div>
     </div>
     <div class="card">
