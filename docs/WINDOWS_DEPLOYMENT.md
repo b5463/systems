@@ -187,12 +187,12 @@ mark running → schedule a detached health/HTTPS check`.
 
 ### Caddy container networking
 For Caddy to reach app containers by name, deployed containers must be named
-`systems-{slug}` and share a Docker network with Caddy that permits
-inter-container traffic. The generated route uses
-`reverse_proxy systems-{slug}:3000`. Set `REVERSE_PROXY=caddy` and run Caddy
-(container or service) with `CADDY_SYSTEMS_DIR` mounted and readable. This is the
-one part that needs the real host to confirm; it can't be exercised in a
-Docker-less CI/dev box.
+`deploy_{slug}` and publish a loopback/host port. Generated Caddy routes target
+`SYSTEMS_APP_UPSTREAM_HOST:<host-port>` (`host.docker.internal` when Caddy is a
+container; use `127.0.0.1` for a Windows service). This avoids joining untrusted
+application containers to the control-plane proxy network. Set
+`REVERSE_PROXY=caddy` and run Caddy with `CADDY_SYSTEMS_DIR` mounted and readable.
+The live networking path still requires validation on the target host.
 
 ### Postgres
 The internal store runs on SQLite today. `POSTGRES_HOST` enables a reachability

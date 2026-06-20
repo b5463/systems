@@ -71,6 +71,8 @@ try { db.exec(`ALTER TABLE projects ADD COLUMN health_status INTEGER`); } catch 
 try { db.exec(`ALTER TABLE projects ADD COLUMN health_response_ms INTEGER`); } catch {}
 try { db.exec(`ALTER TABLE projects ADD COLUMN health_checked_at TEXT`); } catch {}
 try { db.exec(`ALTER TABLE projects ADD COLUMN route_published INTEGER NOT NULL DEFAULT 0`); } catch {}
+try { db.exec(`ALTER TABLE projects ADD COLUMN attestation_state TEXT`); } catch {}
+try { db.exec(`ALTER TABLE projects ADD COLUMN attestation_checked_at TEXT`); } catch {}
 
 // Last deploy/runtime failure (stage + message), surfaced on the system detail
 // page so a failure says what failed, not just "error". Cleared on success.

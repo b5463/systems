@@ -29,7 +29,7 @@ generated Caddy route (dry-run, via `POST /api/deploy/plan`) before you upload.
 - [ ] Set `REVERSE_PROXY=caddy` in `.env`
 - [ ] Set the Postgres connection in `.env`
 - [ ] Ship a test Vue/Vite `.zip`
-- [ ] Confirm `systems-{slug}` container exists (`docker ps`)
+- [ ] Confirm `deploy_{slug}` container exists (`docker ps`)
 - [ ] Confirm route file exists (`...\caddy\systems.d\{slug}.caddy`)
 - [ ] Validate Caddy config (`caddy validate`)
 - [ ] Reload Caddy
@@ -47,7 +47,7 @@ generated Caddy route (dry-run, via `POST /api/deploy/plan`) before you upload.
       `A acronym.sk → SERVER_IP` record)
 - [ ] Flag a different system primary; confirm the first one's apex route is dropped
       (only one primary at a time)
-- [ ] Stop a container out-of-band (`docker stop systems-{slug}`); confirm the
+- [ ] Stop a container out-of-band (`docker stop deploy_{slug}`); confirm the
       dashboard status self-corrects within `RECONCILE_INTERVAL_SEC` (reconciliation)
 - [ ] Take an in-app backup (Server → **Back up now**); confirm a timestamped
       folder appears under `BACKUP_DIR`

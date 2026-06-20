@@ -27,6 +27,8 @@ services:
       - ENV_SECRET=${ENV_SECRET}
       - ADMIN_USERS=${ADMIN_USERS}
       - CORS_ORIGIN=${CORS_ORIGIN:-https://project.acronym.sk}
+      - SYSTEMS_API_INTERNAL_UPSTREAM=${SYSTEMS_API_INTERNAL_UPSTREAM:-acronym-api:3000}
+      - SYSTEMS_ATTESTATION_SECRET=${SYSTEMS_ATTESTATION_SECRET:-}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:

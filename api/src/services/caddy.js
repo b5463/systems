@@ -12,6 +12,7 @@ const fsp = require('fs/promises');
 const path = require('path');
 const { isValidSlug } = require('../util/slug');
 const { DATA_DIR } = require('../util/paths');
+const attestation = require('../util/attestation');
 
 // dockerode is loaded lazily so the pure route-generation logic can be used
 // (and tested) without the Docker dependency present.
@@ -30,8 +31,12 @@ function caddyfilePath() {
 function baseDomain() {
   return process.env.BASE_DOMAIN || 'acronym.sk';
 }
-function containerName(slug) {
-  return `systems-${slug}`;
+function appUpstreamHost() {
+  const value = process.env.SYSTEMS_APP_UPSTREAM_HOST || 'host.docker.internal';
+  if (!/^[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?$/.test(value)) {
+    throw new Error('Invalid SYSTEMS_APP_UPSTREAM_HOST');
+  }
+  return value;
 }
 function routeFile(slug) {
   return path.join(systemsDir(), `${slug}.caddy`);
@@ -44,24 +49,28 @@ function routeFile(slug) {
  *   in addition to {slug}.base — used for the designated primary system.
  */
 function renderRoute({ slug, port = 3000, visibility = 'public', basicUser, basicHash, apex = false }) {
+  if (!isValidSlug(slug)) throw new Error('invalid slug');
   const hosts = [`${slug}.${baseDomain()}`];
   if (apex) hosts.push(baseDomain());
   const host = hosts.join(', ');
-  const target = `${containerName(slug)}:${port}`;
+  const target = `${appUpstreamHost()}:${port}`;
   const tag = `${visibility === 'password' ? 'password' : 'public'}${apex ? ', apex' : ''}`;
-  if (visibility === 'password' && basicUser && basicHash) {
-    return `# managed by SYSTEMS. — ${slug} (${tag})
-${host} {
-\tbasic_auth {
-\t\t${basicUser} ${basicHash}
-\t}
-\treverse_proxy ${target}
-}
-`;
-  }
+  const upstream = attestation.internalUpstream();
+  const credential = attestation.routeCredential(slug);
+  const auth = visibility === 'password' && basicUser && basicHash
+    ? `\t\tbasic_auth {\n\t\t\t${basicUser} ${basicHash}\n\t\t}\n`
+    : '';
   return `# managed by SYSTEMS. — ${slug} (${tag})
 ${host} {
-\treverse_proxy ${target}
+\thandle ${attestation.PATH} {
+\t\trewrite * /api/internal/attestation/${slug}
+\t\treverse_proxy ${upstream} {
+\t\t\theader_up X-Systems-Route-Credential ${credential}
+\t\t}
+\t}
+\thandle {
+${auth}\t\treverse_proxy ${target}
+\t}
 }
 `;
 }
@@ -138,6 +147,6 @@ async function reload() {
 }
 
 module.exports = {
-  systemsDir, caddyfilePath, baseDomain, containerName, routeFile,
+  systemsDir, caddyfilePath, baseDomain, appUpstreamHost, routeFile,
   renderRoute, writeRoute, removeRoute, validate, reload,
 };

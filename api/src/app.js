@@ -88,6 +88,7 @@ async function buildApp(opts = {}) {
   await fastify.register(require('./routes/audit'));
   await fastify.register(require('./routes/admin'));
   await fastify.register(require('./routes/server'));
+  await fastify.register(require('./routes/attestation'));
   await fastify.register(require('./routes/webhook'));
   await fastify.register(require('./routes/upload'));
 

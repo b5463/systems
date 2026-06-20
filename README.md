@@ -193,8 +193,11 @@ is fine — it's unwrapped for you):
   are checked through their real public URL (including DNS, TLS, and the proxy);
   private and unpublished systems fall back to `127.0.0.1:<host-port>`;
   `LOCAL_MODE=true` forces that target even when a route is marked published.
-  A 2xx or 3xx response is healthy. Per-system health paths are not configurable
-  yet.
+  A 2xx or 3xx response is healthy. Published routes also reserve
+  `/.well-known/systems/v1/attestation`: the proxy—not uploaded code—answers a
+  fresh challenge with a five-second AES-256-GCM encrypted attestation. This
+  proves the managed route and detects tampering/replay; it does not replace the
+  separate application probe. Per-system health paths are not configurable yet.
 - **After it's live:** it's served at `{slug}.<base>`; choose Public,
   password-protected, or Private (no public route) in Settings.
 

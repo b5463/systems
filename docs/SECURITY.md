@@ -46,6 +46,17 @@ The "not yet" column is the genuinely unbuilt work, not a release timeline.
   and per-file size limits.
 - **Path traversal** is prevented on extraction (resolved paths must stay under
   the destination).
+- The reserved route-attestation path is owned by Caddy/nginx, before uploaded
+  application handlers. Generated proxy config carries a per-slug HMAC
+  credential to the private API upstream; it is never injected into the app.
+- Attestation payloads use AES-256-GCM authenticated encryption, a random
+  challenge nonce, a five-second expiry, strict size limits, no redirects, and
+  `Cache-Control: no-store`. Modification, cross-system substitution, and replay
+  fail closed. TLS is still required on public routes.
+- Attestations expose only a hashed deployment fingerprint and minimal observed
+  status. They never contain secrets, environment values, ports, container IDs,
+  logs, or arbitrary app data. A malicious app remains untrusted; application
+  health and Docker metrics are measured independently.
 
 ## Not yet built
 

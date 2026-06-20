@@ -1,5 +1,7 @@
 'use strict';
 
+const attestation = require('../util/attestation');
+
 // Health + HTTPS checks. Performs a real HTTP(S) request and reports exactly
 // what it observed. Never fabricates a status — on timeout/refusal it returns
 // state:'failed' / 'unreachable'.
@@ -64,4 +66,28 @@ async function checkSystem(baseUrl, healthPath = '/') {
   };
 }
 
-module.exports = { checkSystem, isLocalMode, targetFor };
+async function checkAttestation(baseUrl, slug, timeoutMs = 6000) {
+  const nonce = attestation.newNonce();
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  const checkedAt = new Date().toISOString();
+  try {
+    const url = `${baseUrl.replace(/\/+$/, '')}${attestation.PATH}?nonce=${encodeURIComponent(nonce)}`;
+    const response = await fetch(url, {
+      method: 'GET', redirect: 'error', cache: 'no-store', signal: ctrl.signal,
+      headers: { accept: 'application/systems-attestation+json' },
+    });
+    const declared = Number(response.headers?.get?.('content-length'));
+    if (!response.ok || (Number.isFinite(declared) && declared > 16384)) throw new Error('attestation unavailable');
+    const raw = await response.text();
+    if (Buffer.byteLength(raw) > 16384) throw new Error('attestation too large');
+    const payload = attestation.open(JSON.parse(raw), { slug, nonce });
+    return { state: 'verified', checkedAt, payload };
+  } catch (error) {
+    return { state: 'failed', checkedAt, reason: error.name === 'AbortError' ? 'timeout' : 'invalid_or_unavailable' };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+module.exports = { checkAttestation, checkSystem, isLocalMode, targetFor };

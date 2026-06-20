@@ -156,10 +156,16 @@ const truth = computed(() => {
     unreachable: { tone: 'error', val: 'Unreachable' }
   }
   const health = healthMap[hs] || { tone: 'idle', val: 'Not measured yet' }
+  const routeProof = s.attestation_state === 'verified'
+    ? { tone: 'ok', val: 'Verified' }
+    : s.attestation_state === 'failed'
+      ? { tone: 'error', val: 'Failed' }
+      : { tone: 'idle', val: LOCAL_MODE || vis === 'private' ? 'Not applicable' : 'Not measured yet' }
 
   return [
     { key: 'Container', tone: containerTone, val: containerLabel },
     { key: 'Route', tone: routePublished ? 'ok' : (vis === 'private' ? 'idle' : 'warn'), val: routePublished ? 'Published' : (vis === 'private' ? 'None (private)' : 'Not published') },
+    { key: 'Route proof', tone: routeProof.tone, val: routeProof.val },
     { key: 'HTTPS', tone: LOCAL_MODE || vis === 'private' ? 'idle' : (hs ? (health.tone === 'error' ? 'error' : 'ok') : 'idle'), val: LOCAL_MODE ? 'Not applicable (local)' : (vis === 'private' ? '—' : (hs ? (health.tone === 'error' ? 'Failed' : 'Valid') : 'Not measured yet')) },
     { key: 'Health', tone: health.tone, val: health.val },
     { key: 'Visibility', tone: 'idle', val: vis.charAt(0).toUpperCase() + vis.slice(1) },

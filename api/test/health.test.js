@@ -1,6 +1,8 @@
 'use strict';
 const { test } = require('node:test');
 const assert = require('node:assert');
+process.env.SYSTEMS_ATTESTATION_SECRET = 'health-test-attestation-secret-32-characters';
+const attestation = require('../src/util/attestation');
 const health = require('../src/services/health');
 
 const realFetch = global.fetch;
@@ -56,4 +58,31 @@ test('connection error → unreachable', async () => {
   const r = await health.checkSystem('demo.acronym.sk', '/');
   restore();
   assert.equal(r.state, 'unreachable');
+});
+test('route attestation verifies a fresh slug-bound envelope', async () => {
+  stub(async (url) => {
+    const nonce = new URL(url).searchParams.get('nonce');
+    const now = Date.now();
+    const body = attestation.seal({ slug: 'demo', nonce, issuedAt: now, expiresAt: now + 5000 });
+    return { ok: true, headers: { get: () => null }, text: async () => JSON.stringify(body) };
+  });
+  const result = await health.checkAttestation('https://demo.example.test', 'demo');
+  restore();
+  assert.equal(result.state, 'verified');
+  assert.equal(result.payload.slug, 'demo');
+});
+
+test('route attestation fails closed when ciphertext is altered', async () => {
+  stub(async (url) => {
+    const nonce = new URL(url).searchParams.get('nonce');
+    const now = Date.now();
+    const body = attestation.seal({ slug: 'demo', nonce, issuedAt: now, expiresAt: now + 5000 });
+    const bytes = Buffer.from(body.ciphertext, 'base64url');
+    bytes[0] ^= 1;
+    body.ciphertext = bytes.toString('base64url');
+    return { ok: true, headers: { get: () => null }, text: async () => JSON.stringify(body) };
+  });
+  const result = await health.checkAttestation('https://demo.example.test', 'demo');
+  restore();
+  assert.equal(result.state, 'failed');
 });

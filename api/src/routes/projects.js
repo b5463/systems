@@ -254,10 +254,13 @@ async function projectsRoutes(fastify, options) {
       return reply.code(400).send({ error: 'Nothing to check — the system is not running and has no published route.' });
     }
     const result = await health.checkSystem(target, '/');
-    db.prepare(`UPDATE projects SET health_state = ?, health_status = ?, health_response_ms = ?, health_checked_at = ? WHERE slug = ?`)
-      .run(result.state, result.httpStatus, result.responseMs, result.checkedAt, slug);
+    const routeAttestation = project.route_published && !health.isLocalMode()
+      ? await health.checkAttestation(target, slug)
+      : { state: 'not_applicable', checkedAt: new Date().toISOString() };
+    db.prepare(`UPDATE projects SET health_state = ?, health_status = ?, health_response_ms = ?, health_checked_at = ?, attestation_state = ?, attestation_checked_at = ? WHERE slug = ?`)
+      .run(result.state, result.httpStatus, result.responseMs, result.checkedAt, routeAttestation.state, routeAttestation.checkedAt, slug);
     auditLog({ user_id: request.user.id, action: result.state === 'healthy' ? 'health_ok' : 'health_fail', target: slug, detail: `${result.state} ${result.httpStatus ?? ''}`.trim(), ip: request.ip });
-    return { health: result };
+    return { health: result, routeAttestation };
   });
 
   // Roll back to the previously deployed image.

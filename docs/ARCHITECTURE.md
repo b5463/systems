@@ -123,6 +123,16 @@ systems—the probe uses `http://127.0.0.1:<port>`. `LOCAL_MODE=true` forces the
 host-port target even when a route is marked published. Results are persisted
 without delaying the build-log `done` event. The current health path is `/`.
 
+For published systems, the generated proxy config reserves
+`/.well-known/systems/v1/attestation` before the uploaded application handler.
+It forwards a fresh nonce to an internal API callback with a per-slug HMAC route
+credential. The callback returns a five-second AES-256-GCM envelope bound to the
+slug and nonce. SYSTEMS. rejects modified, mismatched, oversized, expired, or
+replayed envelopes and persists `verified`/`failed` as route proof. Uploaded code
+never receives the credential or encryption key. This attests the managed
+DNS/TLS/proxy/control-plane path; `/` separately measures application liveness,
+and Docker remains authoritative for runtime metrics.
+
 ## 5. Background services & operations
 
 Beyond request handling, the API runs a few in-process jobs, started in

@@ -65,8 +65,8 @@ Other pieces from this stage:
 
 Still needs the Windows host to confirm (can't be exercised without Docker):
 
-- Container naming `systems-{slug}` on a shared Caddy network (ICC) so Caddy
-  reaches apps by name; the Caddy and Postgres compose/service wiring.
+- Container naming `deploy_{slug}` with Caddy reaching the mapped host port via
+  `SYSTEMS_APP_UPSTREAM_HOST`; the Caddy and optional Postgres service wiring.
 - The SQLite-to-Postgres internal-store cutover (currently a design plan only;
   implement and test a runner as a dedicated, backed-up migration).
 - Live Caddy reload/validate plus end-to-end HTTPS issuance.

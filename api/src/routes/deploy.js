@@ -226,8 +226,11 @@ function probeHealthSoon(slug) {
       if (!target) return;
       try {
         const hr = await health.checkSystem(target, '/');
-        db.prepare('UPDATE projects SET health_state = ?, health_status = ?, health_response_ms = ?, health_checked_at = ? WHERE slug = ?')
-          .run(hr.state, hr.httpStatus, hr.responseMs, hr.checkedAt, slug);
+        const routeAttestation = fresh.route_published && !health.isLocalMode()
+          ? await health.checkAttestation(target, slug)
+          : { state: 'not_applicable', checkedAt: new Date().toISOString() };
+        db.prepare('UPDATE projects SET health_state = ?, health_status = ?, health_response_ms = ?, health_checked_at = ?, attestation_state = ?, attestation_checked_at = ? WHERE slug = ?')
+          .run(hr.state, hr.httpStatus, hr.responseMs, hr.checkedAt, routeAttestation.state, routeAttestation.checkedAt, slug);
         if (hr.state === 'healthy') return;
       } catch { /* keep trying */ }
     }
@@ -527,7 +530,7 @@ async function deployRoutes(fastify, options) {
       error: err || (taken ? 'A system with this slug already exists.' : null),
       proxy: proxy.kind(),
       host: `${slug}.${process.env.BASE_DOMAIN || 'acronym.sk'}`,
-      containerName: `systems-${slug}`,
+      containerName: `deploy_${slug}`,
       visibility,
       routePublished: visibility !== 'private',
       route: visibility === 'private' ? null
