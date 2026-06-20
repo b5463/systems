@@ -77,18 +77,18 @@ test('authenticated core pages render their primary surfaces', async ({ page }) 
   await mockApi(page, { authed: true })
 
   await page.goto('/ship')
-  await expect(page.getByRole('heading', { name: 'Ship' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Ship', level: 1 })).toBeVisible()
   await expect(page.getByText('Source archive')).toBeVisible()
 
   await page.goto('/events')
-  await expect(page.getByRole('heading', { name: 'Events' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Events', level: 1 })).toBeVisible()
   await expect(page.getByText('No events yet.')).toBeVisible()
 
   await page.goto('/server')
-  await expect(page.getByRole('heading', { name: 'Server' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Server', level: 1 })).toBeVisible()
   await expect(page.getByText('Infrastructure')).toBeVisible()
 
   await page.goto('/admin')
-  await expect(page.getByRole('heading', { name: 'Admin' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Admin', level: 1 })).toBeVisible()
   await expect(page.getByText('Administrators')).toBeVisible()
 })
