@@ -1,5 +1,6 @@
 <script setup>
 import { useToast } from '../composables/useToast'
+import Icon from './Icon.vue'
 
 const { toasts, dismiss, pause, resume } = useToast()
 </script>
@@ -19,9 +20,7 @@ const { toasts, dismiss, pause, resume } = useToast()
         <span class="toast-dot"></span>
         <span class="toast-msg">{{ t.message }}</span>
         <button class="toast-x" aria-label="Dismiss" @click="dismiss(t.id)">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-            <path d="M18 6 6 18M6 6l12 12" />
-          </svg>
+          <Icon name="close" :size="14" />
         </button>
       </div>
     </transition-group>
@@ -61,7 +60,7 @@ const { toasts, dismiss, pause, resume } = useToast()
   height: 9px;
   border-radius: 50%;
   flex-shrink: 0;
-  background: var(--accent);
+  background: var(--info);
 }
 .toast-msg { min-width: 0; flex: 1; overflow-wrap: anywhere; }
 .toast-x {
@@ -86,7 +85,7 @@ const { toasts, dismiss, pause, resume } = useToast()
 .toast-error .toast-dot { background: var(--danger); }
 .toast-warn { border-color: rgba(214, 162, 60, 0.45); }
 .toast-warn .toast-dot { background: var(--warn); }
-.toast-info .toast-dot { background: var(--accent); }
+.toast-info .toast-dot { background: var(--info); }
 
 .toast-enter-active,
 .toast-leave-active { transition: opacity 0.25s ease, transform 0.25s ease; }

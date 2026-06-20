@@ -355,7 +355,7 @@ onBeforeUnmount(() => clearTimeout(textDebounce))
         <input id="ev-target" v-model="filterTarget" autocapitalize="none" autocorrect="off" />
       </div>
       <div class="field-group" style="min-width:130px; flex:1">
-        <label class="field-label" for="ev-user">Admin</label>
+        <label class="field-label" for="ev-user">Actor</label>
         <input id="ev-user" v-model="filterUser" autocapitalize="none" autocorrect="off" />
       </div>
     </div>
@@ -526,6 +526,8 @@ onBeforeUnmount(() => clearTimeout(textDebounce))
 </template>
 
 <style scoped>
+/* Historical log dots are static — pulsing many at once is noise (BRAND §6). */
+.timeline .sdot, .ev-table .sdot, .ev-card .sdot { animation: none; }
 .ev-table {
   width: 100%;
   border-collapse: collapse;

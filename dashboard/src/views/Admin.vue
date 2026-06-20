@@ -333,8 +333,7 @@ onMounted(() => { loadUsers(); loadServerInfo(); loadSessions() })
           <div class="input-wrap">
             <input id="ap-cur-pw" v-model="currentPassword" :type="showCurrentPw ? 'text' : 'password'" autocomplete="current-password" @keyup="onPwKey" @keydown="onPwKey" />
             <button type="button" class="pw-toggle" :aria-label="showCurrentPw ? 'Hide password' : 'Show password'" @click="showCurrentPw = !showCurrentPw">
-              <svg v-if="!showCurrentPw" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z"/><circle cx="12" cy="12" r="3"/></svg>
-              <svg v-else viewBox="0 0 24 24"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+              <Icon :name="showCurrentPw ? 'eye-off' : 'eye'" />
             </button>
           </div>
         </div>
@@ -343,8 +342,7 @@ onMounted(() => { loadUsers(); loadServerInfo(); loadSessions() })
           <div class="input-wrap">
             <input id="ap-new-pw" v-model="newPassword" :type="showNewPw ? 'text' : 'password'" autocomplete="new-password" @keyup="onPwKey" @keydown="onPwKey" />
             <button type="button" class="pw-toggle" :aria-label="showNewPw ? 'Hide password' : 'Show password'" @click="showNewPw = !showNewPw">
-              <svg v-if="!showNewPw" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z"/><circle cx="12" cy="12" r="3"/></svg>
-              <svg v-else viewBox="0 0 24 24"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+              <Icon :name="showNewPw ? 'eye-off' : 'eye'" />
             </button>
           </div>
           <div v-if="pwStrengthInfo" class="pw-strength">
@@ -357,8 +355,7 @@ onMounted(() => { loadUsers(); loadServerInfo(); loadSessions() })
           <div class="input-wrap">
             <input id="ap-conf-pw" v-model="confirmPassword" :type="showConfirmPw ? 'text' : 'password'" autocomplete="new-password" />
             <button type="button" class="pw-toggle" :aria-label="showConfirmPw ? 'Hide password' : 'Show password'" @click="showConfirmPw = !showConfirmPw">
-              <svg v-if="!showConfirmPw" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z"/><circle cx="12" cy="12" r="3"/></svg>
-              <svg v-else viewBox="0 0 24 24"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+              <Icon :name="showConfirmPw ? 'eye-off' : 'eye'" />
             </button>
           </div>
         </div>

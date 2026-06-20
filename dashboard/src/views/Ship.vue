@@ -269,7 +269,7 @@ async function submit() {
   error.value = ''
   if (!name.value.trim()) return (error.value = 'Enter a system name.')
   if (!slugValid.value) return (error.value = 'Slug must be 2–50 chars: a–z, 0–9 and hyphens.')
-  if (!file.value) return (error.value = 'Choose a .zip archive to ship.')
+  if (!file.value) return (error.value = 'Choose a .zip archive to deploy.')
   // Reject oversized archives early unless large uploads are enabled.
   if (!largeUploads.value && file.value.size > uploadMaxMb.value * 1024 * 1024) {
     return (error.value = `Archive exceeds the ${uploadMaxMb.value} MB limit. Enable large uploads (ENABLE_LARGE_UPLOADS) to ship bigger archives.`)
@@ -284,7 +284,7 @@ async function submit() {
     deployedPort.value = (data && data.project && data.project.port) || null
     phase.value = 'building'
   } catch (e) {
-    error.value = e.message || 'Ship failed.'
+    error.value = e.message || 'Deploy failed.'
   } finally {
     uploading.value = false
   }
@@ -348,11 +348,11 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
         <div class="section-label">System</div>
         <div class="field" style="margin:0">
           <label class="label" for="name">Name</label>
-          <input id="name" v-model="name" aria-label="Notes API" placeholder="Notes API" autocorrect="off" />
+          <input id="name" v-model="name" placeholder="Notes API" autocorrect="off" />
         </div>
         <div class="field" style="margin:0">
           <label class="label" for="slug">Slug</label>
-          <input id="slug" aria-label="notes" :value="slug" placeholder="notes" autocapitalize="none" autocorrect="off" @input="onSlugInput" />
+          <input id="slug" :value="slug" placeholder="notes" autocapitalize="none" autocorrect="off" @input="onSlugInput" />
           <div v-if="slugStatus" class="slug-status" :class="slugStatus.tone">
             <span class="sdot" :class="slugStatus.tone" style="flex-shrink:0"></span>{{ slugStatus.label }}
           </div>
@@ -390,7 +390,7 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
             <button type="button" class="env-remove" :aria-label="`Remove ${pair.key || 'env var'}`" @click="removeEnvPair(i)"><Icon name="close" :size="16" /></button>
           </div>
         </div>
-        <button type="button" class="btn btn-sm btn-ghost" style="align-self:flex-start" @click="addEnvPair">+ Add variable</button>
+        <button type="button" class="btn btn-sm btn-ghost" style="align-self:flex-start" @click="addEnvPair"><Icon name="plus" /> Add variable</button>
         <div class="hint">Injected into the container at deploy time. Update or add more in Settings after deploy.</div>
       </div>
     </div>
@@ -400,7 +400,7 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
       <div class="card stack">
         <div class="step-head"><span class="step-num" :class="{ active: !file, done: !!file }">1</span><div class="section-label">Source archive</div></div>
         <div class="dropzone" :class="{ over: dragOver, 'has-file': !!file }" @click="fileInput && fileInput.click()" @dragover.prevent="dragOver = true" @dragleave.prevent="dragOver = false" @drop.prevent="onDrop">
-          <svg class="dz-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5" /><path d="M3 19h18" /></svg>
+          <Icon name="upload" class="dz-ico" />
           <div v-if="file"><strong style="font-size: 15px">{{ file.name }}</strong><div class="small dim">{{ fmtSize(file.size) }} · click to change</div></div>
           <div v-else><strong>Drop a ZIP archive</strong><div class="small dim">or click to choose a file</div></div>
           <input ref="fileInput" type="file" accept=".zip,application/zip" style="display:none" @change="onPick" />
@@ -413,7 +413,7 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
         <div class="section-label">Deployment plan</div>
         <div class="plan-note">Dry-run values below are known before upload. Build detection happens after SYSTEMS. extracts the archive.</div>
         <div class="detect-row">
-          <span class="kv"><span class="k">Type</span><span class="v dim">{{ analysis ? analysis.projectType : (analyzing ? 'analyzing archive...' : (file ? 'waiting for analysis' : 'choose an archive above')) }}</span></span>
+          <span class="kv"><span class="k">Type</span><span class="v dim">{{ analysis ? analysis.projectType : (analyzing ? 'Analyzing archive…' : (file ? 'Waiting for analysis' : 'Choose an archive above')) }}</span></span>
           <span class="kv"><span class="k">Container</span><span class="v mono small">{{ plan ? plan.containerName : (slug ? 'systems-' + slug : 'systems-{slug}') }}</span></span>
           <span class="kv"><span class="k">Network</span><span class="v mono small">systems</span></span>
           <span class="kv"><span class="k">Proxy</span><span class="v dim">{{ plan ? plan.proxy : '—' }}</span></span>
@@ -438,7 +438,7 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
 
       <div class="card stack">
         <div class="section-label">Host readiness</div>
-        <div v-if="systemsCount === null" class="hint">Checking first-deploy host readiness...</div>
+        <div v-if="systemsCount === null" class="hint">Checking first-deploy host readiness…</div>
         <div v-else-if="firstDeploy" class="host-ready">
           <div v-for="r in hostReadiness" :key="r.label" class="host-ready-row">
             <span class="sdot" :class="r.ok ? 'ok' : (r.required ? 'error' : 'warn')"></span>

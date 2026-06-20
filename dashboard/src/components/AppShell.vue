@@ -8,6 +8,7 @@ import SystemsLogo from './SystemsLogo.vue'
 import NavIcon from './NavIcon.vue'
 import KeyboardShortcuts from './KeyboardShortcuts.vue'
 import CommandPalette from './CommandPalette.vue'
+import Icon from './Icon.vue'
 
 const auth = useAuthStore()
 const route = useRoute()
@@ -93,9 +94,7 @@ async function loadHealth() {
           :title="sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
           @click="toggleSidebar"
         >
-          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path :d="sidebarCollapsed ? 'M7 5l6 5-6 5' : 'M13 5l-6 5 6 5'" />
-          </svg>
+          <Icon :name="sidebarCollapsed ? 'chevron-right' : 'chevron-left'" :size="14" />
         </button>
       </div>
 

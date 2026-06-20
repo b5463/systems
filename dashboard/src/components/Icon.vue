@@ -23,6 +23,7 @@ const ICONS = {
   plus: '<path d="M12 5v14M5 12h14"/>',
   'caps-lock': '<path d="M12 4l7 7h-4v4H9v-4H5l7-7ZM9 19h6"/>',
   upload: '<path d="M12 16V4M7 9l5-5 5 5M3 19h18"/>',
+  download: '<path d="M12 4v12M7 11l5 5 5-5M5 20h14"/>',
   clock: '<circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/>',
   'alert-triangle': '<path d="M12 3 2 19h20L12 3Z"/><path d="M12 10v4"/><path d="M12 17h.01"/>',
   info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8h.01"/>',

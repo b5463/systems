@@ -8,6 +8,7 @@ import LogConsole from '../components/LogConsole.vue'
 import ExecTerminal from '../components/ExecTerminal.vue'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 import SystemSettings from '../components/SystemSettings.vue'
+import Icon from '../components/Icon.vue'
 import { useToast } from '../composables/useToast'
 import { hostFor, urlFor, LOCAL_MODE } from '../config'
 import { fmtDateTime } from '../utils/date'
@@ -380,7 +381,7 @@ onBeforeUnmount(() => {
       <div>
         <div class="row gap-sm">
           <RouterLink class="btn btn-sm btn-ghost" :to="{ name: 'systems' }" style="min-height:32px;padding:0 10px">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7" /><path d="M19 12H5" /></svg>
+            <Icon name="arrow-left" :size="15" />
             Systems
           </RouterLink>
           <StatusBadge :project="system" />
@@ -522,7 +523,7 @@ onBeforeUnmount(() => {
       <div class="grid grid-2">
         <div class="card">
           <div class="section-label">Configured plan</div>
-          <div class="kv"><span class="k">Planned endpoint</span><span class="v mono small">{{ system.visibility === 'private' ? 'Private - no public route' : publicHost }}</span></div>
+          <div class="kv"><span class="k">Planned endpoint</span><span class="v mono small">{{ system.visibility === 'private' ? 'Private — no public route' : publicHost }}</span></div>
           <div class="kv"><span class="k">Planned port</span><span class="v mono">{{ system.port ?? '-' }}</span></div>
           <div class="kv"><span class="k">Requested visibility</span><span class="v">{{ (system.visibility || 'public').charAt(0).toUpperCase() + (system.visibility || 'public').slice(1) }}</span></div>
           <div class="kv"><span class="k">Detected runtime</span><span class="v">{{ runtimeLabel }}</span></div>
@@ -530,7 +531,7 @@ onBeforeUnmount(() => {
         </div>
         <div class="card">
           <div class="section-label">Observed runtime</div>
-          <div v-if="isRunning && overviewStat" class="kv"><span class="k">CPU / RAM</span><span class="v mono">{{ (overviewStat.cpu_percent ?? 0).toFixed(1) }}% Â· {{ (overviewStat.memory_mb ?? 0).toFixed(0) }} MB</span></div>
+          <div v-if="isRunning && overviewStat" class="kv"><span class="k">CPU / RAM</span><span class="v mono">{{ (overviewStat.cpu_percent ?? 0).toFixed(1) }}% · {{ (overviewStat.memory_mb ?? 0).toFixed(0) }} MB</span></div>
           <div class="kv"><span class="k">Container</span><span class="v mono small">{{ hasRuntimeContainer ? String(system.container_id).slice(0,12) : 'No container observed' }}</span></div>
           <div class="kv"><span class="k">Image</span><span class="v mono small">{{ system.image_id ? String(system.image_id).replace('sha256:','').slice(0,12) : 'No built image' }}</span></div>
           <div class="kv"><span class="k">Published route</span><span class="v">{{ system.route_published ? publicHost : (system.visibility === 'private' ? 'Not published (private)' : 'Not published') }}</span></div>
@@ -574,7 +575,7 @@ onBeforeUnmount(() => {
       </div>
       <div v-else class="card" style="padding:0">
         <div v-for="(h, i) in deployHistory" :key="h.id" class="conn-row">
-          <span class="conn-ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg></span>
+          <span class="conn-ico"><Icon name="clock" /></span>
           <div>
             <div class="c-name">Release {{ deployHistory.length - i }}</div>
             <div class="c-sub">image {{ h.image_id ? String(h.image_id).replace('sha256:','').slice(0,12) : '–' }}</div>

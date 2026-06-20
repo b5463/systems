@@ -37,6 +37,7 @@
   --warn-dim: #1f1708;
   --ok: #45c267;
   --ok-dim: #0b1f12;
+  --config: #4a6888;
   --info: #6aa6e8;
   --grey: #585c66;
 
@@ -1796,7 +1797,7 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
 
 /* ---------- Severity model — distinct sdot tones ---------- */
 /* .sdot.config = needs host setup / informational action required */
-.sdot.config { background: #4a6888; }
+.sdot.config { background: var(--config); }
 /* .sdot.ok / .warn / .error / .idle already defined above */
 
 /* ---------- Button affordance — ghost has visible rest border ---------- */

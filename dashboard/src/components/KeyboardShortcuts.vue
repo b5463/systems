@@ -1,6 +1,7 @@
 <script setup>
 import { ref, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import Icon from './Icon.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -90,7 +91,7 @@ onBeforeUnmount(() => {
         <div ref="dialogEl" class="modal stack" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts" style="max-width:380px">
           <div class="spread"><h3 style="margin:0">Keyboard shortcuts</h3>
             <button class="iconbtn" aria-label="Close" @click="closeHelp">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
+              <Icon name="close" :size="16" />
             </button>
           </div>
           <div class="ks-row"><span>Command palette</span><span><kbd>Ctrl</kbd> <kbd>K</kbd></span></div>

@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { api } from '../api/client'
 import { BASE_DOMAIN } from '../config'
+import Icon from '../components/Icon.vue'
 
 const info = ref(null)
 const loading = ref(true)
@@ -115,6 +116,7 @@ async function doCleanup() {
 
 const pruning = ref(false)
 const pruneMsg = ref('')
+const confirmPrune = ref(false)
 async function doPrune() {
   pruneMsg.value = ''
   pruning.value = true
@@ -128,6 +130,7 @@ async function doPrune() {
     pruneMsg.value = e.message || 'Prune failed.'
   } finally {
     pruning.value = false
+    confirmPrune.value = false
   }
 }
 
@@ -220,7 +223,7 @@ const backup = computed(() => {
     const age = b.ageHours != null
       ? (b.ageHours < 1 ? 'under 1h ago' : b.ageHours < 24 ? `${b.ageHours}h ago` : `${Math.floor(b.ageHours / 24)}d ${Math.floor(b.ageHours % 24)}h ago`)
       : ''
-    sub = `${b.count} backup${b.count !== 1 ? 's' : ''}${age ? ' · last ' + age : ''}`
+    sub = `${b.count} snapshot${b.count !== 1 ? 's' : ''}${age ? ' · last ' + age : ''}`
   }
   return { tone: p.tone, label: p.label, sub }
 })
@@ -233,8 +236,8 @@ const backupDetails = computed(() => {
     last: fmtDateTime(b.last),
     count: `${b.count || 0} snapshot${b.count === 1 ? '' : 's'}`,
     scheduler: schedulerEnabled
-      ? `Enabled - every ${b.intervalHours || 24}h`
-      : `Disabled - set ENABLE_BACKUP_SCHEDULER=true for automatic backups`,
+      ? `Enabled — every ${b.intervalHours || 24}h`
+      : `Disabled — set ENABLE_BACKUP_SCHEDULER=true for automatic backups`,
     retention: `${b.retentionCount || 7} snapshot${(b.retentionCount || 7) === 1 ? '' : 's'} retained`,
     restoreScript: b.restoreScript || 'scripts/restore-systems-windows.ps1',
     lastFailure: b.lastFailure || 'None reported',
@@ -308,13 +311,7 @@ onMounted(() => { load(); loadCleanup(); })
       class="critical-banner"
       :class="alert.level"
     >
-      <svg class="cb-icon" viewBox="0 0 20 20" fill="none">
-        <path v-if="alert.level === 'error'" d="M10 3L18 17H2L10 3Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
-        <path v-else d="M10 6v5m0 3h.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-        <circle v-if="alert.level === 'warn'" cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.5"/>
-        <line v-if="alert.level === 'error'" x1="10" y1="9" x2="10" y2="13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-        <circle v-if="alert.level === 'error'" cx="10" cy="15.5" r="0.75" fill="currentColor"/>
-      </svg>
+      <Icon class="cb-icon" :name="alert.level === 'error' ? 'alert-triangle' : 'info'" />
       <div class="alert-body">
         <strong>{{ alert.message }}</strong>
         <span v-if="alert.next">{{ alert.next }}</span>
@@ -326,7 +323,7 @@ onMounted(() => { load(); loadCleanup(); })
     <div class="section-label">Infrastructure</div>
     <div class="card" style="padding:0; margin-bottom: 22px">
       <div class="conn-row">
-        <span class="conn-ico"><svg viewBox="0 0 24 24"><rect x="3" y="9" width="4" height="4" /><rect x="8" y="9" width="4" height="4" /><rect x="13" y="9" width="4" height="4" /><path d="M3 16h15a4 4 0 0 0 4-4" /></svg></span>
+        <span class="conn-ico"><Icon name="docker" /></span>
         <div>
           <div class="c-name">Docker</div>
           <div class="c-sub"><template v-if="info.docker.status === 'connected'">{{ info.docker.managed ?? 0 }} managed · {{ info.docker.running ?? 0 }} running</template><template v-else>container runtime</template></div>
@@ -334,17 +331,17 @@ onMounted(() => { load(); loadCleanup(); })
         <div class="conn-state"><span class="sdot" :class="present(info.docker.status).tone"></span>{{ present(info.docker.status).label }}</div>
       </div>
       <div class="conn-row">
-        <span class="conn-ico"><svg viewBox="0 0 24 24"><path d="M4 12h16" /><path d="M4 12a8 8 0 0 1 8-8" /><path d="M20 12a8 8 0 0 1-8 8" /></svg></span>
+        <span class="conn-ico"><Icon name="proxy" /></span>
         <div><div class="c-name">Caddy</div><div class="c-sub">reverse proxy · TLS</div></div>
         <div class="conn-state"><span class="sdot" :class="present(info.caddy.status).tone"></span>{{ present(info.caddy.status).label }}</div>
       </div>
       <div class="conn-row">
-        <span class="conn-ico"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="8" ry="3" /><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5" /><path d="M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6" /></svg></span>
+        <span class="conn-ico"><Icon name="database" /></span>
         <div><div class="c-name">Postgres</div><div class="c-sub">internal database</div></div>
         <div class="conn-state"><span class="sdot" :class="present(info.postgres.status).tone"></span>{{ present(info.postgres.status).label }}</div>
       </div>
       <div class="conn-row">
-        <span class="conn-ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M3 12h18" /><path d="M12 3c2.5 2.5 4 5.6 4 9s-1.5 6.5-4 9c-2.5-2.5-4-5.6-4-9s1.5-6.5 4-9Z" /></svg></span>
+        <span class="conn-ico"><Icon name="globe" /></span>
         <div><div class="c-name">Wildcard DNS</div><div class="c-sub">{{ info.wildcard.domain || ('*.' + BASE_DOMAIN) }}</div></div>
         <div class="conn-state"><span class="sdot" :class="present(info.wildcard.status).tone"></span>{{ present(info.wildcard.status).label }}</div>
       </div>
@@ -422,13 +419,14 @@ onMounted(() => { load(); loadCleanup(); })
         <button
           class="btn btn-sm btn-primary"
           :disabled="pruning || (reclaimableMb === 0 && (!cleanupInfo.storage || cleanupInfo.storage.stoppedContainers === 0))"
-          @click="doPrune"
+          @click="confirmPrune ? doPrune() : (confirmPrune = true)"
         >
           <span v-if="pruning" class="spinner"></span>
+          <span v-else-if="confirmPrune">Confirm — remove unused data</span>
           <span v-else>Free up space<template v-if="reclaimableMb > 0"> (~{{ reclaimableMb }} MB)</template></span>
         </button>
         <button
-          class="btn btn-sm"
+          class="btn btn-sm btn-ghost"
           :disabled="cleaningUp || (cleanupInfo.images.count === 0 && cleanupInfo.releases.count === 0)"
           @click="doCleanup"
         >

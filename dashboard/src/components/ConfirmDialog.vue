@@ -1,3 +1,8 @@
+<script>
+// Module-scoped instance counter (shared across all ConfirmDialog instances).
+let cdCounter = 0
+</script>
+
 <script setup>
 import { ref, watch, nextTick, onBeforeUnmount } from 'vue'
 
@@ -12,6 +17,7 @@ const props = defineProps({
 })
 const emit = defineEmits(['update:open', 'confirm', 'cancel'])
 
+const titleId = `confirm-title-${cdCounter++}`
 const typed = ref('')
 const inputEl = ref(null)
 const confirmEl = ref(null)
@@ -56,8 +62,8 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown))
   <Teleport to="body">
     <Transition name="fade">
       <div v-if="open" class="modal-backdrop" @click.self="close">
-        <div ref="modalEl" class="modal stack" role="dialog" aria-modal="true" aria-labelledby="confirm-dialog-title">
-          <h3 id="confirm-dialog-title" style="margin:0">{{ title }}</h3>
+        <div ref="modalEl" class="modal stack" role="dialog" aria-modal="true" :aria-labelledby="titleId">
+          <h3 :id="titleId" style="margin:0">{{ title }}</h3>
           <div class="stack" style="gap:10px"><slot /></div>
           <template v-if="requireText">
             <label class="label" style="margin:0">Type <span class="mono" style="color:var(--text)">{{ requireText }}</span> to confirm</label>

@@ -168,7 +168,7 @@ function statusLabel(s) {
 function statusTone(s) { return s === 'connected' ? 'ok' : s === 'unavailable' ? 'error' : 'idle' }
 function endpointText(s) {
   if (!s) return ''
-  if (s.visibility === 'private') return 'Private - no public endpoint'
+  if (s.visibility === 'private') return 'Private — no public endpoint'
   return s.route_published ? hostFor(s.slug, s.port) : `Planned endpoint: ${hostFor(s.slug, s.port)}`
 }
 function routeText(s) {
@@ -230,7 +230,7 @@ onBeforeUnmount(() => clearInterval(timer))
     <div class="eb-sub">
       Upload a ZIP containing a static, Vue/Vite, Node.js or Dockerfile project. SYSTEMS. validates the deployment plan before publishing it at <span class="mono">slug.{{ BASE_DOMAIN }}</span> over HTTPS.
     </div>
-    <div class="eb-actions"><RouterLink class="btn btn-primary" :to="{ name: 'ship' }">Prepare deployment</RouterLink></div>
+    <div class="eb-actions"><RouterLink class="btn btn-primary" :to="{ name: 'ship' }">Ship your first system</RouterLink></div>
   </div>
 
   <template v-else>
@@ -312,7 +312,7 @@ onBeforeUnmount(() => clearInterval(timer))
           <span v-if="s.status === 'running' && stats[s.slug]" class="mono small muted">
             CPU {{ (stats[s.slug].cpu_percent ?? 0).toFixed(1) }}% · RAM {{ (stats[s.slug].memory_mb ?? 0).toFixed(0) }} MB<span v-if="s.port"> · :{{ s.port }}</span>
           </span>
-          <span v-else class="small dim">{{ s.status === 'building' ? 'Building…' : s.status === 'error' ? (isCrashed(s) ? 'Crashed' : 'Build failed') : 'Not running' }}</span>
+          <span v-else class="small dim">{{ s.status === 'building' ? 'Building…' : s.status === 'error' ? (isCrashed(s) ? 'Crashed' : 'Build failed') : 'Stopped' }}</span>
           <a v-if="s.status === 'running' && (s.route_published || LOCAL_MODE)" class="sc-open small" :href="urlFor(s.slug, s.port)" target="_blank" rel="noopener" @click.stop>{{ s.route_published ? 'Open' : 'Open local' }} <Icon name="arrow-up-right" /></a>
         </div>
       </div>

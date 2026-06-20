@@ -59,6 +59,14 @@ const grouped = computed(() => {
 // A flat index across groups for arrow-key navigation.
 const flatList = computed(() => grouped.value.flatMap((g) => g.items))
 
+// Stable per-row id so the combobox can point aria-activedescendant at the
+// active option (lets screen readers announce arrow-key navigation).
+const optId = (cmd) => `cmd-opt-${flatList.value.indexOf(cmd)}`
+const activeDescendant = computed(() => {
+  const cmd = flatList.value[activeIndex.value]
+  return cmd ? optId(cmd) : undefined
+})
+
 function go(name) { router.push({ name }) }
 function clickRefresh() { document.querySelector('[data-refresh]')?.click() }
 function dispatch(evt) { window.dispatchEvent(new Event(evt)) }
@@ -102,6 +110,9 @@ function onInputKey(e) {
   else if (e.key === 'ArrowUp') { e.preventDefault(); move(-1) }
   else if (e.key === 'Enter') { e.preventDefault(); runActive() }
   else if (e.key === 'Escape') { e.preventDefault(); hide() }
+  // The input is the only focusable element here, so trap Tab to keep focus in
+  // the palette (matches the focus-trap behavior of the other overlays).
+  else if (e.key === 'Tab') { e.preventDefault() }
 }
 
 // Reset the active row whenever the result set changes.
@@ -138,6 +149,7 @@ onBeforeUnmount(() => {
             role="combobox"
             aria-expanded="true"
             aria-controls="cmd-list"
+            :aria-activedescendant="activeDescendant"
             placeholder="Search commands and systems…"
             autocapitalize="none"
             autocorrect="off"
@@ -150,6 +162,7 @@ onBeforeUnmount(() => {
               <li class="cmd-group" aria-hidden="true">{{ g.group }}</li>
               <li
                 v-for="cmd in g.items"
+                :id="optId(cmd)"
                 :key="cmd.id"
                 class="cmd-opt"
                 :class="{ 'is-active': flatList[activeIndex] && flatList[activeIndex].id === cmd.id }"
@@ -175,7 +188,7 @@ onBeforeUnmount(() => {
   position: fixed;
   inset: 0;
   z-index: 60;
-  background: rgba(0, 0, 0, 0.55);
+  background: rgba(0, 0, 0, 0.6);
   display: flex;
   align-items: flex-start;
   justify-content: center;

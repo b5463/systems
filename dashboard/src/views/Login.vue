@@ -4,6 +4,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import SystemsLogo from '../components/SystemsLogo.vue'
 import FlowField from '../components/FlowField.vue'
+import Icon from '../components/Icon.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -81,7 +82,7 @@ async function submit() {
                 <input
                   id="u"
                   v-model="username"
-                  aria-label="username"
+                  aria-label="Username"
                   autocomplete="username"
                   autocapitalize="none"
                   autocorrect="off"
@@ -109,16 +110,7 @@ async function submit() {
                     :title="showPassword ? 'Hide password' : 'Show password'"
                     @click="showPassword = !showPassword"
                   >
-                    <svg v-if="showPassword" viewBox="0 0 24 24" aria-hidden="true">
-                      <path d="M3 3l18 18" />
-                      <path d="M10.6 10.6a2 2 0 0 0 2.8 2.8" />
-                      <path d="M9.5 5.5A9.8 9.8 0 0 1 12 5c5 0 8.5 4.4 9.5 6.5a12 12 0 0 1-2.1 3.1" />
-                      <path d="M6.2 6.2A13.7 13.7 0 0 0 2.5 11.5C3.5 13.6 7 18 12 18a9.7 9.7 0 0 0 4.1-.9" />
-                    </svg>
-                    <svg v-else viewBox="0 0 24 24" aria-hidden="true">
-                      <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" />
-                      <circle cx="12" cy="12" r="2.5" />
-                    </svg>
+                    <Icon :name="showPassword ? 'eye-off' : 'eye'" />
                   </button>
                 </span>
               </label>
@@ -146,7 +138,7 @@ async function submit() {
               :aria-busy="loading"
             >
               <span v-if="loading" class="spinner"></span>
-              <span>{{ loading ? 'Signing in...' : 'Enter console' }}</span>
+              <span>{{ loading ? 'Signing in…' : 'Sign in' }}</span>
             </button>
 
             <div class="login-context" aria-label="Console details">
