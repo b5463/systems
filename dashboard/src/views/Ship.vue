@@ -41,6 +41,7 @@ const envVarsForSubmit = computed(() => {
 
 const uploading = ref(false)
 const progress = ref(0)
+const uploadStage = ref('')
 const error = ref('')
 const deployedSlug = ref('')
 const deployedPort = ref(null)
@@ -274,24 +275,33 @@ async function submit() {
   if (!largeUploads.value && file.value.size > uploadMaxMb.value * 1024 * 1024) {
     return (error.value = `Archive exceeds the ${uploadMaxMb.value} MB limit. Enable large uploads (ENABLE_LARGE_UPLOADS) to ship bigger archives.`)
   }
-  uploading.value = true; progress.value = 0
+  uploading.value = true; progress.value = 0; uploadStage.value = willChunk.value ? 'Preparing chunked upload…' : 'Uploading archive…'
   try {
     const fields = { name: name.value.trim(), slug: slug.value, visibility: visibility.value, envVars: JSON.stringify(envVarsForSubmit.value) }
     const data = willChunk.value
-      ? await api.chunkedDeploy({ fields, file: file.value, onProgress: (p) => (progress.value = p) })
+      ? await api.chunkedDeploy({
+          fields,
+          file: file.value,
+          onProgress: (p) => (progress.value = p),
+          onStatus: ({ chunk, totalChunks, attempt }) => {
+            uploadStage.value = attempt > 1
+              ? 'Retrying chunk ' + chunk + '/' + totalChunks + ' (attempt ' + attempt + '/3)…'
+              : 'Streaming chunk ' + chunk + '/' + totalChunks + '…'
+          }
+        })
       : await api.upload('/deploy', { fields, files: { file: file.value }, onProgress: (p) => (progress.value = p) })
     deployedSlug.value = (data && data.project && data.project.slug) || slug.value
     deployedPort.value = (data && data.project && data.project.port) || null
     phase.value = 'building'
   } catch (e) {
-    error.value = e.message || 'Deploy failed.'
+    error.value = (e.message || 'Deploy failed.') + (willChunk.value ? ' The archive is still selected; choose Deploy system to retry safely.' : '')
   } finally {
     uploading.value = false
   }
 }
 function reset() {
   name.value = ''; slug.value = ''; slugEdited.value = false
-  file.value = null; progress.value = 0; deployedSlug.value = ''; deployedPort.value = null
+  file.value = null; progress.value = 0; uploadStage.value = ''; deployedSlug.value = ''; deployedPort.value = null
   analysis.value = null; analysisError.value = ''
   phase.value = 'form'; error.value = ''; visibility.value = 'public'; buildResult.value = ''
   envVarPairs.value = []
@@ -468,7 +478,7 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
         <div v-if="error" class="error-box">{{ error }}</div>
         <div v-if="uploading" class="stack">
           <div class="progress"><span :style="{ width: progress + '%' }"></span></div>
-          <div class="small muted center">{{ willChunk ? 'Streaming' : 'Uploading' }}… {{ progress }}%</div>
+          <div class="small muted center">{{ uploadStage || (willChunk ? 'Streaming…' : 'Uploading…') }} {{ progress }}%</div>
         </div>
         <button class="btn btn-primary btn-block" type="submit" :disabled="!canDeploy">
           <span v-if="uploading" class="spinner"></span><span v-else>Deploy system</span>

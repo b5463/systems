@@ -6,6 +6,7 @@ const fsp = require('fs/promises');
 const path = require('path');
 const dockerService = require('../services/docker');
 const { features } = require('../util/flags');
+const { getSetting } = require('../util/settings');
 
 const PLATFORM_VERSION = '2.0.0-rc.1';
 const PLATFORM_STAGE = 'repo-complete · host validation pending';
@@ -43,8 +44,8 @@ async function serverRoutes(fastify, options) {
     preHandler: [fastify.authenticate],
   }, async () => {
     const featureFlags = features();
-    const backupRetention = Number(process.env.BACKUP_RETENTION) || 7;
-    const backupIntervalHours = Number(process.env.BACKUP_INTERVAL_HOURS) || 24;
+    const backupRetention = getSetting('backupRetention');
+    const backupIntervalHours = getSetting('backupIntervalHours');
     const info = {
       platform: {
         name: 'SYSTEMS.',
@@ -57,7 +58,7 @@ async function serverRoutes(fastify, options) {
         wildcardDomain: process.env.WILDCARD_DOMAIN || null,
         dataDir: dataDir(),
         uploadMaxMb: Number(process.env.UPLOAD_MAX_MB) || 100,
-        releaseRetention: Number(process.env.RELEASE_RETENTION_DEFAULT) || 3,
+        releaseRetention: getSetting('releaseRetention'),
         firewall: 'host_validation',   // verify with check-firewall-windows.ps1
         hardening: 'host_validation',  // verify with verify-hardening-windows.ps1
       },

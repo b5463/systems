@@ -326,6 +326,8 @@ async function projectsRoutes(fastify, options) {
       : { state: 'not_applicable', checkedAt: new Date().toISOString() };
     db.prepare(`UPDATE projects SET health_state = ?, health_status = ?, health_response_ms = ?, health_checked_at = ?, attestation_state = ?, attestation_checked_at = ? WHERE slug = ?`)
       .run(result.state, result.httpStatus, result.responseMs, result.checkedAt, routeAttestation.state, routeAttestation.checkedAt, slug);
+    db.prepare(`UPDATE projects SET health_failures = CASE WHEN ? = 'healthy' THEN 0 ELSE health_failures + 1 END WHERE slug = ?`)
+      .run(result.state, slug);
     auditLog({ user_id: request.user.id, action: result.state === 'healthy' ? 'health_ok' : 'health_fail', target: slug, detail: `${result.state} ${result.httpStatus ?? ''}`.trim(), ip: request.ip });
     return { health: result, routeAttestation };
   });

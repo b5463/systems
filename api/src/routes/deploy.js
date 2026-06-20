@@ -22,7 +22,8 @@ const buildStatus = new Map();
 const buildListeners = new Map();
 const buildGate = new BuildGate();
 
-const RELEASE_RETENTION = () => Number(process.env.RELEASE_RETENTION_DEFAULT) || 3;
+const { getSetting } = require('../util/settings');
+const RELEASE_RETENTION = () => getSetting('releaseRetention');
 
 // Serialize the port-allocation + INSERT critical section across concurrent
 // deploys (an in-process promise chain).
@@ -132,6 +133,8 @@ function failBuild({ slug, stage, err, userId, ip, tag = 'deploy' }) {
   auditLog({ user_id: userId, action: `${tag}_fail`, target: slug, detail: `${stage}: ${err.message}`.slice(0, 300), ip });
   notify.send({ kind: 'deploy_failed', slug, detail: reason }).catch(() => {});
   try {
+    db.prepare(`UPDATE projects SET github_deploy_status = 'failed', github_deploy_detail = ?, github_deploy_at = datetime('now') WHERE slug = ? AND github_deploy_status = 'building'`)
+      .run(reason.slice(0, 500), slug);
     db.prepare(`UPDATE projects SET status = 'error', last_error = ?, last_error_stage = ?, last_error_hint = ?, last_error_excerpt = ?, updated_at = datetime('now') WHERE slug = ?`)
       .run(reason.slice(0, 500), stage || null, info.hint || null, recentLogExcerpt(slug), slug);
   } catch (dbErr) {
@@ -234,6 +237,8 @@ function probeHealthSoon(slug) {
           : { state: 'not_applicable', checkedAt: new Date().toISOString() };
         db.prepare('UPDATE projects SET health_state = ?, health_status = ?, health_response_ms = ?, health_checked_at = ?, attestation_state = ?, attestation_checked_at = ? WHERE slug = ?')
           .run(hr.state, hr.httpStatus, hr.responseMs, hr.checkedAt, routeAttestation.state, routeAttestation.checkedAt, slug);
+        db.prepare(`UPDATE projects SET health_failures = CASE WHEN ? = 'healthy' THEN 0 ELSE health_failures + 1 END WHERE slug = ?`)
+          .run(hr.state, slug);
         if (hr.state === 'healthy') return;
       } catch { /* keep trying */ }
     }
@@ -415,6 +420,7 @@ async function runRedeployPipeline(slug, zipPath, extractDir, userId, ip) {
     // (Previously: dockerService.removeImage(oldImageId, true).)
 
     appendBuildLog(slug, `[redeploy] Redeploy complete.\n`);
+    db.prepare(`UPDATE projects SET github_deploy_status = 'succeeded', github_deploy_detail = 'Deployment completed', github_deploy_at = datetime('now') WHERE slug = ? AND github_deploy_status = 'building'`).run(slug);
     auditLog({ user_id: userId, action: 'redeploy', target: slug, ip });
     notify.send({ kind: 'redeploy', slug, detail: 'redeployed' }).catch(() => {});
     finishBuild(slug, 'done');

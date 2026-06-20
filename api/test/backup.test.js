@@ -41,3 +41,20 @@ test('notify: payload shape', () => {
   assert.equal(p.site, 'acronym.sk');
   assert.match(p.at, /\dT\d/);
 });
+
+test('notify: destination-specific payloads', () => {
+  const event = { kind: 'deploy_failed', slug: 'app', detail: '<timeout>' };
+  const slack = buildPayload(event, { BASE_DOMAIN: 'acronym.sk', NOTIFY_FORMAT: 'slack' });
+  assert.match(slack.text, /deploy failed/);
+  assert.equal(slack.attachments[0].fields[0].value, 'app');
+
+  const discord = buildPayload(event, { BASE_DOMAIN: 'acronym.sk', NOTIFY_FORMAT: 'discord' });
+  assert.equal(discord.username, 'SYSTEMS.');
+  assert.equal(discord.embeds[0].fields[0].value, 'app');
+
+  const email = buildPayload(event, { BASE_DOMAIN: 'acronym.sk', NOTIFY_FORMAT: 'email' });
+  assert.match(email.subject, /deploy failed/);
+  assert.match(email.text, /<timeout>/);
+  assert.doesNotMatch(email.html, /<timeout>/);
+  assert.match(email.html, /&lt;timeout&gt;/);
+});

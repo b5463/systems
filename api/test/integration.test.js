@@ -268,6 +268,35 @@ test('env: rejects values with control characters', async () => {
   assert.equal(res.statusCode, 400);
 });
 
+test('admin: safe runtime settings are validated, audited, and resettable', async () => {
+  const initial = await app.inject({ method: 'GET', url: '/api/admin/settings', headers: auth() });
+  assert.equal(initial.statusCode, 200);
+  assert.ok(initial.json().settings.some((item) => item.key === 'releaseRetention'));
+
+  const saved = await app.inject({
+    method: 'PATCH', url: '/api/admin/settings', headers: auth(),
+    payload: { settings: { releaseRetention: 7, notificationFormat: 'slack' } },
+  });
+  assert.equal(saved.statusCode, 200);
+  const retention = saved.json().settings.find((item) => item.key === 'releaseRetention');
+  assert.equal(retention.value, 7);
+  assert.equal(retention.source, 'database');
+  assert.ok(db.prepare("SELECT id FROM audit_log WHERE action = 'settings_update' ORDER BY id DESC LIMIT 1").get());
+
+  const invalid = await app.inject({
+    method: 'PATCH', url: '/api/admin/settings', headers: auth(),
+    payload: { settings: { releaseRetention: 0 } },
+  });
+  assert.equal(invalid.statusCode, 400);
+
+  const reset = await app.inject({
+    method: 'PATCH', url: '/api/admin/settings', headers: auth(),
+    payload: { settings: { releaseRetention: null, notificationFormat: null } },
+  });
+  assert.equal(reset.statusCode, 200);
+  assert.notEqual(reset.json().settings.find((item) => item.key === 'releaseRetention').source, 'database');
+});
+
 test('2fa: setup -> enable -> login requires code', async () => {
   const setup = await app.inject({ method: 'POST', url: '/api/auth/2fa/setup', headers: auth() });
   assert.equal(setup.statusCode, 200);

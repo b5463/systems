@@ -503,6 +503,14 @@ async function provisionDb() {
   <div v-if="features.githubDeploys" class="card stack">
     <div class="spread"><h2 class="section-label">GitHub deploy-on-push</h2><span class="chip">Experimental</span></div>
     <div class="hint">Advanced / optional — off by default and enabled on the server. Map this system to a repo. A push to the branch triggers a redeploy (requires the webhook configured in GitHub).</div>
+    <div v-if="system.github_deploy_status" class="callout" :class="system.github_deploy_status === 'failed' ? 'danger' : system.github_deploy_status === 'succeeded' ? 'ok' : 'warn'" style="margin:0">
+      <div class="co-bar"></div>
+      <div>
+        <strong>Last GitHub delivery: {{ system.github_deploy_status }}</strong>
+        <div class="small">{{ system.github_deploy_detail || 'No detail recorded.' }}</div>
+        <div v-if="system.github_deploy_at" class="small dim">{{ system.github_deploy_at }}</div>
+      </div>
+    </div>
     <div class="field" style="margin:0">
       <label class="label" for="repo">Repository</label>
       <input id="repo" v-model="repoInput" aria-label="Repository (owner/name)" placeholder="owner/name" autocapitalize="none" autocorrect="off" />

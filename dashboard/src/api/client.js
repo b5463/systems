@@ -141,7 +141,7 @@ export const api = {
   // sequential octet-stream chunks (never buffered whole), then completes the
   // session which starts the same build pipeline as a normal deploy.
   // Requires ENABLE_LARGE_UPLOADS on the server.
-  async chunkedDeploy({ fields, file, onProgress, chunkSize = 8 * 1024 * 1024 } = {}) {
+  async chunkedDeploy({ fields, file, onProgress, onStatus, chunkSize = 8 * 1024 * 1024 } = {}) {
     const totalChunks = Math.max(1, Math.ceil(file.size / chunkSize))
     const init = await this.post('/upload/init', {
       name: fields.name, slug: fields.slug, visibility: fields.visibility,
@@ -153,15 +153,26 @@ export const api = {
       for (let i = 0; i < totalChunks; i++) {
         const blob = file.slice(i * chunkSize, (i + 1) * chunkSize)
         const buf = await blob.arrayBuffer()
-        const res = await fetch(`${BASE}/upload/${id}/chunk?index=${i}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/octet-stream', ...csrfHeader() },
-          body: buf
-        })
-        if (!res.ok) {
+        let res = null
+        for (let attempt = 1; attempt <= 3; attempt += 1) {
+          if (onStatus) onStatus({ chunk: i + 1, totalChunks, attempt })
+          try {
+            res = await fetch(`${BASE}/upload/${id}/chunk?index=${i}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/octet-stream', ...csrfHeader() },
+              body: buf
+            })
+          } catch {
+            res = null
+          }
+          if (res && res.ok) break
+          if (res && res.status < 500 && res.status !== 429) break
+          if (attempt < 3) await new Promise((resolve) => setTimeout(resolve, 400 * (2 ** (attempt - 1))))
+        }
+        if (!res || !res.ok) {
           let body = null
-          try { body = JSON.parse(await res.text()) } catch { /* ignore */ }
-          throw new ApiError((body && body.error) || `Chunk ${i} failed (${res.status})`, res.status, body)
+          if (res) { try { body = JSON.parse(await res.text()) } catch { /* ignore */ } }
+          throw new ApiError((body && body.error) || `Chunk ${i + 1} failed after 3 attempts`, res ? res.status : 0, body)
         }
         sent += blob.size
         if (onProgress) onProgress(Math.round((sent / file.size) * 100))

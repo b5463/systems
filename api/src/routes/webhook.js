@@ -66,6 +66,8 @@ async function webhookRoutes(fastify, options) {
     }
 
     auditLog({ action: 'github_push', target: project.slug, detail: `${repo} ${ref}` });
+    db.prepare(`UPDATE projects SET github_deploy_status = 'downloading', github_deploy_detail = ?, github_deploy_at = datetime('now') WHERE slug = ?`)
+      .run(`${repo} ${ref}`.slice(0, 300), project.slug);
 
     // Download the commit zipball and redeploy (best-effort, async).
     const zipPath = tmpZip();
@@ -73,13 +75,19 @@ async function webhookRoutes(fastify, options) {
       await downloadZipball(repo, ref.replace('refs/heads/', ''), zipPath);
     } catch (e) {
       auditLog({ action: 'redeploy_fail', target: project.slug, detail: e.message });
+      db.prepare(`UPDATE projects SET github_deploy_status = 'failed', github_deploy_detail = ?, github_deploy_at = datetime('now') WHERE slug = ?`)
+        .run(e.message.slice(0, 500), project.slug);
       notify.send({ kind: 'deploy_failed', slug: project.slug, detail: e.message }).catch(() => {});
       return reply.code(502).send({ error: e.message });
     }
 
+    db.prepare(`UPDATE projects SET github_deploy_status = 'building', github_deploy_detail = ?, github_deploy_at = datetime('now') WHERE slug = ?`)
+      .run(`Push accepted from ${repo}`.slice(0, 300), project.slug);
     const result = await deploy.beginRedeploy({ slug: project.slug, zipPath, userId: null, ip: request.ip });
     if (!result.ok) {
       await fsp.rm(zipPath, { force: true }).catch(() => {});
+      db.prepare(`UPDATE projects SET github_deploy_status = 'failed', github_deploy_detail = ?, github_deploy_at = datetime('now') WHERE slug = ?`)
+        .run(result.error.slice(0, 500), project.slug);
       return reply.code(result.code).send({ error: result.error });
     }
     return reply.code(202).send({ ok: true, redeploying: project.slug });

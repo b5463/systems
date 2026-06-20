@@ -274,7 +274,49 @@ async function deleteUser(u) {
   }
 }
 
-onMounted(() => { loadUsers(); loadServerInfo(); loadSessions() })
+/* ---------- Safe runtime settings ---------- */
+const platformSettings = ref([])
+const settingsDraft = ref({})
+const settingsSaving = ref(false)
+const settingsMsg = ref('')
+const settingsError = ref('')
+
+async function loadSettings() {
+  try {
+    const data = await api.get('/admin/settings')
+    platformSettings.value = data.settings || []
+    settingsDraft.value = Object.fromEntries(platformSettings.value.map((item) => [item.key, item.value]))
+  } catch (e) {
+    settingsError.value = e.message || 'Could not load platform settings.'
+  }
+}
+async function saveSettings() {
+  settingsSaving.value = true; settingsMsg.value = ''; settingsError.value = ''
+  try {
+    const data = await api.patch('/admin/settings', { settings: settingsDraft.value })
+    platformSettings.value = data.settings || platformSettings.value
+    settingsDraft.value = Object.fromEntries(platformSettings.value.map((item) => [item.key, item.value]))
+    settingsMsg.value = 'Settings saved. Scheduler interval changes apply after an API restart.'
+    await loadServerInfo()
+  } catch (e) {
+    settingsError.value = e.message || 'Could not save platform settings.'
+  } finally { settingsSaving.value = false }
+}
+async function resetSettings() {
+  settingsSaving.value = true; settingsMsg.value = ''; settingsError.value = ''
+  try {
+    const reset = Object.fromEntries(platformSettings.value.map((item) => [item.key, null]))
+    const data = await api.patch('/admin/settings', { settings: reset })
+    platformSettings.value = data.settings || []
+    settingsDraft.value = Object.fromEntries(platformSettings.value.map((item) => [item.key, item.value]))
+    settingsMsg.value = 'Database overrides cleared; environment/default values are active.'
+    await loadServerInfo()
+  } catch (e) {
+    settingsError.value = e.message || 'Could not reset platform settings.'
+  } finally { settingsSaving.value = false }
+}
+
+onMounted(() => { loadUsers(); loadServerInfo(); loadSessions(); loadSettings() })
 </script>
 
 <template>
@@ -510,6 +552,45 @@ onMounted(() => { loadUsers(); loadServerInfo(); loadSessions() })
         <div class="kv"><span class="k">Release retention</span><span class="v mono">{{ releaseRetentionVal }} releases</span></div>
         <div class="hint">
           Effective values reported by the server. Configured in <span class="mono">.env</span>.
+        </div>
+      </div>
+
+      <!-- Safe runtime settings -->
+      <div class="card stack">
+        <div class="spread">
+          <h2 class="section-label">Platform settings</h2>
+          <span class="small dim">Safe, non-secret values only</span>
+        </div>
+        <div class="hint">Database overrides take precedence over .env. Secrets, paths, and feature gates remain environment-only.</div>
+        <div class="grid grid-2">
+          <div v-for="item in platformSettings" :key="item.key" class="field-group">
+            <label class="field-label" :for="`setting-${item.key}`">{{ item.label }}</label>
+            <select
+              v-if="item.type === 'enum'"
+              :id="`setting-${item.key}`"
+              v-model="settingsDraft[item.key]"
+            >
+              <option v-for="option in item.values" :key="option" :value="option">{{ option }}</option>
+            </select>
+            <input
+              v-else
+              :id="`setting-${item.key}`"
+              v-model="settingsDraft[item.key]"
+              type="number"
+              :min="item.min"
+              :max="item.max"
+              :step="item.type === 'integer' ? 1 : 0.1"
+            />
+            <span class="small dim">Source: {{ item.source }}</span>
+          </div>
+        </div>
+        <div v-if="settingsMsg" class="notice">{{ settingsMsg }}</div>
+        <div v-if="settingsError" class="error-box">{{ settingsError }}</div>
+        <div class="btn-row">
+          <button class="btn btn-primary" :disabled="settingsSaving || !platformSettings.length" @click="saveSettings">
+            <span v-if="settingsSaving" class="spinner"></span><span v-else>Save settings</span>
+          </button>
+          <button class="btn btn-ghost" :disabled="settingsSaving || !platformSettings.length" @click="resetSettings">Use environment defaults</button>
         </div>
       </div>
 

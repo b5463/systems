@@ -3,6 +3,7 @@
 const bcrypt = require('bcrypt');
 const { db, auditLog } = require('../db');
 const ipmatch = require('../util/ipmatch');
+const settings = require('../util/settings');
 
 async function adminRoutes(fastify, options) {
   // List all users
@@ -172,6 +173,41 @@ async function adminRoutes(fastify, options) {
     db.prepare('DELETE FROM ip_bans WHERE id = ?').run(id);
     auditLog({ user_id: request.user.id, action: 'ip_ban_delete', target: ban.ip, ip: request.ip });
     return { message: 'IP ban removed.' };
-  });}
+  });
+
+  // Safe runtime settings only. Secrets, filesystem paths, and feature gates
+  // remain environment-owned and are deliberately absent from this allowlist.
+  fastify.get('/api/admin/settings', {
+    preHandler: [fastify.authenticate],
+  }, async () => ({ settings: settings.listSettings() }));
+
+  fastify.patch('/api/admin/settings', {
+    preHandler: [fastify.authenticate],
+    schema: {
+      body: {
+        type: 'object',
+        required: ['settings'],
+        additionalProperties: false,
+        properties: {
+          settings: { type: 'object', minProperties: 1 },
+        },
+      },
+    },
+  }, async (request, reply) => {
+    try {
+      const changed = settings.updateSettings(request.body.settings, request.user.id);
+      auditLog({
+        user_id: request.user.id,
+        action: 'settings_update',
+        target: 'platform',
+        detail: Object.keys(changed).sort().join(', '),
+        ip: request.ip,
+      });
+      return { settings: settings.listSettings(), changed };
+    } catch (err) {
+      return reply.code(400).send({ error: err.message });
+    }
+  });
+}
 
 module.exports = adminRoutes;

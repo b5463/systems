@@ -2,6 +2,7 @@
 
 const { shouldSend, buildPayload } = require('../util/notify');
 const { retry } = require('../util/retry');
+const { getSetting } = require('../util/settings');
 
 // Best-effort outbound notification. Never throws, never blocks a request path.
 // Posts a small JSON payload to NOTIFY_WEBHOOK_URL when notifications are
@@ -12,7 +13,7 @@ const { retry } = require('../util/retry');
 async function send(event) {
   if (!shouldSend()) return { sent: false, reason: 'disabled' };
   const url = process.env.NOTIFY_WEBHOOK_URL;
-  const payload = buildPayload(event);
+  const payload = buildPayload(event, { ...process.env, NOTIFY_FORMAT: getSetting('notificationFormat') });
   try {
     await retry(async () => {
       const controller = new AbortController();

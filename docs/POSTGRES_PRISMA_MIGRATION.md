@@ -1,8 +1,9 @@
 # Control-plane DB: Postgres + Prisma migration plan
 
-Status: **proposed milestone — not started.** This documents *whether* and *how* to
-move the SYSTEMS. control-plane database off SQLite. It is deliberately a decision
-doc first, an implementation plan second.
+Status: **data-copy runner implemented; application cutover remains deferred.**
+SYSTEMS. still uses SQLite for its live control plane. The guarded runner provides
+the backed-up, count-verified SQLite-to-Postgres copy needed before a future
+repository/Prisma cutover.
 
 ## What "the database" means here
 
@@ -35,6 +36,28 @@ instances (HA / horizontal scale).** Reasons:
 **The one scenario that justifies migrating:** running **>1 API instance** sharing
 state (HA, blue/green of the control plane itself, multi-node). SQLite can't be the
 shared source of truth across processes/hosts; Postgres can.
+
+## Available data-copy runner
+
+Run from `api/`:
+
+```powershell
+npm run migrate:postgres -- --dry-run
+
+$env:CONTROL_PLANE_POSTGRES_URL = 'postgresql://user:password@host:5432/systems'
+$env:CONTROL_PLANE_POSTGRES_SCHEMA = 'systems_import'
+npm run migrate:postgres
+```
+
+The real run creates an online SQLite backup first, imports the allowlisted tables
+into an isolated target schema, refuses non-empty target tables, verifies source
+and destination row counts, rolls the transaction back on failure, and writes a
+JSON manifest beside the backup. `CONTROL_PLANE_SQLITE_PATH` can override the
+source database path.
+
+This is intentionally a data-copy tool, not an automatic backend switch. The API
+continues using SQLite until the repository, concurrency, session, backup, and
+operational cutover phases below are implemented.
 
 ## If/when we migrate — phased plan
 

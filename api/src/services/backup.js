@@ -6,6 +6,7 @@ const path = require('path');
 const { db, auditLog } = require('../db');
 const notify = require('./notify');
 const { backupsToPrune, backupStamp } = require('../util/backup');
+const { getSetting } = require('../util/settings');
 
 // Node-native backups. Uses better-sqlite3's online backup API, which is safe
 // to run against a live WAL-mode database (no need to stop the API). Copies the
@@ -63,7 +64,7 @@ async function runBackup() {
         const st = await fsp.stat(path.join(backupDir(), e.name));
         dirs.push({ name: e.name, mtimeMs: st.mtimeMs });
       }
-      for (const name of backupsToPrune(dirs, process.env.BACKUP_RETENTION)) {
+      for (const name of backupsToPrune(dirs, getSetting('backupRetention'))) {
         await fsp.rm(path.join(backupDir(), name), { recursive: true, force: true });
         pruned++;
       }
@@ -85,7 +86,7 @@ async function runBackup() {
 function start() {
   const { features } = require('../util/flags');
   if (!features().backupScheduler) return; // off by default
-  const hours = Number(process.env.BACKUP_INTERVAL_HOURS) || 24;
+  const hours = getSetting('backupIntervalHours');
   if (hours <= 0) return;
   timer = setInterval(() => { runBackup().catch(() => {}); }, hours * 3.6e6);
   if (timer.unref) timer.unref();

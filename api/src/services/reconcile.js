@@ -9,6 +9,7 @@ const notify = require('./notify');
 const health = require('./health');
 const { reconcileStatus } = require('../util/reconcile');
 const { evaluateAlerts, alertDelta } = require('../util/alerts');
+const { getSetting } = require('../util/settings');
 
 // Reconcile DB status against actual Docker container state. The DB otherwise
 // only records the last *action*; this corrects drift from crashes, OOM kills,
@@ -67,6 +68,24 @@ async function buildInfoSnapshot(dockerOk) {
       info.backup.status = 'none';
     }
   } catch { /* not_measured */ }
+
+  try {
+    info.systems = db.prepare(`
+      SELECT p.slug, p.health_failures,
+        s.cpu_percent,
+        CASE WHEN s.memory_limit_mb > 0 THEN (s.memory_mb / s.memory_limit_mb) * 100 ELSE NULL END AS memory_percent
+      FROM projects p
+      LEFT JOIN stats_history s ON s.id = (
+        SELECT id FROM stats_history WHERE project_id = p.id ORDER BY recorded_at DESC, id DESC LIMIT 1
+      )
+      WHERE p.status = 'running'
+    `).all().map((row) => ({
+      slug: row.slug,
+      healthFailures: row.health_failures || 0,
+      cpuPercent: row.cpu_percent,
+      memoryPercent: row.memory_percent,
+    }));
+  } catch { info.systems = []; }
 
   return info;
 }
@@ -137,6 +156,8 @@ async function reconcileOnce() {
              SET health_state = ?, health_status = ?, health_response_ms = ?, health_checked_at = ?
              WHERE slug = ?`
           ).run(observed.state, observed.httpStatus, observed.responseMs, observed.checkedAt, project.slug);
+          db.prepare(`UPDATE projects SET health_failures = CASE WHEN ? = 'healthy' THEN 0 ELSE health_failures + 1 END WHERE slug = ?`)
+            .run(observed.state, project.slug);
           if (observed.state !== project.health_state) {
             auditLog({
               action: observed.state === 'healthy' ? 'health_ok' : 'health_fail',
@@ -173,7 +194,12 @@ async function reconcileOnce() {
   // not on every poll cycle.
   buildInfoSnapshot(dockerOk)
     .then((snapshot) => {
-      const next = evaluateAlerts(snapshot);
+      const next = evaluateAlerts(snapshot, {
+        backupOverdueHours: getSetting('backupOverdueHours'),
+        memoryPercent: getSetting('alertMemoryPercent'),
+        cpuPercent: getSetting('alertCpuPercent'),
+        healthFailures: getSetting('alertHealthFailures'),
+      });
       const { raised } = alertDelta(prevAlerts, next);
       prevAlerts = next;
       for (const a of raised) {

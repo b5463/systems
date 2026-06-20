@@ -106,6 +106,12 @@ try { db.exec(`ALTER TABLE projects ADD COLUMN limit_log_max_size TEXT`); } catc
 try { db.exec(`ALTER TABLE projects ADD COLUMN limit_log_max_file INTEGER`); } catch {}
 try { db.exec(`ALTER TABLE projects ADD COLUMN health_path TEXT NOT NULL DEFAULT '/'`); } catch {}
 
+try { db.exec(`ALTER TABLE projects ADD COLUMN health_failures INTEGER NOT NULL DEFAULT 0`); } catch {}
+
+try { db.exec(`ALTER TABLE projects ADD COLUMN github_deploy_status TEXT`); } catch {}
+try { db.exec(`ALTER TABLE projects ADD COLUMN github_deploy_detail TEXT`); } catch {}
+try { db.exec(`ALTER TABLE projects ADD COLUMN github_deploy_at TEXT`); } catch {}
+
 // Tamper-evident audit log: each row links to the previous via a SHA-256 hash
 // chain (see util/audit). Rows written before this migration keep NULL hashes
 // and verification simply starts at the first hashed row.
@@ -138,6 +144,15 @@ db.exec(`
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
   CREATE INDEX IF NOT EXISTS idx_ip_bans_ip ON ip_bans(ip);
+
+  -- Safe, non-secret runtime settings editable by administrators. Feature
+  -- flags, credentials, paths, and secrets intentionally remain environment-only.
+  CREATE TABLE IF NOT EXISTS platform_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
 `);
 
 db.exec(`

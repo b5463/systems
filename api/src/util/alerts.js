@@ -39,6 +39,34 @@ function evaluateAlerts(info = {}, opts = {}) {
     alerts.push({ key: 'postgres', severity: 'warning', message: 'Postgres unreachable' });
   }
 
+  const memoryThreshold = Number(opts.memoryPercent) || 90;
+  const cpuThreshold = Number(opts.cpuPercent) || 90;
+  const healthFailures = Number(opts.healthFailures) || 3;
+  for (const system of info.systems || []) {
+    const slug = system.slug || 'unknown';
+    if (Number.isFinite(system.memoryPercent) && system.memoryPercent >= memoryThreshold) {
+      alerts.push({
+        key: `system:${slug}:memory`,
+        severity: system.memoryPercent >= 98 ? 'critical' : 'warning',
+        message: `${slug} memory at ${Math.round(system.memoryPercent)}%`,
+      });
+    }
+    if (Number.isFinite(system.cpuPercent) && system.cpuPercent >= cpuThreshold) {
+      alerts.push({
+        key: `system:${slug}:cpu`,
+        severity: 'warning',
+        message: `${slug} CPU at ${Math.round(system.cpuPercent)}%`,
+      });
+    }
+    if (Number(system.healthFailures) >= healthFailures) {
+      alerts.push({
+        key: `system:${slug}:health`,
+        severity: 'critical',
+        message: `${slug} failed ${system.healthFailures} consecutive health checks`,
+      });
+    }
+  }
+
   return alerts;
 }
 

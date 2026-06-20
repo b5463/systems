@@ -26,15 +26,6 @@ These paths are implemented but still require end-to-end validation on the real 
 - Validate the in-dashboard shell console with its feature flag enabled.
 - Run the full backup and non-production restore drill from [WINDOWS_VALIDATION_CHECKLIST.md](WINDOWS_VALIDATION_CHECKLIST.md).
 
-## v2.5 — Finish and harden the single host
-
-- Move safe administrator settings out of **.env** into audited, DB-backed editable settings.
-- Add health and resource-pressure alert coverage beyond the existing disk, backup, Docker, and Postgres alerts.
-- Polish gated features after host validation:
-  - Show GitHub deploy status and delivery failures in the UI.
-  - Format notifications for Slack, Discord, and email destinations.
-  - Improve large-upload progress and recovery UX.
-- Implement and test the dedicated, backed-up SQLite-to-Postgres control-plane migration runner.
 
 ## v3 — Beyond one box
 
@@ -163,3 +154,9 @@ These paths are implemented but still require end-to-end validation on the real 
 - ~~Disk-cleanup preview and execution on the Server screen.~~ **Done.**
 - ~~Longer metrics history with bounded response sizes.~~ **Done.**
 - ~~Transition-only alert notifications instead of repeated alerts on every poll.~~ **Done.**
+- ~~Audited, DB-backed editing for allowlisted safe administrator settings.~~ **Done.**
+- ~~Per-system memory, CPU, and consecutive-health-failure alerts with editable thresholds.~~ **Done.**
+- ~~GitHub delivery/deploy status and failures displayed in system settings.~~ **Done; host validation remains.**
+- ~~Slack, Discord, email-relay, and generic webhook notification payload formats.~~ **Done; host validation remains.**
+- ~~Retry-aware large-upload progress and recovery UX.~~ **Done; 2 GB host validation remains.**
+- ~~Backed-up, count-verified SQLite-to-Postgres control-plane data migration runner.~~ **Done.**

@@ -3,6 +3,7 @@
 const { db } = require('../db');
 const { getContainerStats } = require('../services/docker');
 const { loadOr404 } = require('../util/project');
+const { getSetting } = require('../util/settings');
 
 /**
  * Stats routes plugin.
@@ -56,7 +57,7 @@ async function statsRoutes(fastify, options) {
         // Occasionally trim old history so the table doesn't grow without bound
         // (this endpoint is polled for every running system on an interval).
         if (Math.random() < 0.02) {
-          const hours = Number(process.env.STATS_RETENTION_HOURS) || 168;
+          const hours = getSetting('statsRetentionHours');
           db.prepare(
             `DELETE FROM stats_history WHERE project_id = ? AND julianday(recorded_at) < julianday('now', ?)`
           ).run(project.id, `-${hours} hours`);
@@ -84,7 +85,7 @@ async function statsRoutes(fastify, options) {
     const project = loadOr404(reply, slug);
     if (!project) return;
 
-    const retentionHours = Math.max(1, Math.min(24 * 30, Number(process.env.STATS_RETENTION_HOURS) || 168));
+    const retentionHours = getSetting('statsRetentionHours');
     let hours = Number(request.query.hours);
     if (!Number.isFinite(hours) || hours <= 0) hours = 1;
     hours = Math.min(hours, retentionHours);

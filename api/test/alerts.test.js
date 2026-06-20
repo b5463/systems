@@ -50,3 +50,18 @@ test('alertDelta reports newly raised and cleared by key', () => {
   assert.deepEqual(d.raised.map((a) => a.key), ['docker']);
   assert.deepEqual(d.cleared.map((a) => a.key), ['disk']);
 });
+
+test('resource pressure and health failures use configured thresholds', () => {
+  const alerts = evaluateAlerts({
+    ...healthy,
+    systems: [
+      { slug: 'busy', memoryPercent: 98.2, cpuPercent: 81, healthFailures: 4 },
+      { slug: 'quiet', memoryPercent: 20, cpuPercent: 10, healthFailures: 0 },
+    ],
+  }, { memoryPercent: 95, cpuPercent: 80, healthFailures: 4 });
+
+  assert.equal(alerts.find((a) => a.key === 'system:busy:memory').severity, 'critical');
+  assert.equal(alerts.find((a) => a.key === 'system:busy:cpu').severity, 'warning');
+  assert.equal(alerts.find((a) => a.key === 'system:busy:health').severity, 'critical');
+  assert.equal(alerts.some((a) => a.key.startsWith('system:quiet:')), false);
+});
