@@ -77,8 +77,8 @@ the real Windows host.
 Vercel and Render are great, but they're someone else's cloud — metered and
 multi-tenant. The bigger self-hosted PaaS tools (Coolify, Dokku, CapRover) are
 powerful and general-purpose. SYSTEMS. is deliberately small and opinionated:
-single-host, Windows-first, no public signup, and careful about status — it
-won't show a green light it hasn't actually checked. If you want one focused
+single-host, Windows production plus macOS testing, no public signup, and
+careful about status — it won't show a green light it hasn't actually checked. If you want one focused
 deploy engine you can read end to end, that's the gap it fills.
 
 ## Domain model
@@ -226,6 +226,16 @@ cd api && npm install && npm run dev:local # http://localhost:3000; reads ../.en
 cd dashboard && npm install && npm run dev   # proxies /api to :3000
 ```
 
+For a Docker Desktop test stack on macOS (Apple Silicon or Intel):
+
+```bash
+bash scripts/systems-setup-macos.sh
+bash scripts/systems-deploy-macos.sh  # dashboard at http://localhost:8080
+```
+
+See [`docs/MACOS_TESTING.md`](docs/MACOS_TESTING.md) for the full deploy,
+route, health, backup, restore, and rollback validation path.
+
 Run the tests:
 
 ```bash
@@ -272,7 +282,7 @@ api/         Fastify API — auth, deploy pipeline, lifecycle, routing, logs,
   src/util/    pure, unit-tested helpers                  nginx, health, backup,
   test/        node:test unit + integration               notify, reconcile
 dashboard/   Vue 3 + Vite PWA (views, components, stores); scripts/ generates art
-scripts/     Windows PowerShell ops (setup, deploy, backup, restore, update, checks)
+scripts/     Windows PowerShell and macOS Bash ops helpers
 docs/        Architecture, deployment, security, operations, per-feature guides
 ```
 
@@ -285,9 +295,11 @@ docs/        Architecture, deployment, security, operations, per-feature guides
   periodic runs. Full-volume/offsite backups use the PowerShell scripts.
 - **Recovery** — see [`docs/DISASTER_RECOVERY.md`](docs/DISASTER_RECOVERY.md).
 
-## Production (Windows)
+## Platform operation
 
-The target is a Windows host with Docker Desktop (WSL2, Linux containers). The
+Windows remains the production target. macOS has a separate Docker Desktop
+test topology for cross-platform validation; it uses local HTTP/nginx and does
+not claim to validate public Caddy/TLS. The
 step-by-step guide is [`docs/WINDOWS_DEPLOYMENT.md`](docs/WINDOWS_DEPLOYMENT.md),
 with PowerShell scripts in [`scripts/`](scripts) (`setup`, `deploy`, `backup`,
 `restore`, `update`, `check-systems-health`, `check-firewall`,
@@ -331,7 +343,8 @@ tested, and the live pieces (Caddy, optional per-app Postgres, HTTPS) remain
 pending validation on a real host — see the
 [Windows checklist](docs/WINDOWS_VALIDATION_CHECKLIST.md).
 
-**Linux?** Linux is the dev path (nginx + SQLite); Windows + Caddy is the
+**Linux or macOS?** Linux is the dev path. macOS has a Docker Desktop test
+path (nginx + SQLite); Windows + Caddy is the
 production target. The control-plane store remains SQLite; Postgres is optional
 for databases provisioned to deployed apps.
 
@@ -339,6 +352,7 @@ for databases provisioned to deployed apps.
 
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — architecture & data model
 - [`docs/WINDOWS_DEPLOYMENT.md`](docs/WINDOWS_DEPLOYMENT.md) — Windows production guide
+- [`docs/MACOS_TESTING.md`](docs/MACOS_TESTING.md) — macOS Docker Desktop testing
 - [`docs/SERVER_DEPLOYMENT_GUIDE.md`](docs/SERVER_DEPLOYMENT_GUIDE.md) — deployment surface + Linux dev
 - [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) — how a zip becomes a live system
 - [`docs/SECURITY.md`](docs/SECURITY.md) — security model & firewall

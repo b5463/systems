@@ -1,0 +1,49 @@
+name: systems-macos
+
+services:
+  acronym-nginx:
+    image: nginx:1.27-alpine
+    container_name: acronym-nginx
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${SYSTEMS_HTTP_PORT:-8080}:80"
+    volumes:
+      - ./nginx/nginx.macos.conf:/etc/nginx/nginx.conf:ro
+      - "${SYSTEMS_MAC_NGINX_CONF_DIR}:/etc/nginx/conf.d"
+      - ./dashboard/dist:/usr/share/nginx/html:ro
+    networks: [systems]
+
+  acronym-api:
+    build: { context: ./api }
+    container_name: acronym-api
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - "${SYSTEMS_MAC_DATA_DIR}:/app/data"
+      - "${SYSTEMS_MAC_NGINX_CONF_DIR}:/app/nginx-conf"
+    environment:
+      NODE_ENV: production
+      DATA_DIR: /app/data
+      SYSTEMS_DATA_DIR: /app/data
+      BACKUP_DIR: /app/data/backups
+      DEPLOYMENTS_DIR: /app/data/releases
+      UPLOADS_DIR: /app/data/uploads
+      JWT_SECRET: ${JWT_SECRET}
+      ENV_SECRET: ${ENV_SECRET}
+      ADMIN_USERS: ${ADMIN_USERS}
+      SYSTEMS_ATTESTATION_SECRET: ${SYSTEMS_ATTESTATION_SECRET}
+      CORS_ORIGIN: http://localhost:${SYSTEMS_HTTP_PORT:-8080}
+      BASE_DOMAIN: localhost
+      PUBLIC_SCHEME: http
+      LOCAL_MODE: "true"
+      REVERSE_PROXY: nginx
+      NGINX_CONF_DIR: /app/nginx-conf
+      SYSTEMS_API_INTERNAL_UPSTREAM: acronym-api:3000
+      SYSTEMS_APP_UPSTREAM_HOST: host.docker.internal
+      RECONCILE_INTERVAL_SEC: ${RECONCILE_INTERVAL_SEC:-30}
+    depends_on: [acronym-nginx]
+    networks: [systems]
+
+networks:
+  systems:
+    name: systems-macos

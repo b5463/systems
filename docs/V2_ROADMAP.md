@@ -11,6 +11,11 @@ real Windows host; the control-plane database remains SQLite. Since the
 feature work landed there's also been a hardening, UX, and maintainability pass
 (see "2.0-rc — hardening, UX & maintainability" below).
 
+A separate macOS Docker Desktop topology now covers cross-platform local testing on
+Apple Silicon and Intel. It proves the Linux-container deploy, local nginx route,
+health, redeploy, and rollback path; public Caddy, DNS, and TLS remain Windows-host
+validation work. See [`MACOS_TESTING.md`](MACOS_TESTING.md).
+
 ## V1.1 — Foundation / product shell (done)
 
 - Rebrand to SYSTEMS.; monochrome-first operational design base.

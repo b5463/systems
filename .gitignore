@@ -3,6 +3,7 @@ data/
 certbot/conf/
 certbot/www/
 .env
+.env.macos
 *.zip
 nginx/conf.d/*.conf
 
