@@ -25,7 +25,7 @@
     "bcrypt": "^6",
     "better-sqlite3": "^12.11.1",
     "dockerode": "^4",
-    "fastify": "^4",
+    "fastify": "^5",
     "unzipper": "^0.12",
     "uuid": "^14"
   },
