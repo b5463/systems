@@ -47,11 +47,10 @@ jobs:
       # services are excluded — they're covered by the integration tests but not
       # to a percentage we want to gate on. Raise these thresholds over time.
       - run: npm run test:coverage
-      # Surfaces high/critical advisories in runtime deps. TEMPORARILY report-only
-      # (continue-on-error) while the breaking security upgrades (Fastify 5 +
-      # plugins, bcrypt 6) are landed — flip back to blocking once they're in.
+      # Blocks on high/critical advisories in runtime deps. (The Fastify 5 +
+      # plugin upgrades have landed, so this is back to blocking; only sub-high
+      # advisories remain.)
       - run: npm audit --omit=dev --audit-level=high
-        continue-on-error: true
 
   dashboard:
     name: Dashboard — lint + build + audit
@@ -69,9 +68,8 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run build
-      # Report-only for now (see the API job note); flip back to blocking later.
+      # Blocks on high/critical advisories (see the API job note).
       - run: npm audit --audit-level=high
-        continue-on-error: true
 
   e2e:
     name: Dashboard — e2e (Playwright)
