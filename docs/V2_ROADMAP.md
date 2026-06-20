@@ -1,256 +1,165 @@
 # SYSTEMS. — Roadmap
 
-This is the staged plan the project followed, kept as history plus where things
-stand now. Each stage was meant to be shippable and reviewable on its own, with
-the dangerous backend and server changes isolated rather than bundled in.
+SYSTEMS. is currently at **2.0.0-rc.1**.
 
-**Where it's at:** 2.0 release candidate (`2.0.0-rc.1`). The "V2 features" below
-are built and wired, just off by default behind their `.env` flags. Caddy and
-optional per-system Postgres provisioning are wired pending validation on the
-real Windows host; the control-plane database remains SQLite. Since the
-feature work landed there's also been a hardening, UX, and maintainability pass
-(see "2.0-rc — hardening, UX & maintainability" below).
+This roadmap is split by status:
 
-A separate macOS Docker Desktop topology now covers cross-platform local testing on
-Apple Silicon and Intel. It proves the Linux-container deploy, local nginx route,
-health, redeploy, and rollback path; public Caddy, DNS, and TLS remain Windows-host
-validation work. See [`MACOS_TESTING.md`](MACOS_TESTING.md).
+- **Not done** contains remaining implementation, host-validation, and future-platform work.
+- **Done** contains shipped work. Completed headings and items are struck through.
+- A feature can be built and listed as done while its Windows-host validation remains separately listed as not done.
 
-## V1.1 — Foundation / product shell (done)
+# Not done
 
-- Rebrand to SYSTEMS.; monochrome-first operational design base.
-- Responsive product shell: desktop sidebar plus mobile hamburger/drawer.
-- Five surfaces (Systems, Ship, Events, Server, Admin) plus System detail
-  (Overview/Deployments/Logs/Metrics/Console/Settings), with a status truth
-  model and grouped primary/secondary/danger actions.
-- Honest empty, loading, and error states. No faked data or statuses.
-- PWA rebrand (manifest, icons, meta). Read-only Server status endpoint.
-- Docs, security direction, and config skeletons.
-- Backend kept functional (SQLite + nginx), no rushed migrations.
+## Windows-host validation
 
-## V1.1.5 — Windows target + hardening baseline (done)
+These paths are implemented but still require end-to-end validation on the real Windows host:
 
-- Windows-first `.env`, paths (`C:\ProgramData\SYSTEMS`), and docs
-  (WINDOWS_DEPLOYMENT, UPDATE_STRATEGY, DISASTER_RECOVERY; firewall in
-  SECURITY/OPERATIONS).
-- PowerShell scripts: setup, deploy, backup, restore, update, health, firewall.
-- Per-container resource limits (memory/CPU/PIDs/restart/log rotation) from
-  `DEFAULT_CONTAINER_*`.
-- SYSTEMS. self-observability on the Server screen (uptime, disk, backups,
-  defaults) with real data, nothing faked.
-- Destructive delete requires typing the system slug; backup-awareness before
-  destructive actions.
-
-## V1.2 — Working deployment platform
-
-Built and verifiable: slug rules plus a reserved-name list; the reverse-proxy
-abstraction with a real Caddy route-file generator (public / password basic-auth
-/ private) selected by `REVERSE_PROXY`; the visibility model (schema, endpoint,
-deploy logic, private = no route); the health and HTTPS checker (real request,
-honest states) and its endpoint; delete-vs-purge (purge requires typing the
-slug); deploy-history retention (old history rows trimmed; images kept for
-rollback); deploy type recorded; and the UI wiring for all of it (Ship
-visibility, System detail health/visibility/purge, Systems truth plus the
-deleted section).
-
-Other pieces from this stage:
-
-- SQLite control-plane DB; a Postgres/Prisma cutover is documented as a
-  migration plan, not implemented.
-- Caddy reverse proxy: `Caddyfile` plus generated `systems.d/` route files;
-  automatic HTTPS; certbot removed.
-- Schema: `visibility` (public / password / private), `deploy_type`, an explicit
-  `routes` table, persisted editable settings.
-- Visibility modes: public route, password-protected (basic auth where safe),
-  private (no public route).
-- Auth uses HttpOnly/SameSite cookie sessions (Secure + __Host- in production), session-bound CSRF, strict Origin checks, rotation/revocation, login backoff, and a persistent operator IP denylist.
-- Build timeouts and resource-limit enforcement; the delete-vs-purge split.
-- Windows-first server deployment guide and `.env`.
-
-Still needs the Windows host to confirm (can't be exercised without Docker):
-
-- Container naming `deploy_{slug}` with Caddy reaching the mapped host port via
-  `SYSTEMS_APP_UPSTREAM_HOST`; the Caddy and optional Postgres service wiring.
-- The SQLite-to-Postgres internal-store cutover (currently a design plan only;
-  implement and test a runner as a dedicated, backed-up migration).
-- Live Caddy reload/validate plus end-to-end HTTPS issuance.
-
-## V1.5 — More runtimes (built, host-validation pending)
-
-- Node API / worker deploys (long-running services): the build-and-run path is
-  in; proving it end-to-end needs the Windows host.
-- Custom Dockerfile support: built, admin-only, off by default
-  (`ENABLE_DOCKERFILE_MODE`).
-
-## V2 — Full deployment engine
-
-The original target list (built items struck through; see "what's actually
-built" below for the gating detail):
-
-- ~~2 GB streaming/chunked uploads.~~ **Built** (off by default).
-- ~~Managed databases for systems.~~ **Built** (off by default).
-- ~~Workers/bots (non-HTTP long-running processes).~~ **Built** (host-validation pending).
-- ~~GitHub deploys (push-to-deploy).~~ **Built** (off by default — riskiest flag).
-- ~~Backups and restores (DB plus per-system).~~ **Built and on.**
-- ~~In-dashboard shell console (beyond per-container exec).~~ **Built** (off by default).
-- Advanced metrics and alerting — ~~threshold alerting~~ **done**; ~~longer metrics
-  history~~ **done** (seven-day retention with bounded downsampling).
-
-## V2 — what's actually built
-
-Wired up, off by default (enable after host validation): chunked/streamed 2 GB
-uploads (`ENABLE_LARGE_UPLOADS`), per-system Postgres provisioning
-(`ENABLE_DB_PROVISIONING`), GitHub deploy-on-push (`ENABLE_GITHUB_DEPLOYS`,
-which verifies the webhook HMAC and then pulls and builds external code, so it's
-the riskiest flag), and outbound webhook notifications (`ENABLE_NOTIFICATIONS`
-plus `NOTIFY_WEBHOOK_URL`). See the per-feature docs for each.
-
-Wired up and on: in-app backups, with a manual "Back up now" (online SQLite
-snapshot plus an optional Caddy routes copy) always available and an optional
-periodic scheduler (`ENABLE_BACKUP_SCHEDULER`). Container-state reconciliation
-runs on boot and on an interval, so crashes and reboots don't leave stale
-"running" rows. Admin auth supports opt-in TOTP two-factor and JWT session
-revocation via `token_version`. One system can be made **primary** so the bare
-root domain (e.g. `acronym.sk`) serves it while the dashboard stays on its
-subdomain (`PATCH /api/projects/:slug/primary`). See [`BACKUPS.md`](BACKUPS.md),
-[`OPERATIONS.md`](OPERATIONS.md), and [`SECURITY.md`](SECURITY.md).
-
-Engineering and product: the API is assembled by `buildApp()` and covered by
-route-level integration tests (`app.inject`) on top of the pure-logic unit tests.
-The login and empty-state art is a generated pastel ribbon field.
-
-Gated in the deploy and exec paths: Dockerfile mode (off by default, never
-silent) and the shell console (off by default). The V2 feature flags show on the
-Server screen, and `/api/deploy/plan` gives a dry-run.
-
-Still needs Windows host validation: the Node-API/worker container runtime plus
-Caddy reachability, Dockerfile builds, and the risky flags above run end-to-end
-on the host.
-
-## 2.0-rc — hardening, UX & maintainability (done)
-
-A pass after the feature work, driven by deep code/UX audits. All shipped:
-
-Reliability & security:
-- Container-state reconciliation also recovers builds left stuck in `building`
-  after a process restart.
-- Env updates **merge** over the existing vars (and support explicit removal)
-  instead of replacing — a full replace was silently wiping un-retyped vars,
-  since the API only ever returns key names. Failed env recreates also clear the
-  dangling `container_id`.
-- Serialized deploy port allocation (no two concurrent deploys grabbing the same
-  port); chunked-upload sessions + temp files get a TTL sweeper.
-- Basic-auth username validated before it's written into a Caddy route
-  (directive-injection guard); equal-time login (no username-enumeration oracle);
-  the API refuses to start with the insecure default `JWT_SECRET` in production.
-- 2FA enable/disable and password change/reset bump `token_version`, so they
-  sign other sessions out. DB indexes for the hot lookups; `stats_history`
-  retention pruning.
-
-UX & feel:
-- Mobile **bottom tab bar** (replaced the hamburger drawer); keyboard shortcuts
-  with a `?` help overlay; optimistic start/stop/restart; success/failure toasts
-  on the actions that change live state; copy buttons on secrets/IDs.
-- Reusable `ConfirmDialog` (delete / purge / redeploy) with focus management;
-  redeploy now has a confirm step; route transitions; Systems search + sort.
-- "Crashed" (ran then died) vs "Failed" (build) vocabulary; richer empty states;
-  an incident-recovery callout with one-click View logs / Restart / Redeploy /
-  Roll back; onboarding empty state; Server screen framed so "Set up on host" /
-  "Not measured yet" don't read as breakage.
-
-Maintainability & tooling:
-- Shared API helpers (`pub`, `loadOr404`) and frontend `config` / `date` /
-  `status` utilities; `readUploadToTmp`; the Settings tab extracted into a
-  `SystemSettings` component.
-- ESLint + Prettier on both packages (lint clean); route-level integration tests
-  via `app.inject` on top of the pure-logic unit tests.
-
-## Not built yet (the honest backlog)
-
-Current backlog status:
-
-- ~~Auth: HTTP-only cookie sessions + CSRF, login lockout/backoff.~~ **Done.**
-  Browser JWT exposure and query/bearer fallbacks are removed; mutations require
-  a session-bound CSRF header; Origin is checked; sensitive changes rotate sessions.
-  A persistent audited IP denylist (exact IP **and CIDR range**) is enforced
-  pre-auth through the admin API, and every response carries hardened headers
-  (locked-down CSP, HSTS in production, frame-deny, nosniff, Referrer/Permissions
-  policies).
-- ~~Per-build resource ceilings and a concurrent-build cap.~~ **Done.**
-  `MAX_CONCURRENT_BUILDS` gates admission (default one), while
-  `BUILD_CPU_LIMIT`, `BUILD_MEMORY_MB`, and `BUILD_TIMEOUT_SECONDS` bound each
-  Docker build.
-- ~~Per-system resource overrides in the UI.~~ **Done.** CPU, memory, PIDs,
-  restart policy, log rotation, and health-path overrides are stored per system,
-  editable in Settings, and applied across every container recreation path.
-- ~~Automated disk cleanup~~ — **Done.** `POST /api/server/cleanup` removes
-  orphaned managed images and release dirs without touching rollback targets.
-  Preview via `GET /api/server/cleanup/preview`; surfaced on the Server screen.
-- Persisted, editable settings in Admin (still `.env`-driven).
-- ~~Threshold alerting~~ — **Done.** `evaluateAlerts` checks disk %, backup age,
-  Docker, and Postgres on every reconcile cycle; `alertDelta` fires a webhook
-  only on first-seen transitions (raised → notify, not every poll). ~~Longer metrics
-  history~~ **Done** with seven-day retention and bounded downsampling.
-
-## UX polish backlog (nice-to-have)
-
-Low-impact niceties, consciously deferred — worth doing but not worth churning
-working code for right now:
-
-- ~~Clarify the Ship deploy-lifecycle rail~~ — **Done.** It is explicitly labeled
-  as a pipeline reference and directs operators to the build log for live state.
-- ~~Per-cell tooltips / a small legend on the Overview truth grid.~~
-  **Done.** Every cell explains its source and neutral/not-applicable states.
-- ~~Co-locate Purge next to Delete~~ — **Done.** Both appear in the Overview and
-  Settings danger areas, with the recoverable-delete/permanent-purge distinction.
-- ~~First-run framing on the login screen~~ — **Done.** The login explains that
-  the initial administrator comes from `ADMIN_USERS` and that signup is closed.
-- ~~Pair Failed/Crashed cards with a next action~~ — **Done.** Attention cards
-  direct the operator to logs and the appropriate restart, redeploy, or rollback.
+- Validate the **deploy_{slug}** container runtime with Caddy reaching mapped host ports through **SYSTEMS_APP_UPSTREAM_HOST**.
+- Validate live Caddy configuration generation, validation, reload, public routing, automatic HTTPS, and certificate issuance.
+- Validate public, password-protected, private, and bare-root-domain routes.
+- Validate Node API and worker containers end to end.
+- Validate custom Dockerfile builds with **ENABLE_DOCKERFILE_MODE**.
+- Validate 2 GB chunked uploads with **ENABLE_LARGE_UPLOADS**.
+- Validate per-system Postgres provisioning with **ENABLE_DB_PROVISIONING**.
+- Validate GitHub deploy-on-push with **ENABLE_GITHUB_DEPLOYS**.
+- Validate outbound webhook notifications with **ENABLE_NOTIFICATIONS**.
+- Validate the in-dashboard shell console with its feature flag enabled.
+- Run the full backup and non-production restore drill from [WINDOWS_VALIDATION_CHECKLIST.md](WINDOWS_VALIDATION_CHECKLIST.md).
 
 ## v2.5 — Finish and harden the single host
 
-Theme: once the Windows host validation is done, take everything that's wired
-into something you'd trust in production on one box. Mostly closing the backlog
-above, in priority order:
-
-- ~~**Auth hardening:** cookie sessions + CSRF, login lockout/backoff.~~ **Done.**
-  Also includes strict Origin checks, session rotation/revocation, no bearer/query
-  fallback, 15-character password minimums, safe proxy-trust defaults, exact-IP
-  and CIDR-range IP bans, and hardened response headers (CSP/HSTS/frame-deny/nosniff).
-- ~~**Build safety:** enforce build timeouts, concurrent-build admission, and
-  per-build resource ceilings.~~ **Done.**
-- ~~**Per-system limits in the UI:** wire CPU/memory/PIDs/restart/log/health-path
-  overrides to the existing limits mapping.~~ **Done.**
-- ~~**Disk hygiene:** safe pruning of old images/releases without touching rollback
-  targets, surfaced on Server.~~ **Done.**
-- **Settings out of `.env`:** DB-backed, editable settings where it's safe to.
-- **Observability:** ~~longer metrics history~~ **done**. ~~Threshold alerts for disk,
-  backup age, Docker, and Postgres transitions routed through notifications.~~ **Done.**
-  Health/resource-pressure alert coverage is still pending.
-- **Polish the gated features:** flip them on after host validation with the UX
-  rough edges sanded — GitHub deploy status in the UI, notification formatting
-  for Slack/Discord/email, large-upload progress.
+- Move safe administrator settings out of **.env** into audited, DB-backed editable settings.
+- Add health and resource-pressure alert coverage beyond the existing disk, backup, Docker, and Postgres alerts.
+- Polish gated features after host validation:
+  - Show GitHub deploy status and delivery failures in the UI.
+  - Format notifications for Slack, Discord, and email destinations.
+  - Improve large-upload progress and recovery UX.
+- Implement and test the dedicated, backed-up SQLite-to-Postgres control-plane migration runner.
 
 ## v3 — Beyond one box
 
-Theme: from a private single-host engine to something a small team can run at
-scale. These are the real architectural leaps, each big enough to stage on its
-own:
+- **Multi-node:** per-node Docker and Caddy, scheduler/placement, node health, and route distribution.
+- **Zero-downtime deploys:** blue/green or rolling cutover gated on health checks.
+- **Preview environments:** ephemeral branch and pull-request deployments.
+- **Roles and SSO:** owner/admin/viewer roles plus OIDC/SSO.
+- **Secrets management:** a dedicated per-system secrets store with rotation.
+- **Build pipeline:** cache, selectable runtimes, and a build queue or farm.
+- **Backups and disaster recovery at scale:** object storage, restore drills, and Postgres point-in-time recovery.
+- **API and CLI:** scoped API tokens and a **systems** CLI for CI deployments.
 
-- **Multi-node:** per-node Docker + Caddy, a scheduler/placement layer, node
-  health, and route distribution across hosts.
-- **Zero-downtime deploys:** blue/green or rolling cutover gated on a health
-  check, instead of today's stop-old-then-start-new.
-- **Preview environments:** ephemeral per-branch/PR deploys, building on the
-  GitHub integration.
-- **Roles and SSO:** move past the two-admin cap to scoped roles
-  (owner/admin/viewer) and OIDC/SSO login.
-- **Secrets management:** a real per-system secrets store with rotation, beyond
-  env-var encryption.
-- **Build pipeline:** build cache, selectable runtimes/versions, and a build
-  queue/farm so deploys don't contend for the host.
-- **Backups/DR at scale:** offsite/object-storage targets, scheduled restore
-  drills, and point-in-time recovery for Postgres.
-- **API + CLI:** scoped API tokens and a `systems` CLI so CI can deploy without
-  the dashboard.
+# Done
+
+## ~~V1.1 — Foundation / product shell~~ **Done**
+
+- ~~Rebrand to SYSTEMS. with a monochrome-first operational design.~~ **Done.**
+- ~~Responsive desktop sidebar and mobile navigation shell.~~ **Done.**
+- ~~Systems, Ship, Events, Server, Admin, and System detail surfaces.~~ **Done.**
+- ~~System detail tabs for Overview, Deployments, Logs, Metrics, Console, and Settings.~~ **Done.**
+- ~~Status truth model with grouped primary, secondary, and danger actions.~~ **Done.**
+- ~~Honest loading, empty, error, and unavailable states without fake data.~~ **Done.**
+- ~~PWA branding, manifest, icons, and metadata.~~ **Done.**
+- ~~Read-only server-status endpoint.~~ **Done.**
+- ~~Initial documentation, security direction, and configuration skeletons.~~ **Done.**
+
+## ~~V1.1.5 — Windows target and hardening baseline~~ **Done**
+
+- ~~Windows-first .env, C:/ProgramData/SYSTEMS paths, and deployment documentation.~~ **Done.**
+- ~~Windows setup, deploy, backup, restore, update, health, and firewall PowerShell scripts.~~ **Done.**
+- ~~Default per-container memory, CPU, PID, restart, and log-rotation limits.~~ **Done.**
+- ~~Server self-observability for uptime, disk, backups, and effective defaults.~~ **Done.**
+- ~~Typed-slug confirmation for destructive deletion and backup-awareness messaging.~~ **Done.**
+
+## ~~V1.2 — Working deployment platform~~ **Done**
+
+- ~~Slug rules and reserved-name validation.~~ **Done.**
+- ~~Reverse-proxy abstraction with nginx and Caddy route generators.~~ **Done.**
+- ~~Public, password-protected, and private visibility modes.~~ **Done.**
+- ~~Private systems publish no public route.~~ **Done.**
+- ~~Real health and HTTPS checks with persisted results.~~ **Done.**
+- ~~Delete versus purge semantics with typed confirmation for purge.~~ **Done.**
+- ~~Deployment history retention and rollback image preservation.~~ **Done.**
+- ~~Detected deployment type stored per system.~~ **Done.**
+- ~~Caddy systems.d route files and automatic-HTTPS configuration.~~ **Done.**
+- ~~Persisted editable system settings schema.~~ **Done.**
+- ~~HttpOnly/SameSite cookie sessions, session-bound CSRF, strict Origin checks, rotation, and revocation.~~ **Done.**
+- ~~Login backoff and persistent exact-IP/CIDR denylist.~~ **Done.**
+- ~~Build timeouts, concurrent-build admission, and build resource ceilings.~~ **Done.**
+- ~~SQLite control-plane database with documented Postgres migration design.~~ **Done.**
+
+## ~~V1.5 — More runtimes~~ **Built**
+
+- ~~Node API deployments.~~ **Built; host validation remains.**
+- ~~Long-running worker and bot deployments.~~ **Built; host validation remains.**
+- ~~Admin-only custom Dockerfile support behind ENABLE_DOCKERFILE_MODE.~~ **Built; host validation remains.**
+
+## ~~V2 — Full deployment engine~~ **Built**
+
+- ~~2 GB streaming and chunked uploads behind ENABLE_LARGE_UPLOADS.~~ **Built; host validation remains.**
+- ~~Managed per-system Postgres databases behind ENABLE_DB_PROVISIONING.~~ **Built; host validation remains.**
+- ~~GitHub push-to-deploy with HMAC verification behind ENABLE_GITHUB_DEPLOYS.~~ **Built; host validation remains.**
+- ~~In-dashboard shell console behind its feature flag.~~ **Built; host validation remains.**
+- ~~Outbound webhook notifications behind ENABLE_NOTIFICATIONS.~~ **Built; host validation remains.**
+- ~~Manual in-app backups using an online SQLite snapshot and optional Caddy route copy.~~ **Done.**
+- ~~Optional scheduled backups with ENABLE_BACKUP_SCHEDULER.~~ **Done.**
+- ~~Container-state reconciliation on startup and on an interval.~~ **Done.**
+- ~~Recovery of builds left stuck after a process restart.~~ **Done.**
+- ~~Opt-in TOTP two-factor authentication and session revocation through token_version.~~ **Done.**
+- ~~One primary system can serve the bare root domain.~~ **Done.**
+- ~~Dry-run deployment planning through /api/deploy/plan.~~ **Done.**
+- ~~Threshold alerts for disk, backup age, Docker, and Postgres state transitions.~~ **Done.**
+- ~~Seven-day metrics history with 1h, 6h, 24h, and 7d views plus bounded server-side downsampling.~~ **Done.**
+- ~~API assembly through buildApp() with route-level app.inject integration tests.~~ **Done.**
+- ~~Generated pastel ribbon artwork for login and empty states.~~ **Done.**
+
+## ~~2.0-rc — Reliability and security hardening~~ **Done**
+
+- ~~Reconcile crashed containers and interrupted builds without stale running/building rows.~~ **Done.**
+- ~~Merge environment-variable updates and support explicit removal without wiping omitted secrets.~~ **Done.**
+- ~~Clear dangling container IDs after failed environment-triggered recreation.~~ **Done.**
+- ~~Serialize deploy-port allocation.~~ **Done.**
+- ~~Expire abandoned chunked-upload sessions and temporary files.~~ **Done.**
+- ~~Validate basic-auth usernames before writing Caddy directives.~~ **Done.**
+- ~~Use equal-time login behavior to avoid username enumeration.~~ **Done.**
+- ~~Reject the default JWT secret in production.~~ **Done.**
+- ~~Invalidate other sessions after password and 2FA changes.~~ **Done.**
+- ~~Add indexes for hot project, deployment-history, statistics, session, and audit lookups.~~ **Done.**
+- ~~Prune retained statistics history.~~ **Done.**
+- ~~Harden responses with CSP, production HSTS, frame denial, nosniff, referrer, and permissions policies.~~ **Done.**
+- ~~Add tamper-evident audit-log hash chaining and verification.~~ **Done.**
+
+## ~~2.0-rc — UX and product polish~~ **Done**
+
+- ~~Mobile bottom tab bar.~~ **Done.**
+- ~~Keyboard shortcuts and ? help overlay.~~ **Done.**
+- ~~Optimistic lifecycle actions with success and failure toasts.~~ **Done.**
+- ~~Copy controls for secrets and identifiers.~~ **Done.**
+- ~~Reusable confirmation dialogs with focus management.~~ **Done.**
+- ~~Redeploy confirmation before replacing the running container.~~ **Done.**
+- ~~Route transitions, Systems search, and sorting.~~ **Done.**
+- ~~Clear Failed versus Crashed vocabulary.~~ **Done.**
+- ~~Incident-recovery actions for logs, restart, redeploy, and rollback.~~ **Done.**
+- ~~First-run onboarding and clearer Server setup/unmeasured framing.~~ **Done.**
+- ~~Ship deployment-lifecycle rail clarified as a pipeline reference.~~ **Done.**
+- ~~Truth-grid explanations and neutral-state legend behavior.~~ **Done.**
+- ~~Purge colocated with Delete and clearly marked permanent.~~ **Done.**
+- ~~Login first-run framing for ADMIN_USERS and closed signup.~~ **Done.**
+- ~~Failed and Crashed cards paired with a next action.~~ **Done.**
+- ~~Semantic section headings, associated form labels, reduced-motion handling, and 44 by 44 pixel touch targets.~~ **Done.**
+
+## ~~2.0-rc — Maintainability and tooling~~ **Done**
+
+- ~~Shared API helpers and frontend configuration/date/status utilities.~~ **Done.**
+- ~~Shared upload-to-temporary-file helper.~~ **Done.**
+- ~~System Settings extracted into its own component.~~ **Done.**
+- ~~ESLint and Prettier configuration for API and dashboard packages.~~ **Done.**
+- ~~Pure-logic unit tests and route-level integration tests.~~ **Done.**
+
+## ~~v2.5 — Completed single-host work~~ **Done**
+
+- ~~Cookie-session, CSRF, Origin, password-policy, proxy-trust, denylist, and response-header hardening.~~ **Done.**
+- ~~Build timeout, concurrency, CPU, and memory enforcement.~~ **Done.**
+- ~~Per-system CPU, memory, PID, restart-policy, log-rotation, and health-path overrides.~~ **Done.**
+- ~~Safe cleanup of orphaned managed images and release directories without touching rollback targets.~~ **Done.**
+- ~~Disk-cleanup preview and execution on the Server screen.~~ **Done.**
+- ~~Longer metrics history with bounded response sizes.~~ **Done.**
+- ~~Transition-only alert notifications instead of repeated alerts on every poll.~~ **Done.**
