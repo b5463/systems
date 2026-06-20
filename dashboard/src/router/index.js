@@ -82,8 +82,11 @@ router.onError(async (error, to) => {
   window.location.assign(to.fullPath)
 })
 
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
   const auth = useAuthStore()
+  // Resolve the session before the first guarded decision. init() is memoized,
+  // so this awaits the in-flight probe once and is a no-op on later navigations.
+  if (!auth.ready) await auth.init()
   if (!to.meta.public && !auth.isAuthenticated) {
     return { name: 'login', query: to.fullPath !== '/' ? { redirect: to.fullPath } : undefined }
   }

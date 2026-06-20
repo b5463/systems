@@ -17,17 +17,31 @@ const serverInfo = {
   backup: { status: 'ok' },
   self: {},
 }
-
-function json(route, body) {
-  return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) })
+// Mirrors GET /api/server/cleanup/preview (diskhygiene previewCleanup + storage).
+const cleanup = {
+  images: { count: 0, sizeMb: 0 },
+  releases: { count: 0 },
+  storage: { buildCacheMb: 0, danglingImagesMb: 0, stoppedContainers: 0, unusedVolumesMb: 0, available: false },
 }
 
-async function mockApi(page) {
+function json(route, body, status = 200) {
+  return route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) })
+}
+
+// Mock the API for one of two session states. Auth is an HttpOnly cookie the
+// test can't set, so the session is expressed purely through /api/auth/me:
+// a signed-in browser gets a user, a signed-out one gets 401.
+async function mockApi(page, { authed }) {
   await page.route('**/api/**', (route) => {
     const p = new URL(route.request().url()).pathname
-    if (p === '/api/auth/me') return json(route, { id: 1, username: 'admin', twoFactorEnabled: false })
+    if (p === '/api/auth/me') {
+      return authed
+        ? json(route, { id: 1, username: 'admin', twoFactorEnabled: false, csrfToken: 'e2e-csrf' })
+        : json(route, { error: 'Unauthorized' }, 401)
+    }
     if (p === '/api/projects') return json(route, { projects: systems })
     if (p === '/api/server/info') return json(route, serverInfo)
+    if (p === '/api/server/cleanup/preview') return json(route, cleanup)
     if (p === '/api/audit') return json(route, { entries: [], total: 0 })
     return json(route, {})
   })
@@ -36,22 +50,23 @@ async function mockApi(page) {
 test.beforeEach(async ({ page }) => {
   // Skip the service worker so navigation is deterministic.
   await page.addInitScript(() => Object.defineProperty(navigator, 'serviceWorker', { get: () => undefined }))
-  await mockApi(page)
 })
 
 test('login page renders the sign-in form', async ({ page }) => {
+  await mockApi(page, { authed: false })
   await page.goto('/login')
   await expect(page.locator('input#p')).toBeVisible()
-  await expect(page.getByRole('button', { name: /enter systems/i })).toBeVisible()
+  await expect(page.getByRole('button', { name: /sign in/i })).toBeVisible()
 })
 
 test('unauthenticated visit to a guarded route redirects to login', async ({ page }) => {
+  await mockApi(page, { authed: false })
   await page.goto('/')
   await expect(page).toHaveURL(/\/login/)
 })
 
 test('authenticated Systems view lists deployed systems', async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem('acronym_token', 'eyJfake.token.e2e'))
+  await mockApi(page, { authed: true })
   await page.goto('/')
   // The system name can appear in more than one place (card title + aria/label);
   // assert at least one is visible rather than requiring a unique match.
@@ -59,7 +74,7 @@ test('authenticated Systems view lists deployed systems', async ({ page }) => {
 })
 
 test('authenticated core pages render their primary surfaces', async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem('acronym_token', 'eyJfake.token.e2e'))
+  await mockApi(page, { authed: true })
 
   await page.goto('/ship')
   await expect(page.getByRole('heading', { name: 'Ship' })).toBeVisible()
@@ -71,7 +86,7 @@ test('authenticated core pages render their primary surfaces', async ({ page }) 
 
   await page.goto('/server')
   await expect(page.getByRole('heading', { name: 'Server' })).toBeVisible()
-  await expect(page.getByText('Core services')).toBeVisible()
+  await expect(page.getByText('Infrastructure')).toBeVisible()
 
   await page.goto('/admin')
   await expect(page.getByRole('heading', { name: 'Admin' })).toBeVisible()

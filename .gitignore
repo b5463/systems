@@ -10,6 +10,10 @@ nginx/conf.d/*.conf
 # Generated UI screenshots (visual artifacts, not source)
 shots/
 
+# Playwright e2e output (regenerated each run)
+dashboard/test-results/
+dashboard/playwright-report/
+
 # AI agent / assistant tooling — local only, not project source
 .agents/
 .claude/

@@ -1,5 +1,9 @@
 import { defineStore } from 'pinia'
 
+// Shared across all callers so the session probe runs exactly once per page
+// load, even if the router guard and App.vue both call init() concurrently.
+let initPromise = null
+
 export const useAuthStore = defineStore('auth', {
   state: () => ({
     user: null,
@@ -69,9 +73,17 @@ export const useAuthStore = defineStore('auth', {
     async init() {
       // The HttpOnly credential cannot be inspected by JavaScript. Ask the
       // server whether the browser has a valid session on every cold start.
-      localStorage.removeItem('acronym_token')
-      try { await this.fetchMe() } catch { this.clear() }
-      this.ready = true
+      // Memoized: the router guard awaits this on the first navigation while
+      // App.vue also kicks it off on mount — they must share one probe so the
+      // guard never decides auth state before the session is known (which would
+      // bounce an already-signed-in user to /login on a cold load).
+      if (initPromise) return initPromise
+      initPromise = (async () => {
+        localStorage.removeItem('acronym_token')
+        try { await this.fetchMe() } catch { this.clear() }
+        this.ready = true
+      })()
+      return initPromise
     }
   }
 })
