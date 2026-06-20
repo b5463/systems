@@ -44,7 +44,8 @@ proxy. Caddy is the production proxy and is already wired; you switch to it with
 - `JWT_SECRET` / `ENV_SECRET` strong and unique; default admin password changed;
   two-factor enabled on each admin.
 - Only `80`/`443` public. Postgres, Docker API, and Caddy admin not public.
-- CORS locked to `systems.acronym.sk`.
+- CORS locked to systems.acronym.sk.
+- Keep TRUST_PROXY=false for direct API exposure. Set it to 	rue only when Caddy/nginx is the sole path to the API, then verify the audit/session IPs show the real client rather than the proxy.
 - Run `check-firewall-windows.ps1 -PublicIp <SERVER_IP>`.
 - Take a first backup (Server → Back up now); confirm restore on test data.
 

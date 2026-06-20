@@ -23,10 +23,15 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./data:/app/data
     environment:
+      - NODE_ENV=production
       - JWT_SECRET=${JWT_SECRET}
+      - CSRF_SECRET=${CSRF_SECRET:-}
+      - SESSION_IDLE_MINUTES=${SESSION_IDLE_MINUTES:-720}
+      - SESSION_ABSOLUTE_HOURS=${SESSION_ABSOLUTE_HOURS:-168}
+      - TRUST_PROXY=true
       - ENV_SECRET=${ENV_SECRET}
       - ADMIN_USERS=${ADMIN_USERS}
-      - CORS_ORIGIN=${CORS_ORIGIN:-https://project.acronym.sk}
+      - CORS_ORIGIN=${CORS_ORIGIN:-https://systems.acronym.sk}
       - SYSTEMS_API_INTERNAL_UPSTREAM=${SYSTEMS_API_INTERNAL_UPSTREAM:-acronym-api:3000}
       - SYSTEMS_ATTESTATION_SECRET=${SYSTEMS_ATTESTATION_SECRET:-}
     extra_hosts:

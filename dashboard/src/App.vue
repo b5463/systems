@@ -17,7 +17,7 @@ let lastRefresh = 0
 // Refresh at most once a minute on window focus (avoids spamming /auth/refresh
 // when alt-tabbing).
 function onFocus() {
-  if (auth.token && Date.now() - lastRefresh > 60 * 1000) {
+  if (auth.isAuthenticated && Date.now() - lastRefresh > 60 * 1000) {
     lastRefresh = Date.now()
     auth.refresh()
   }
@@ -26,7 +26,7 @@ function onFocus() {
 onMounted(async () => {
   await auth.init()
   refreshTimer = setInterval(() => {
-    if (auth.token && document.visibilityState === 'visible') { lastRefresh = Date.now(); auth.refresh() }
+    if (auth.isAuthenticated && document.visibilityState === 'visible') { lastRefresh = Date.now(); auth.refresh() }
   }, 10 * 60 * 1000)
   window.addEventListener('focus', onFocus)
 })

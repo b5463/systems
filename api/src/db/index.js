@@ -116,6 +116,18 @@ db.exec(`
     last_seen_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
   CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
+
+  -- Persistent operator-managed denylist. Automatic lockout remains temporary
+  -- so a spoofed or shared address cannot permanently lock out the only admin.
+  CREATE TABLE IF NOT EXISTS ip_bans (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ip TEXT UNIQUE NOT NULL,
+    reason TEXT,
+    expires_at TEXT,
+    created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_ip_bans_ip ON ip_bans(ip);
 `);
 
 db.exec(`
@@ -174,6 +186,12 @@ async function initDefaultUsers() {
 
     const existing = db.prepare('SELECT id FROM users WHERE username = ?').get(username);
     if (existing) {
+      continue;
+    }
+    if (password.length < 15) {
+      const message = `[db] ADMIN_USERS password for ${username} must be at least 15 characters.`;
+      if (process.env.NODE_ENV === 'production') throw new Error(message);
+      console.warn(message);
       continue;
     }
 

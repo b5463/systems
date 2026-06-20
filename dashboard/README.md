@@ -6,7 +6,7 @@ Chart.js, and xterm.js.
 
 ## Features
 
-- JWT auth (Bearer for REST, `?token=` for WebSockets)
+- HttpOnly cookie sessions for REST and WebSockets; session-bound CSRF headers on every mutation
 - Systems overview with honest runtime, route, TLS, and health state
 - System detail tabs: Overview, Deployments, Logs, Metrics, Console, Settings
 - Zip analysis and deployment with upload progress and live build logs

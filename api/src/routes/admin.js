@@ -2,6 +2,7 @@
 
 const bcrypt = require('bcrypt');
 const { db, auditLog } = require('../db');
+const ipmatch = require('../util/ipmatch');
 
 async function adminRoutes(fastify, options) {
   // List all users
@@ -23,7 +24,7 @@ async function adminRoutes(fastify, options) {
         required: ['username', 'password'],
         properties: {
           username: { type: 'string', minLength: 1, maxLength: 100 },
-          password: { type: 'string', minLength: 8, maxLength: 200 },
+          password: { type: 'string', minLength: 15, maxLength: 200 },
         },
       },
     },
@@ -33,8 +34,8 @@ async function adminRoutes(fastify, options) {
     if (!username || !password) {
       return reply.code(400).send({ error: 'Username and password are required.' });
     }
-    if (password.length < 8) {
-      return reply.code(400).send({ error: 'Password must be at least 8 characters.' });
+    if (password.length < 15) {
+      return reply.code(400).send({ error: 'Password must be at least 15 characters.' });
     }
 
     // Hard cap: SYSTEMS. is a two-admin platform. No public signup, ever.
@@ -89,7 +90,7 @@ async function adminRoutes(fastify, options) {
         type: 'object',
         required: ['newPassword'],
         properties: {
-          newPassword: { type: 'string', minLength: 8, maxLength: 200 },
+          newPassword: { type: 'string', minLength: 15, maxLength: 200 },
         },
       },
     },
@@ -98,8 +99,8 @@ async function adminRoutes(fastify, options) {
     if (!Number.isInteger(id)) return reply.code(400).send({ error: 'Invalid user id.' });
 
     const { newPassword } = request.body;
-    if (!newPassword || newPassword.length < 8) {
-      return reply.code(400).send({ error: 'New password must be at least 8 characters.' });
+    if (!newPassword || newPassword.length < 15) {
+      return reply.code(400).send({ error: 'New password must be at least 15 characters.' });
     }
 
     const user = db.prepare('SELECT id, username FROM users WHERE id = ?').get(id);
@@ -112,6 +113,65 @@ async function adminRoutes(fastify, options) {
     auditLog({ user_id: request.user.id, action: 'password_reset', target: user.username, ip: request.ip });
     return { message: 'Password reset.' };
   });
-}
+
+  // Persistent IP denylist for incident response. This is intentionally
+  // operator-managed; login backoff remains the safer automatic response.
+  fastify.get('/api/admin/ip-bans', {
+    preHandler: [fastify.authenticate],
+  }, async () => ({
+    bans: db.prepare(
+      'SELECT id, ip, reason, expires_at, created_at FROM ip_bans ORDER BY created_at DESC'
+    ).all(),
+  }));
+
+  fastify.post('/api/admin/ip-bans', {
+    preHandler: [fastify.authenticate],
+    schema: {
+      body: {
+        type: 'object', required: ['ip'], additionalProperties: false,
+        properties: {
+          // Either a single IPv4/IPv6 address or a CIDR range (e.g. 10.0.0.0/24).
+          ip: { type: 'string', minLength: 2, maxLength: 49 },
+          reason: { type: 'string', maxLength: 300 },
+          expiresAt: { type: ['string', 'null'], maxLength: 40 },
+        },
+      },
+    },
+  }, async (request, reply) => {
+    const { ip, reason = null, expiresAt = null } = request.body;
+    if (!ipmatch.isValidBanTarget(ip)) {
+      return reply.code(400).send({ error: 'A valid IPv4/IPv6 address or CIDR range (min /8 for IPv4, /32 for IPv6) is required.' });
+    }
+    // Refuse a target that would lock out the acting admin — exact match or a
+    // range that contains their address.
+    if (ipmatch.matchesAny(request.ip, [ip])) {
+      return reply.code(400).send({ error: 'Refusing to ban the current administrator address or a range that contains it.' });
+    }
+    if (expiresAt && (!Number.isFinite(Date.parse(expiresAt)) || Date.parse(expiresAt) <= Date.now())) {
+      return reply.code(400).send({ error: 'Ban expiry must be a future timestamp.' });
+    }
+    try {
+      const info = db.prepare(
+        'INSERT INTO ip_bans (ip, reason, expires_at, created_by) VALUES (?, ?, ?, ?)'
+      ).run(ip, reason, expiresAt, request.user.id);
+      auditLog({ user_id: request.user.id, action: 'ip_ban_create', target: ip, detail: reason, ip: request.ip });
+      return reply.code(201).send({ ban: db.prepare('SELECT id, ip, reason, expires_at, created_at FROM ip_bans WHERE id = ?').get(info.lastInsertRowid) });
+    } catch (err) {
+      if (err.code === 'SQLITE_CONSTRAINT_UNIQUE') return reply.code(409).send({ error: 'That address is already banned.' });
+      throw err;
+    }
+  });
+
+  fastify.delete('/api/admin/ip-bans/:id', {
+    preHandler: [fastify.authenticate],
+  }, async (request, reply) => {
+    const id = Number(request.params.id);
+    if (!Number.isInteger(id)) return reply.code(400).send({ error: 'Invalid ban id.' });
+    const ban = db.prepare('SELECT id, ip FROM ip_bans WHERE id = ?').get(id);
+    if (!ban) return reply.code(404).send({ error: 'IP ban not found.' });
+    db.prepare('DELETE FROM ip_bans WHERE id = ?').run(id);
+    auditLog({ user_id: request.user.id, action: 'ip_ban_delete', target: ban.ip, ip: request.ip });
+    return { message: 'IP ban removed.' };
+  });}
 
 module.exports = adminRoutes;

@@ -35,7 +35,7 @@ system runs in. Here's how they fit together.
 - **API** — Node.js + Fastify, built via `buildApp()` in `src/app.js` so you can
   exercise it with `app.inject()` in tests. It's the only component that touches
   the Docker socket. It owns the deploy pipeline, lifecycle, routing files, logs,
-  metrics, audit, auth (JWT + `token_version` + optional TOTP), and the opt-in
+  metrics, audit, auth (HttpOnly cookie session + CSRF + `token_version` + optional TOTP), and the opt-in
   routes (`/api/upload/*`, `/api/webhook/github`, `/api/projects/:slug/provision-db`).
 - **Reverse proxy** — terminates TLS, routes `systems.*` to the dashboard and
   `{slug}.*`/path routes to each system's container.

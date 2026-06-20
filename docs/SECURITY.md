@@ -14,18 +14,21 @@ The "not yet" column is the genuinely unbuilt work, not a release timeline.
 | --- | --- | --- |
 | Public signup | **Disabled** (none exists) | — |
 | Dashboard access | Admin-only | — |
-| API auth | JWT bearer token (7d), verified per route, with **per-user `token_version`** so old tokens can be revoked | HTTP-only, Secure, SameSite cookie sessions |
+| API auth | **HttpOnly, SameSite=Strict cookie session**; `Secure` and `__Host-` prefix in production; server-tracked `jti` plus per-user `token_version`; bearer/query tokens rejected | — |
 | Two-factor (admin) | **Opt-in TOTP**, set up on the Admin page | — |
-| Session revocation | Password change, admin reset, and "sign out other sessions" bump `token_version`, invalidating old tokens | — |
-| CSRF | N/A (bearer token, not cookies) | required once auth moves to cookies |
-| Password hashing | **bcrypt** (cost 12) | — |
+| Session revocation | Per-session revoke; password/2FA changes and "sign out other sessions" rotate the current session and invalidate the rest | — |
+| CSRF | **Session-bound HMAC token** required in `X-CSRF-Token` for every authenticated mutation, plus strict Origin validation and SameSite defense-in-depth | — |
+| Password hashing | **bcrypt** (cost 12); new/reset passwords require at least 15 characters | breached-password screening |
 | Plaintext passwords | None stored | — |
 | Env vars | **AES-256-GCM encrypted at rest**, values never returned by API | — |
 | Secrets in frontend | None (build-time vars are non-secret only) | — |
 | Secrets in logs | Avoided | — |
 | CORS | Locked to `systems.acronym.sk` | — |
-| Login rate limiting | **10/min per IP** + **escalating lockout/backoff** (per IP) after repeated credential failures | — |
+| Response headers | **CSP `default-src 'none'`** (JSON-only API), `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, `Permissions-Policy` (sensors/media/payment off), `Cross-Origin-Opener/Resource-Policy: same-origin`, **HSTS (2y, includeSubDomains, preload) in production**; `X-Powered-By` removed | dashboard SPA gets its own CSP at the proxy |
+| Login rate limiting | **10/min per IP** + escalating lockout/backoff; equal-time unknown-user checks | distributed rate-limit store for multi-node |
 | API rate limiting | **100/min global**, deploy 5/min | per-route tuning |
+| IP denylist | Persistent **exact-IP and CIDR-range** bans, enforced before auth; add/list/remove admin API; self-ban (incl. a range containing the admin) refused; broad prefixes (< /8 v4, < /32 v6) rejected; check fails open on internal error so a bad row can't 500 every request; actions audited | dashboard controls |
+| Proxy trust | Disabled by default; explicit TRUST_PROXY=true required behind a controlled proxy | named/CIDR trust policy for multi-proxy topologies |
 | Audit log | All admin actions recorded; **tamper-evident SHA-256 hash chain** (each row links to the previous), verifiable via `GET /api/audit/verify`; optional retention (`AUDIT_RETENTION_DAYS`) | export, offsite anchoring |
 | Destructive actions | **Delete** keeps history; **purge** needs the typed slug | — |
 | Docker socket | Internal to API container only | — |
@@ -41,6 +44,8 @@ The "not yet" column is the genuinely unbuilt work, not a release timeline.
   frontend never talks to Docker directly. Only the API/deploy worker controls
   Docker, internally.
 - The **reverse proxy admin/API** is never public.
+- Production dashboard/API traffic must use TLS. The session cookie is `Secure`, `HttpOnly`, `SameSite=Strict`, path-scoped to `/`, and uses the `__Host-` prefix in production.
+- `TRUST_PROXY` stays false unless the API is reachable only through the trusted Caddy/nginx hop; otherwise forwarded client IP headers are attacker-controlled.
 - The **internal database** is never public.
 - **Uploaded code is untrusted.** Extraction is zip-slip-guarded with entry-count
   and per-file size limits.
@@ -60,8 +65,6 @@ The "not yet" column is the genuinely unbuilt work, not a release timeline.
 
 ## Not yet built
 
-- Cookie-based sessions (HTTP-only, Secure in prod, SameSite) + CSRF tokens, to
-  replace the localStorage bearer token.
 - Env var masking in the UI with explicit reveal + audit on reveal.
 
 ## Change safety

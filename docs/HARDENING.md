@@ -27,7 +27,9 @@ cd api && npm test
 | Caddy: private = no route; password = hashed basic_auth | `caddy` tests |
 | Container resource limits (mem/cpu/pids/restart/log) | `limits` tests |
 | Health states are honest (no fake green) | `health` tests |
-| Webhook HMAC constant-time verify | `webhook` test |
+| Webhook HMAC constant-time verify | webhook test |
+| Cookie auth / CSRF / origin rejection / session rotation | route integration tests |
+| Login backoff + persistent operator IP denylist | lockout unit tests + admin route integration test |
 | Env vars encrypted at rest; values never returned | code review (`routes/env.js`) |
 | Secrets never returned (basic-auth hash stripped) | code review (`routes/projects.js`) |
 | No tracked `.env`; `.env` gitignored | repo check |
@@ -41,7 +43,7 @@ cd api && npm test
 - Docker socket / Docker API not reachable on the network
 - Postgres `5432`, Caddy admin `2019` not public; only `80`/`443` open (firewall)
 - Caddy reload/validate, HTTPS issuance, wildcard DNS resolution
-- TLS/secure/HTTP-only cookies if/when cookie auth replaces bearer tokens
+- Production TLS and the `Secure` cookie flag on the deployed origin (cookie/CSRF logic is repository-tested)
 
 ## Manual production steps
 `verify-hardening-windows.ps1` flags placeholder secrets, default admin

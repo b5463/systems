@@ -84,10 +84,10 @@ router.onError(async (error, to) => {
 
 router.beforeEach((to) => {
   const auth = useAuthStore()
-  if (!to.meta.public && !auth.token) {
+  if (!to.meta.public && !auth.isAuthenticated) {
     return { name: 'login', query: to.fullPath !== '/' ? { redirect: to.fullPath } : undefined }
   }
-  if (to.name === 'login' && auth.token) {
+  if (to.name === 'login' && auth.isAuthenticated) {
     return { name: 'systems' }
   }
   return true

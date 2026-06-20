@@ -4,10 +4,7 @@ import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
 import { openWs } from '../api/ws'
-import { useAuthStore } from '../stores/auth'
 import Icon from './Icon.vue'
-
-const auth = useAuthStore()
 
 const props = defineProps({
   slug: { type: String, required: true },
@@ -35,7 +32,7 @@ let term = null
 let fit = null
 let ws = null
 let resizeObserver = null
-let terminalReached = false   // a terminal state was reached — do not reconnect
+let terminalReached = false   // a terminal state was reached â€” do not reconnect
 let reconnects = 0
 let idleTimer = null
 let lastOutputAt = 0
@@ -45,10 +42,10 @@ let pendingLine = ''
 let suppressedBuffer = ''
 
 const STATUS_LABEL = {
-  connecting: 'Connecting…',
-  waiting: props.mode === 'build' ? 'Waiting for build output…' : 'Waiting for output…',
+  connecting: 'Connectingâ€¦',
+  waiting: props.mode === 'build' ? 'Waiting for build outputâ€¦' : 'Waiting for outputâ€¦',
   streaming: 'Streaming',
-  reconnecting: 'Reconnecting…',
+  reconnecting: 'Reconnectingâ€¦',
   ended: 'Stream ended',
   error: 'Error'
 }
@@ -226,11 +223,11 @@ function connect() {
       if (props.mode === 'build' && reconnects < 3) {
         reconnects += 1
         status.value = 'reconnecting'
-        writeLine(`\n[reconnecting… attempt ${reconnects}]\n`)
+        writeLine(`\n[reconnectingâ€¦ attempt ${reconnects}]\n`)
         setTimeout(() => { if (!terminalReached) connect() }, 1000 * reconnects)
       } else {
         status.value = 'ended'
-        if (reconnects > 0) writeLine('\n[stream interrupted — could not reconnect]\n')
+        if (reconnects > 0) writeLine('\n[stream interrupted â€” could not reconnect]\n')
       }
     },
     onError() {
@@ -294,12 +291,8 @@ function doFit() {
 }
 
 async function downloadLogs() {
-  // Fetch with the bearer header (not a ?token= URL) so the token never lands in
-  // browser history or server access logs, then save the blob.
   try {
-    const res = await fetch(`/api/projects/${props.slug}/logs/download`, {
-      headers: auth.token ? { Authorization: `Bearer ${auth.token}` } : {}
-    })
+    const res = await fetch(`/api/projects/${props.slug}/logs/download`)
     if (!res.ok) return
     const url = URL.createObjectURL(await res.blob())
     const a = document.createElement('a')
@@ -401,7 +394,7 @@ defineExpose({ refit: doFit })
       <span v-if="searchQuery.trim()" class="small muted">{{ searchMatches.length }} match{{ searchMatches.length === 1 ? '' : 'es' }} in buffer</span>
     </div>
     <div v-if="noOutput" class="hint" style="margin:0">
-      No output for 30s — {{ mode === 'build' ? 'the worker may still be preparing the build.' : 'the container may be idle.' }}
+      No output for 30s â€” {{ mode === 'build' ? 'the worker may still be preparing the build.' : 'the container may be idle.' }}
     </div>
     <div v-if="paused" class="hint" style="margin:0">Paused locally. Incoming output is buffered and will appear when resumed.</div>
     <div v-if="sourceFilter !== 'all' && suppressedBuffer" class="hint" style="margin:0">Showing {{ sourceFilter }} only. Other log lines are still buffered for search, copy, and download.</div>
