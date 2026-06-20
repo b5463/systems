@@ -16,7 +16,10 @@ export default defineConfig({
     headless: true,
     trace: 'on-first-retry',
   },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  projects: [
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    { name: 'mobile-chromium', use: { ...devices['Pixel 7'] } },
+  ],
   // Serve the production build; mirrors scripts/shots.mjs.
   webServer: {
     command: 'npm run preview -- --port 4173 --strictPort',

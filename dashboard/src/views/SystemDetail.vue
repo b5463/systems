@@ -575,7 +575,7 @@ onBeforeUnmount(() => {
         </div>
         <div class="card">
           <h2 class="section-label">Observed runtime</h2>
-          <div v-if="isRunning && overviewStat" class="kv"><span class="k">CPU / RAM</span><span class="v mono">{{ (overviewStat.cpu_percent ?? 0).toFixed(1) }}% · {{ (overviewStat.memory_mb ?? 0).toFixed(0) }} MB</span></div>
+          <div v-if="isRunning && overviewStat" class="kv"><span class="k">CPU / RAM</span><span class="v mono">{{ Math.max(0, Number(overviewStat.cpu_percent) || 0).toFixed(1) }}% · {{ (overviewStat.memory_mb ?? 0).toFixed(0) }} MB</span></div>
           <div class="kv"><span class="k">Container</span><span class="v mono small">{{ hasRuntimeContainer ? String(system.container_id).slice(0,12) : 'No container observed' }}</span></div>
           <div class="kv"><span class="k">Image</span><span class="v mono small">{{ system.image_id ? String(system.image_id).replace('sha256:','').slice(0,12) : 'No built image' }}</span></div>
           <div class="kv"><span class="k">Published route</span><span class="v">{{ system.route_published ? publicHost : (system.visibility === 'private' ? 'Not published (private)' : 'Not published') }}</span></div>
@@ -586,7 +586,7 @@ onBeforeUnmount(() => {
 
       <!-- Legacy mixed metadata kept out of the rendered UI. -->
       <div v-if="false" class="card">
-        <div v-if="isRunning && overviewStat" class="kv"><span class="k">CPU / RAM</span><span class="v mono">{{ (overviewStat.cpu_percent ?? 0).toFixed(1) }}% · {{ (overviewStat.memory_mb ?? 0).toFixed(0) }} MB</span></div>
+        <div v-if="isRunning && overviewStat" class="kv"><span class="k">CPU / RAM</span><span class="v mono">{{ Math.max(0, Number(overviewStat.cpu_percent) || 0).toFixed(1) }}% · {{ (overviewStat.memory_mb ?? 0).toFixed(0) }} MB</span></div>
         <div class="kv"><span class="k">{{ hasContainer ? 'Port' : 'Planned port' }}</span><span class="v mono">{{ system.port ?? '–' }}</span></div>
         <div class="kv"><span class="k">Container</span><span class="v mono small">{{ system.container_id ? String(system.container_id).slice(0,12) : '–' }}</span></div>
         <div class="kv"><span class="k">Image</span><span class="v mono small">{{ system.image_id ? String(system.image_id).replace('sha256:','').slice(0,12) : '–' }}</span></div>

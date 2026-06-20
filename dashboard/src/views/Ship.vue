@@ -3,7 +3,6 @@ import { ref, watch, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '../api/client'
 import LogConsole from '../components/LogConsole.vue'
-import FlowField from '../components/FlowField.vue'
 import Icon from '../components/Icon.vue'
 import { BASE_DOMAIN, SCHEME, LOCAL_MODE, urlFor } from '../config'
 
@@ -53,7 +52,31 @@ const analysisError = ref('')
 
 // Where the just-shipped system is actually reachable (localhost:port locally).
 const deployedUrl = computed(() => urlFor(deployedSlug.value, deployedPort.value))
-const deployedHost = computed(() => deployedUrl.value.replace(/^https?:\/\//, ''))
+const deployedHost = computed(() => deployedUrl.value.replace(/^https?:[/][/]/, ''))
+const deploymentState = computed(() => {
+  if (buildResult.value === 'done') {
+    return {
+      label: 'Deployment complete',
+      tone: 'success',
+      title: 'Your system is live',
+      detail: 'The image built successfully, the container started, and the deployment finished.',
+    }
+  }
+  if (buildResult.value === 'error') {
+    return {
+      label: 'Deployment failed',
+      tone: 'error',
+      title: 'The build needs attention',
+      detail: 'Nothing new went live. Review the output below, then open the system to correct and redeploy it.',
+    }
+  }
+  return {
+    label: 'Deployment in progress',
+    tone: 'building',
+    title: 'Building your system',
+    detail: 'SYSTEMS. is preparing the release. The live output below is the source of truth for progress.',
+  }
+})
 
 // Upload limits/capabilities (from the server). When large uploads are enabled
 // and a file is bigger than the standard limit, we stream it in chunks.
@@ -130,6 +153,9 @@ const hostReadiness = computed(() => {
   const info = serverInfo.value
   const dockerReady = info?.docker?.status === 'connected'
   const diskReady = info?.disk?.status !== 'measured' || Number(info.disk.usedPct) < 90
+  const diskToFreeGb = info?.disk?.status === 'measured' && Number(info.disk.totalGb) > 0
+    ? Math.max(0, (Number(info.disk.totalGb) * 0.1) - Number(info.disk.freeGb || 0))
+    : null
   const domainReady = LOCAL_MODE || !!info?.platform?.baseDomain
   const proxyReady = LOCAL_MODE || info?.caddy?.status !== 'unavailable'
   return [
@@ -155,9 +181,13 @@ const hostReadiness = computed(() => {
       label: 'Data volume capacity',
       ok: diskReady,
       required: true,
-      detail: info?.disk?.status === 'measured' ? `${info.disk.freeGb} GB free, ${info.disk.usedPct}% used` : 'Disk usage could not be measured from the API.',
-    },
-  ]
+      detail: info?.disk?.status === 'measured'
+        ? String(info.disk.freeGb) + ' GB free · ' + String(info.disk.usedPct) + '% used · deployment limit is below 90%'
+        : 'Disk usage could not be measured from the API.',
+      action: diskReady ? null : (diskToFreeGb != null
+        ? 'Free at least ' + Math.max(0.1, diskToFreeGb).toFixed(1) + ' GB from the SYSTEMS. data volume, then refresh this page.'
+        : 'Reduce data-volume usage below 90%, then refresh this page.'),
+    },  ]
 })
 const hostBlocks = computed(() =>
   firstDeploy.value ? hostReadiness.value.filter((r) => r.required && !r.ok) : []
@@ -231,7 +261,7 @@ const nextStep = computed(() => {
   if (analyzing.value) return 'Analyzing the archive…'
   if (!analysis.value) return 'Waiting for archive detection to finish.'
   if ((analysis.value.blockers || []).length) return analysis.value.blockers.join(' ')
-  if (hostBlocks.value.length) return 'Resolve the required host checks before the first deploy.'
+  if (hostBlocks.value.length) return hostBlocks.value[0].action || ('Resolve ' + hostBlocks.value[0].label.toLowerCase() + ' before the first deploy.')
   if (uploading.value) return 'Upload in progress…'
   return 'Complete the checklist above to deploy.'
 })
@@ -312,44 +342,83 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
 <template>
   <div class="page-head"><h1>Ship</h1></div>
 
-  <!-- BUILDING -->
-  <div v-if="phase === 'building'" class="stack" style="max-width: 860px">
-    <div class="brand-panel" :class="{ live: buildResult === 'done' }">
-      <FlowField />
-      <div class="brand-panel-fade" aria-hidden="true"></div>
-      <div class="spread">
-        <div>
-          <div class="sc-name" style="font-size:17px">{{ name || deployedSlug }}</div>
-          <a class="mono small" :href="deployedUrl" target="_blank" rel="noopener">{{ deployedHost }}</a>
+  <!-- ACTIVE DEPLOYMENT -->
+  <section
+    v-if="phase === 'building'"
+    class="ship-active"
+    :class="'is-' + deploymentState.tone"
+    aria-live="polite"
+  >
+    <div class="ship-status-card card">
+      <div class="ship-status-main">
+        <div class="ship-status-copy">
+          <div class="ship-status-label">
+            <span class="ship-status-dot" aria-hidden="true"></span>
+            {{ deploymentState.label }}
+          </div>
+          <h2>{{ deploymentState.title }}</h2>
+          <p>{{ deploymentState.detail }}</p>
         </div>
-        <span v-if="buildResult === 'done'" class="live-pulse"><span class="lp-dot"></span>Live</span>
-        <span v-else-if="buildResult === 'error'" class="badge badge-error"><span class="dot"></span>Failed</span>
-        <span v-else class="badge badge-building"><span class="dot"></span>Building</span>
+        <div class="ship-system-identity">
+          <span class="small dim">System</span>
+          <strong>{{ name || deployedSlug }}</strong>
+          <a class="mono" :href="deployedUrl" target="_blank" rel="noopener">{{ deployedHost }}</a>
+        </div>
       </div>
-      <div class="lifecycle" style="margin-top: 22px">
-        <template v-for="(step, i) in LIFECYCLE" :key="step">
-          <span class="lc-step" :class="{ active: buildResult === 'done' }" :style="{ '--i': i }"><span class="lc-dot"></span>{{ step }}</span>
-          <span v-if="i < LIFECYCLE.length - 1" class="lc-link"></span>
-        </template>
-      </div>
-      <div v-if="buildResult === ''" class="small dim" style="margin-top:12px">
-        Pipeline reference — SYSTEMS. doesn't claim which step is live; watch the build log below for real progress.
+
+      <div class="ship-status-facts" aria-label="Deployment summary">
+        <div><span>Release</span><strong class="mono">{{ deployedSlug }}</strong></div>
+        <div><span>Visibility</span><strong>{{ visibility }}</strong></div>
+        <div><span>Destination</span><strong class="mono">{{ deployedHost }}</strong></div>
       </div>
     </div>
-    <div class="card">
-      <h2 class="section-label">Build log</h2>
+
+    <div class="ship-pipeline card">
+      <div class="ship-section-head">
+        <div>
+          <h2>Deployment pipeline</h2>
+          <p>Pipeline reference. Detailed progress and failures appear in the build output.</p>
+        </div>
+        <span
+          class="badge"
+          :class="{
+          'badge-building': buildResult === '',
+          'badge-running': buildResult === 'done',
+          'badge-error': buildResult === 'error',
+        }">
+          <span class="dot"></span>{{ buildResult === 'done' ? 'Complete' : buildResult === 'error' ? 'Stopped' : 'Running' }}
+        </span>
+      </div>
+      <ol class="ship-steps">
+        <li
+          v-for="(step, i) in LIFECYCLE"
+          :key="step"
+          :class="{ complete: buildResult === 'done', failed: buildResult === 'error' }"
+        >
+          <span class="ship-step-index">{{ String(i + 1).padStart(2, '0') }}</span>
+          <span>{{ step }}</span>
+        </li>
+      </ol>
+    </div>
+
+    <div class="ship-log-card card">
+      <div class="ship-section-head">
+        <div>
+          <h2>Build output</h2>
+          <p>Search, pause, copy, or reconnect without interrupting the deployment.</p>
+        </div>
+      </div>
       <LogConsole :slug="deployedSlug" mode="build" @finished="onBuildFinished" />
     </div>
-    <div v-if="buildResult === 'error'" class="hint">
-      The build failed, so nothing went live — but the system now exists in a failed state.
-      Open it to read the logs and redeploy a fix.
-    </div>
-    <div class="btn-row" style="max-width: 360px">
-      <button class="btn" @click="reset">Ship another</button>
-      <button class="btn btn-primary" @click="openSystem">{{ buildResult === 'error' ? 'Open system to fix' : 'Open system' }}</button>
-    </div>
-  </div>
 
+    <div class="ship-active-actions">
+      <button class="btn btn-primary" @click="openSystem">
+        {{ buildResult === 'error' ? 'Open system to fix' : 'View system' }}
+      </button>
+      <a v-if="buildResult === 'done'" class="btn" :href="deployedUrl" target="_blank" rel="noopener">Open live site</a>
+      <button class="btn btn-ghost" @click="reset">Deploy another system</button>
+    </div>
+  </section>
   <!-- WORKBENCH -->
   <form v-else class="workbench" @submit.prevent="submit">
     <!-- LEFT: configuration -->
@@ -459,7 +528,15 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
           </div>
         </div>
         <div v-else class="hint">Host readiness is enforced before the first deploy. Existing systems indicate initial rollout has already completed.</div>
-        <div v-if="hostBlocks.length" class="error-box">Resolve the required host checks before the first deploy.</div>
+        <div v-if="hostBlocks.length" class="host-blocker" role="alert">
+          <strong>Deployment blocked by {{ hostBlocks.length }} host check{{ hostBlocks.length === 1 ? '' : 's' }}</strong>
+          <ul>
+            <li v-for="block in hostBlocks" :key="block.label">
+              <span>{{ block.label }}</span>
+              <span>{{ block.action || block.detail }}</span>
+            </li>
+          </ul>
+        </div>
       </div>
 
       <div class="card stack">
@@ -490,6 +567,192 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
 </template>
 
 <style scoped>
+.ship-active {
+  width: 100%;
+  max-width: 1240px;
+  min-width: 0;
+  display: grid;
+  gap: 16px;
+}
+.ship-active > * { min-width: 0; }
+.ship-status-card {
+  padding: clamp(20px, 3vw, 32px);
+  border-color: var(--border);
+}
+.ship-status-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(240px, 0.75fr);
+  gap: clamp(24px, 5vw, 72px);
+  align-items: start;
+}
+.ship-status-copy { max-width: 700px; }
+.ship-status-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+}
+.ship-status-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--warn);
+}
+.ship-active.is-success .ship-status-dot { background: var(--ok); }
+.ship-active.is-error .ship-status-dot { background: var(--danger); }
+.ship-status-copy h2 {
+  margin: 14px 0 8px;
+  font-size: clamp(1.45rem, 1.2rem + 0.7vw, 2rem);
+  line-height: 1.2;
+  text-wrap: balance;
+}
+.ship-status-copy p,
+.ship-section-head p {
+  margin: 0;
+  color: var(--text-muted);
+  line-height: 1.55;
+  text-wrap: pretty;
+}
+.ship-system-identity {
+  display: grid;
+  gap: 5px;
+  padding-left: 22px;
+  border-left: 1px solid var(--border);
+  min-width: 0;
+}
+.ship-system-identity strong { font-size: 1.05rem; }
+.ship-system-identity a {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ship-system-identity a:hover { color: var(--text); }
+.ship-status-facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 28px;
+  border-top: 1px solid var(--border-soft);
+}
+.ship-status-facts > div {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+  padding: 18px 20px 0 0;
+}
+.ship-status-facts span {
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+}
+.ship-status-facts strong {
+  overflow: hidden;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  text-overflow: ellipsis;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+.ship-pipeline,
+.ship-log-card { padding: clamp(18px, 2.4vw, 24px); }
+.ship-pipeline { overflow: hidden; }
+.ship-section-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  align-items: flex-start;
+  margin-bottom: 18px;
+}
+.ship-section-head h2 {
+  margin: 0 0 4px;
+  font-size: 1rem;
+  line-height: 1.35;
+  text-wrap: balance;
+}
+.ship-section-head p { font-size: var(--fs-sm); }
+.ship-steps {
+  display: grid;
+  grid-template-columns: repeat(9, minmax(76px, 1fr));
+  margin: 0;
+  padding: 0;
+  overflow-x: auto;
+  list-style: none;
+  scrollbar-width: thin;
+}
+.ship-steps li {
+  position: relative;
+  display: grid;
+  gap: 8px;
+  min-width: 76px;
+  padding: 12px 12px 10px 0;
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+  text-transform: capitalize;
+}
+.ship-steps li::after {
+  content: '';
+  position: absolute;
+  top: 16px;
+  right: 8px;
+  left: 29px;
+  height: 1px;
+  background: var(--border);
+}
+.ship-steps li:last-child::after { display: none; }
+.ship-step-index {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 18px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-card);
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.ship-steps li.complete { color: var(--text-muted); }
+.ship-steps li.complete .ship-step-index {
+  border-color: color-mix(in srgb, var(--ok) 55%, var(--border));
+  color: var(--ok);
+}
+.ship-steps li.failed:first-child .ship-step-index {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+.ship-log-card :deep(.term-wrap) { height: clamp(320px, 42vh, 520px); }
+.ship-active-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-top: 2px;
+}
+.ship-active-actions .btn { min-width: 170px; }
+
+@media (max-width: 760px) {
+  .ship-active { gap: 12px; }
+  .ship-status-main { grid-template-columns: 1fr; gap: 20px; }
+  .ship-system-identity {
+    padding: 16px 0 0;
+    border-top: 1px solid var(--border-soft);
+    border-left: 0;
+  }
+  .ship-status-facts { grid-template-columns: 1fr 1fr; }
+  .ship-status-facts > div { padding-top: 14px; }
+  .ship-status-facts > div:last-child { grid-column: 1 / -1; }
+  .ship-section-head { gap: 12px; }
+  .ship-log-card :deep(.term-wrap) { height: 360px; }
+  .ship-active-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+  .ship-active-actions .btn { width: 100%; }
+}
 .url-preview-lg { font-size: 16px; padding: 12px 14px; }
 .detect-row { display: flex; flex-direction: column; gap: 0; }
 .detect-row .kv { display: flex; justify-content: space-between; padding: 9px 0; border-bottom: 1px solid var(--border-soft); font-size: 13px; }
@@ -540,6 +803,35 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
 .readiness li.ok { color: var(--text-muted); }
 .readiness .rd-mark { width: 14px; flex-shrink: 0; text-align: center; color: var(--text-disabled); font-weight: 700; }
 .readiness li.ok .rd-mark { color: var(--ok); }
+.host-blocker {
+  padding: 14px 16px;
+  border: 1px solid color-mix(in srgb, var(--danger) 55%, var(--border));
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--danger-dim) 70%, var(--bg-card));
+}
+.host-blocker > strong {
+  display: block;
+  color: #ffb4ae;
+  font-size: var(--fs-sm);
+}
+.host-blocker ul {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.host-blocker li {
+  display: grid;
+  gap: 2px;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  line-height: 1.45;
+}
+.host-blocker li span:first-child {
+  color: var(--text);
+  font-weight: var(--fw-medium);
+}
 .host-ready { display: grid; gap: 8px; }
 .host-ready-row {
   display: grid;

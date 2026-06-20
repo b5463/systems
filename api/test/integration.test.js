@@ -205,7 +205,7 @@ test('metrics history: supports seven-day windows with bounded downsampling', as
     VALUES (?, ?, ?, 512, 0, 0, datetime('now', ?))
   `);
   const seed = db.transaction(() => {
-    for (let i = 0; i < 400; i += 1) insert.run(project.id, i % 100, 100 + i, `-${i} seconds`);
+    for (let i = 0; i < 400; i += 1) insert.run(project.id, i === 0 ? -10 : i % 100, 100 + i, `-${i} seconds`);
   });
   seed();
 
@@ -217,6 +217,7 @@ test('metrics history: supports seven-day windows with bounded downsampling', as
   assert.equal(response.json().retentionHours, 168);
   assert.ok(response.json().points.length > 0);
   assert.ok(response.json().points.length <= 360);
+  assert.ok(response.json().points.every((point) => point.cpu_percent >= 0));
 });
 test('limits: persists validated per-system overrides and exposes a stable shape', async () => {
   db.prepare(`INSERT INTO projects (name, slug, port, status) VALUES ('Limited','limited',4331,'running')`).run();

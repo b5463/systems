@@ -3,9 +3,9 @@ import fs from 'fs'
 const require = createRequire(import.meta.url)
 const { chromium } = require(`${process.env.NODE_PATH}/playwright`)
 
-const OUT = '/tmp/shots'
+const OUT = process.env.SHOTS_OUT || 'test-results/shots'
 fs.mkdirSync(OUT, { recursive: true })
-const BASE = 'http://localhost:4173'
+const BASE = process.env.SHOTS_BASE_URL || 'http://localhost:4173'
 
 const systems = [
   { id: 1, name: 'Notes API', slug: 'notes', status: 'running', visibility: 'public', route_published: 1, health_state: 'healthy', port: 4012, updated_at: new Date(Date.now() - 9e5).toISOString(), created_at: new Date(Date.now() - 8.6e7).toISOString(), deploy_branch: 'main' },
@@ -36,11 +36,15 @@ const audit = { total: 5, entries: [
 
 function json(route, body) { route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) }) }
 
-async function mock(page) {
+async function mock(page, { authed = true } = {}) {
   await page.route('**/api/**', (route) => {
     const url = new URL(route.request().url())
     const p = url.pathname
-    if (p === '/api/auth/me') return json(route, { id: 1, username: 'admin', twoFactorEnabled: false })
+    if (p === '/api/auth/me') {
+      return authed
+        ? json(route, { id: 1, username: 'admin', twoFactorEnabled: false })
+        : route.fulfill({ status: 401, contentType: 'application/json', body: JSON.stringify({ error: 'Unauthorized' }) })
+    }
     if (p === '/api/projects') return json(route, { projects: systems })
     if (p === '/api/server/info') return json(route, serverInfo)
     if (p === '/api/audit') return json(route, audit)
@@ -74,11 +78,13 @@ for (const vp of [{ tag: 'desktop', w: 1280, h: 900 }, { tag: 'mobile', w: 390, 
   const ctx = await browser.newContext({ viewport: { width: vp.w, height: vp.h }, deviceScaleFactor: 2 })
   for (const pg of pages) {
     const page = await ctx.newPage()
-    await page.addInitScript(() => { Object.defineProperty(navigator, 'serviceWorker', { get: () => undefined }) })
+    page.on('pageerror', (error) => console.error('pageerror', pg.name, error.message))
+    await page.addInitScript(() => { delete Navigator.prototype.serviceWorker })
     if (pg.auth) await page.addInitScript(() => localStorage.setItem('acronym_token', 'eyJfake.token.shot'))
-    await mock(page)
-    await page.goto(BASE + pg.path, { waitUntil: 'networkidle' }).catch(() => {})
+    await mock(page, { authed: pg.auth })
+    await page.goto(BASE + pg.path, { waitUntil: 'networkidle' })
     await page.waitForTimeout(700)
+    console.log(vp.tag, pg.name, page.url(), await page.locator('h1').allTextContents(), (await page.locator('body').innerText()).slice(0, 120))
     await page.screenshot({ path: `${OUT}/${pg.name}-${vp.tag}.png`, fullPage: vp.tag === 'desktop' })
     await page.close()
   }

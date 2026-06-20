@@ -42,14 +42,54 @@ async function mockApi(page, { authed }) {
     if (p === '/api/projects') return json(route, { projects: systems })
     if (p === '/api/server/info') return json(route, serverInfo)
     if (p === '/api/server/cleanup/preview') return json(route, cleanup)
+    if (p === '/api/admin/settings') return json(route, { settings: [] })
+    if (p === '/api/admin/sessions') return json(route, { sessions: [] })
+    if (p === '/api/admin/users') return json(route, { users: [{ id: 1, username: 'admin', created_at: new Date().toISOString() }] })
+    if (p === '/api/deploy/plan') return json(route, {
+      plan: { valid: true, containerName: 'systems-ui-audit', proxy: 'caddy', routePublished: true, host: 'ui-audit.acronym.sk' },
+    })
+    if (p === '/api/deploy/analyze') return json(route, {
+      analysis: {
+        projectType: 'static', rootFolder: '.', entryPoint: 'index.html', outputFolder: '.', expectedPort: 3000,
+        fileCount: 1, filesUsed: ['index.html'], warnings: [], blockers: [],
+      },
+    })
+    if (p === '/api/deploy') return json(route, {
+      project: { id: 2, name: 'UI Audit', slug: 'ui-audit', port: 4022, status: 'building', visibility: 'public' },
+    }, 202)
     if (p === '/api/audit') return json(route, { entries: [], total: 0 })
     return json(route, {})
   })
 }
 
+async function expectNoViewportOverflow(page) {
+  const overflow = await page.evaluate(() => ({
+    viewport: window.innerWidth,
+    document: document.documentElement.scrollWidth,
+    offenders: [...document.querySelectorAll('body *')]
+      .map((element) => {
+        const rect = element.getBoundingClientRect()
+        return {
+          tag: element.tagName.toLowerCase(),
+          className: typeof element.className === 'string' ? element.className : '',
+          width: Math.round(rect.width),
+          right: Math.round(rect.right),
+          scrollWidth: element.scrollWidth,
+          clientWidth: element.clientWidth,
+        }
+      })
+      .filter((item) => item.right > window.innerWidth + 1 || item.width > window.innerWidth + 1)
+      .slice(0, 8),
+  }))
+  expect(
+    overflow.document,
+    'Viewport overflow: ' + JSON.stringify(overflow.offenders),
+  ).toBeLessThanOrEqual(overflow.viewport + 1)
+}
+
 test.beforeEach(async ({ page }) => {
   // Skip the service worker so navigation is deterministic.
-  await page.addInitScript(() => Object.defineProperty(navigator, 'serviceWorker', { get: () => undefined }))
+  await page.addInitScript(() => { delete Navigator.prototype.serviceWorker })
 })
 
 test('login page renders the sign-in form', async ({ page }) => {
@@ -91,4 +131,34 @@ test('authenticated core pages render their primary surfaces', async ({ page }) 
   await page.goto('/admin')
   await expect(page.getByRole('heading', { name: 'Admin', level: 1 })).toBeVisible()
   await expect(page.getByText('Administrators')).toBeVisible()
+})
+test('primary authenticated pages do not overflow the viewport', async ({ page }) => {
+  await mockApi(page, { authed: true })
+  for (const path of ['/', '/ship', '/events', '/server', '/admin']) {
+    await page.goto(path)
+    await expectNoViewportOverflow(page)
+  }
+})
+
+test('active Ship deployment uses the responsive production layout', async ({ page }) => {
+  await mockApi(page, { authed: true })
+  await page.goto('/ship')
+
+  await page.getByLabel('Name').fill('UI Audit')
+  await page.getByLabel('Slug').fill('ui-audit')
+  await page.locator('input[type="file"]').setInputFiles({
+    name: 'ui-audit.zip',
+    mimeType: 'application/zip',
+    buffer: Buffer.from('PK mocked archive'),
+  })
+
+  await expect(page.getByText('static', { exact: true }).first()).toBeVisible()
+  await page.getByRole('button', { name: 'Deploy system' }).click()
+
+  await expect(page.getByRole('heading', { name: 'Building your system' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Deployment pipeline' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Build output' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'View system' })).toBeVisible()
+  await expectNoViewportOverflow(page)
+  await page.goto('/')
 })

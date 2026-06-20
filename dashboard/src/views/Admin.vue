@@ -441,15 +441,21 @@ onMounted(() => { loadUsers(); loadServerInfo(); loadSessions(); loadSettings() 
       </div>
 
       <!-- Sessions -->
-      <div class="card stack">
-        <div class="spread">
+      <div class="card stack sessions-card">
+        <div class="spread sessions-head">
           <h2 class="section-label">Active sessions</h2>
           <button v-if="otherSessionCount > 0" class="btn btn-sm btn-ghost" :disabled="revoking" @click="revokeSessions">
             <span v-if="revoking" class="spinner"></span><span v-else>Sign out {{ otherSessionCount }} other{{ otherSessionCount === 1 ? '' : 's' }}</span>
           </button>
         </div>
 
-        <div v-if="sessionsLoading" class="muted small">Loading sessions…</div>
+        <div
+          class="sessions-scroll"
+          role="region"
+          aria-label="Active session list"
+          :tabindex="sessions.length > 4 ? 0 : -1"
+        >
+          <div v-if="sessionsLoading" class="muted small">Loading sessions…</div>
 
         <template v-else-if="sessions.length">
           <div v-for="s in sessions" :key="s.id" class="sess-row">
@@ -472,6 +478,8 @@ onMounted(() => { loadUsers(); loadServerInfo(); loadSessions(); loadSettings() 
           <span class="v small muted">{{ currentSession.since }}</span>
         </div>
         <div v-else class="muted small">No active sessions recorded.</div>
+
+        </div>
 
         <div v-if="revokeMsg" class="notice">{{ revokeMsg }}</div>
         <button class="btn btn-danger btn-block" :disabled="loggingOut" @click="logout">
@@ -660,6 +668,22 @@ onMounted(() => { loadUsers(); loadServerInfo(); loadSessions(); loadSettings() 
 .pw-label.pw-fair { color: var(--warn); }
 .pw-label.pw-strong { color: var(--ok); }
 .caps-warn { color: var(--warn); display: flex; align-items: center; gap: 6px; }
+.sessions-card { min-height: 0; }
+.sessions-head { align-items: flex-start; }
+.sessions-scroll {
+  max-height: clamp(320px, 52dvh, 620px);
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  padding-right: 6px;
+  margin-right: -6px;
+}
+.sessions-scroll:focus-visible {
+  outline: 2px solid var(--focus-border);
+  outline-offset: 3px;
+  border-radius: var(--radius-sm);
+}
 .sess-row {
   display: flex;
   align-items: center;
@@ -669,4 +693,12 @@ onMounted(() => { loadUsers(); loadServerInfo(); loadSessions(); loadSettings() 
 }
 .sess-row:last-of-type { border-bottom: none; }
 .sess-name { font-weight: 600; font-size: 14px; }
+@media (max-width: 600px) {
+  .sessions-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .sessions-head .btn { width: 100%; }
+  .sessions-scroll { max-height: 58dvh; }
+}
 </style>

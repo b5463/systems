@@ -4,6 +4,7 @@ const { db } = require('../db');
 const { getContainerStats } = require('../services/docker');
 const { loadOr404 } = require('../util/project');
 const { getSetting } = require('../util/settings');
+const { nonNegativeMetric } = require('../util/stats');
 
 /**
  * Stats routes plugin.
@@ -38,6 +39,7 @@ async function statsRoutes(fastify, options) {
 
     try {
       const stats = await getContainerStats(project.container_id);
+      const safeStats = { ...stats, cpu_percent: nonNegativeMetric(stats.cpu_percent) };
 
       // Fire-and-forget: persist a snapshot for historical charts.
       // Never block (or fail) the live-stats response on the write.
@@ -48,7 +50,7 @@ async function statsRoutes(fastify, options) {
           VALUES (?, ?, ?, ?, ?, ?)
         `).run(
           project.id,
-          stats.cpu_percent ?? 0,
+          safeStats.cpu_percent,
           stats.memory_mb ?? 0,
           stats.memory_limit_mb ?? 0,
           stats.rx_bytes ?? 0,
@@ -66,7 +68,7 @@ async function statsRoutes(fastify, options) {
         request.log.warn({ err: writeErr }, '[stats] Failed to persist stats history');
       }
 
-      return { ...stats, status: project.status };
+      return { ...safeStats, status: project.status };
     } catch (err) {
       request.log.error({ err }, '[stats] Failed to get container stats');
       return reply.code(500).send({ error: `Failed to get stats: ${err.message}` });
@@ -94,7 +96,7 @@ async function statsRoutes(fastify, options) {
     // ten-second buckets; wider windows are averaged into proportionally larger
     // buckets instead of shipping every stored poll to the browser.
     const bucketSeconds = Math.max(10, Math.ceil((hours * 3600) / 360));
-    const points = db.prepare(`
+    const rawPoints = db.prepare(`
       SELECT
         AVG(cpu_percent) AS cpu_percent,
         AVG(memory_mb) AS memory_mb,
@@ -107,6 +109,11 @@ async function statsRoutes(fastify, options) {
       GROUP BY CAST(CAST(strftime('%s', recorded_at) AS INTEGER) / ? AS INTEGER)
       ORDER BY recorded_at ASC
     `).all(project.id, `-${hours} hours`, bucketSeconds);
+
+    const points = rawPoints.map((point) => ({
+      ...point,
+      cpu_percent: nonNegativeMetric(point.cpu_percent),
+    }));
 
     return { points, hours, retentionHours };
   });

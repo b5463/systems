@@ -37,7 +37,7 @@ const ICONS = {
 </script>
 
 <template>
-  <!-- eslint-disable-next-line vue/no-v-html — static internal markup, no user input -->
+  <!-- eslint-disable vue/no-v-html -->
   <svg
     class="icon"
     :style="size ? { width: typeof size === 'number' ? size + 'px' : size, height: typeof size === 'number' ? size + 'px' : size } : null"

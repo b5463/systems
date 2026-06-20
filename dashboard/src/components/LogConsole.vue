@@ -358,10 +358,12 @@ defineExpose({ refit: doFit })
 
 <template>
   <div class="stack">
-    <div class="spread small muted">
-      <span>{{ mode === 'build' ? 'Build log' : 'Live logs' }}</span>
-      <div class="row" style="gap: 10px; align-items: center">
+    <div class="log-console-head">
+      <div class="log-console-title">
+        <span>{{ mode === 'build' ? 'Build log' : 'Live logs' }}</span>
         <span class="lc-status"><span class="sdot" :class="statusTone"></span>{{ statusLabel }}</span>
+      </div>
+      <div class="log-console-actions">
         <button class="btn btn-sm btn-ghost" :aria-pressed="followLogs" @click="followLogs = !followLogs">{{ followLogs ? 'Following' : 'Follow logs' }}</button>
         <button v-if="!followLogs" class="btn btn-sm btn-ghost" @click="jumpLatest">Jump latest</button>
         <button class="btn btn-sm btn-ghost" @click="togglePause">{{ paused ? 'Resume' : 'Pause' }}</button>
@@ -378,8 +380,7 @@ defineExpose({ refit: doFit })
           <Icon name="download" :size="16" />
         </button>
       </div>
-    </div>
-    <div class="log-tools">
+    </div>    <div class="log-tools">
       <label class="log-search">
         <span>Search</span>
         <input v-model="searchQuery" type="search" placeholder="Find in buffered logs" autocomplete="off" />
@@ -428,6 +429,31 @@ defineExpose({ refit: doFit })
 </template>
 
 <style scoped>
+.log-console-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.log-console-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 150px;
+  color: var(--text);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+}
+.log-console-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.log-console-actions .btn {
+  min-height: 40px;
+  padding-inline: 12px;
+}
 .lc-status { display: inline-flex; align-items: center; gap: 7px; }
 .lc-status .sdot { width: 7px; height: 7px; }
 .log-tools {
@@ -444,7 +470,7 @@ defineExpose({ refit: doFit })
   gap: 10px;
 }
 .log-search span {
-  color: var(--muted);
+  color: var(--text-muted);
   font-size: 12px;
 }
 .log-search input {
@@ -454,7 +480,7 @@ defineExpose({ refit: doFit })
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  color: var(--muted);
+  color: var(--text-muted);
   font-size: 12px;
   white-space: nowrap;
 }
@@ -492,7 +518,7 @@ defineExpose({ refit: doFit })
   padding: 10px;
 }
 .issue-head {
-  color: var(--muted);
+  color: var(--text-muted);
   font-size: 12px;
   margin-bottom: 8px;
 }
@@ -528,7 +554,7 @@ defineExpose({ refit: doFit })
   color: var(--text);
 }
 .issue-time {
-  color: var(--muted);
+  color: var(--text-muted);
   font-family: var(--mono);
   font-size: 11px;
 }
@@ -548,12 +574,29 @@ defineExpose({ refit: doFit })
   cursor: pointer;
 }
 .match-line:hover span:last-child {
-  color: var(--text-strong);
+  color: var(--text);
 }
 .term-wrap.no-wrap :deep(.xterm-rows span) {
   white-space: pre !important;
 }
 @media (max-width: 720px) {
+  .log-console-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .log-console-title { justify-content: space-between; }
+  .log-console-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .log-console-actions .btn,
+  .log-console-actions .iconbtn { width: 100%; }
+  .log-search {
+    flex-basis: 100%;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
   .issue-line {
     grid-template-columns: auto minmax(0, 1fr) auto;
   }

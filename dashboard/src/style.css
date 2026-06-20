@@ -48,7 +48,7 @@
   --nav-height: 56px;
   --sidebar-width: 260px;
   --sidebar-collapsed: 64px;
-  --content-max: 1760px;
+  --content-max: 1480px;
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-top: env(safe-area-inset-top, 0px);
 
@@ -84,8 +84,36 @@
 
 * {
   box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: #4b4f59 transparent;
 }
 
+/* Dark, arrowless scrollbars for Windows Chromium and other WebKit engines. */
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-track,
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  min-height: 36px;
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: #4b4f59;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: #686d78;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-button,
+*::-webkit-scrollbar-button:single-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
 html,
 body {
   margin: 0;
@@ -104,12 +132,14 @@ body {
   font-size: var(--fs-body);
   line-height: 1.5;
   overflow-x: hidden;
+  text-rendering: optimizeLegibility;
+  font-synthesis: none;
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior-y: none;
 }
 
 #app {
-  min-height: 100vh;
+  min-height: 100dvh;
 }
 
 a {
@@ -139,6 +169,23 @@ select {
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
+/* Keep numeric controls visually consistent with the custom input system.
+   Arrow keys, validation, and mobile numeric keyboards remain available. */
+input[type='number'] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+  font-variant-numeric: tabular-nums;
+}
+
+input[type='number']::-webkit-inner-spin-button,
+input[type='number']::-webkit-outer-spin-button {
+  width: 0;
+  margin: 0;
+  opacity: 0;
+  pointer-events: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
 textarea {
   resize: none;
 }
@@ -195,7 +242,7 @@ select.is-invalid {
 
 /* ---------- Layout ---------- */
 .app-shell {
-  min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
 }
@@ -243,6 +290,7 @@ select.is-invalid {
 
 .mono {
   font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
 }
 
 .small {
@@ -273,7 +321,7 @@ select.is-invalid {
   border: 1px solid var(--border-soft);
   border-radius: var(--radius);
   padding: 18px;
-  animation: fadeUp 0.22s ease both;
+
 }
 
 .card:focus-within {
@@ -934,7 +982,7 @@ select.is-invalid {
 
 /* ---------- App shell (desktop sidebar + content) ---------- */
 .shell {
-  min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
 }
 
@@ -1050,7 +1098,7 @@ select.is-invalid {
   margin-left: var(--sidebar-width);
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  min-height: 100dvh;
 }
 
 .content-inner {
@@ -1067,13 +1115,13 @@ select.is-invalid {
 :root.density-compact .content-inner { padding-top: 24px; padding-bottom: 56px; }
 :root.density-compact .card { padding: 12px; }
 :root.density-compact .stack { gap: 10px; }
-:root.density-compact .btn { min-height: 38px; padding-inline: 12px; font-size: 13px; }
+:root.density-compact .btn { min-height: 44px; padding-inline: 12px; font-size: 13px; }
 :root.density-compact .btn-sm { min-height: 44px; padding-inline: 10px; font-size: 12.5px; }
 :root.density-compact input,
 :root.density-compact textarea,
 :root.density-compact select { padding: 9px 11px; }
 :root.density-compact .select-trigger { min-height: 38px; }
-:root.density-compact .nav-link { min-height: 38px; padding: 7px 10px; font-size: 13px; }
+:root.density-compact .nav-link { min-height: 44px; padding: 7px 10px; font-size: 13px; }
 :root.density-compact .sidebar-nav { gap: 1px; }
 :root.density-compact .conn-row { padding: 11px 13px; }
 :root.density-compact .metric { padding: 11px 12px; }
@@ -1082,7 +1130,7 @@ select.is-invalid {
 :root.density-compact .term-wrap { height: 300px; }
 
 @media (min-width: 2200px) {
-  :root { --content-max: 2160px; }
+
   .content-inner { padding-inline: clamp(56px, 4vw, 96px); }
 }
 
@@ -1138,7 +1186,7 @@ select.is-invalid {
   min-height: 44px;
   transition: color 0.15s ease;
 }
-.bn-tab :deep(svg) { width: 21px; height: 21px; }
+.bn-tab svg { width: 21px; height: 21px; }
 .bn-tab.router-link-active { color: var(--text); }
 .bn-tab.router-link-active::before {
   content: '';
@@ -1173,13 +1221,17 @@ select.is-invalid {
 .page-head h1 {
   font-size: var(--fs-h1);
   font-weight: var(--fw-bold);
-  letter-spacing: -0.02em;
   margin: 0;
+  line-height: 1.1;
+  text-wrap: balance;
 }
 .page-head .sub {
-  font-size: 13px;
+  max-width: 72ch;
+  font-size: var(--fs-sm);
   color: var(--text-muted);
-  margin-top: 4px;
+  line-height: 1.5;
+  margin-top: 6px;
+  text-wrap: pretty;
 }
 .page-head .head-actions { display: flex; gap: var(--sp-2); flex-wrap: wrap; }
 
@@ -1230,12 +1282,12 @@ select.is-invalid {
 /* ---------- Section block ---------- */
 .section-label {
   font-size: var(--fs-label);
-  font-weight: var(--fw-bold);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--text-muted);
+  font-weight: var(--fw-semibold);
+  line-height: 1.35;
+  color: var(--text);
   margin-top: 0;
   margin-bottom: 12px;
+  text-wrap: balance;
 }
 
 /* ---------- System card ---------- */
@@ -1498,7 +1550,7 @@ select.is-invalid {
 .login-page {
   position: relative;
   overflow: hidden;
-  min-height: 100vh;
+  min-height: 100dvh;
   display: grid;
   grid-template-columns: 1.05fr minmax(360px, 0.95fr);
 }
@@ -1583,7 +1635,7 @@ select.is-invalid {
     padding: 24px;
     align-items: center;
     justify-content: center;
-    min-height: 100vh;
+    min-height: 100dvh;
   }
   .lf-mobile-brand { margin-bottom: 32px; }
 }
@@ -1690,8 +1742,8 @@ select.is-invalid {
   .card { padding: 14px; }
   .section-label { margin-bottom: 9px; }
 
-  /* buttons touch-friendly but not massive */
-  .btn { min-height: 42px; }
+  /* controls remain touch-friendly */
+  .btn { min-height: 44px; }
   .btn-sm { min-height: 44px; }
   .btn-row { gap: 8px; }
 
@@ -1704,7 +1756,6 @@ select.is-invalid {
   /* system-detail action groups closer together */
   .action-group + .action-group { margin-top: 12px; }
 }
-
 /* ---------- Review polish ---------- */
 /* Action buttons fill the row evenly — no dead space on the right. */
 .action-group .btn-row { grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); }
@@ -1714,18 +1765,6 @@ select.is-invalid {
 
 /* Section labels inside a .stack rely on the stack gap (no extra margin). */
 .stack > .section-label { margin-bottom: 0; }
-
-/* ============================================================
-   Accessibility — visible keyboard focus (WCAG 2.4.7)
-   Mouse users see nothing extra; keyboard users get a clear ring.
-   ============================================================ */
-:where(a, button, .btn, .nav-link, .card-tap, .tabs button, .segmented button,
-        .iconbtn, [tabindex]):focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--focus-border),
-              0 0 16px var(--focus-ring);
-  border-radius: var(--radius-xs);
-}
 /* don't double up: inputs already show a focus ring via box-shadow */
 input:focus-visible, textarea:focus-visible, select:focus-visible { outline: none; }
 

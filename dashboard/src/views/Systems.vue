@@ -315,7 +315,7 @@ onBeforeUnmount(() => clearInterval(timer))
 
         <div class="sc-foot">
           <span v-if="s.status === 'running' && stats[s.slug]" class="mono small muted">
-            CPU {{ (stats[s.slug].cpu_percent ?? 0).toFixed(1) }}% · RAM {{ (stats[s.slug].memory_mb ?? 0).toFixed(0) }} MB<span v-if="s.port"> · :{{ s.port }}</span>
+            CPU {{ Math.max(0, Number(stats[s.slug].cpu_percent) || 0).toFixed(1) }}% · RAM {{ (stats[s.slug].memory_mb ?? 0).toFixed(0) }} MB<span v-if="s.port"> · :{{ s.port }}</span>
           </span>
           <span v-else class="small dim">{{ s.status === 'building' ? 'Building…' : s.status === 'error' ? (isCrashed(s) ? 'Crashed' : 'Build failed') : 'Stopped' }}</span>
           <a v-if="s.status === 'running' && (s.route_published || LOCAL_MODE)" class="sc-open small" :href="urlFor(s.slug, s.port)" target="_blank" rel="noopener" @click.stop>{{ s.route_published ? 'Open' : 'Open local' }} <Icon name="arrow-up-right" /></a>

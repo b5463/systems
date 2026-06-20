@@ -1,6 +1,5 @@
 <script setup>
 import { computed, ref, onMounted, onBeforeUnmount, watch } from 'vue'
-import { useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { api } from '../api/client'
 import { BASE_DOMAIN } from '../config'
@@ -11,7 +10,6 @@ import CommandPalette from './CommandPalette.vue'
 import Icon from './Icon.vue'
 
 const auth = useAuthStore()
-const route = useRoute()
 
 const nav = [
   { name: 'systems', label: 'Systems', icon: 'systems' },
@@ -20,13 +18,6 @@ const nav = [
   { name: 'server', label: 'Server', icon: 'server' },
   { name: 'admin', label: 'Admin', icon: 'admin' }
 ]
-
-const currentTitle = computed(() => {
-  const match = nav.find((n) => n.name === route.name)
-  if (match) return match.label
-  if (route.name === 'system-detail') return route.params.slug || 'System'
-  return 'SYSTEMS.'
-})
 
 const initial = computed(() => (auth.user?.username || '?').slice(0, 1).toUpperCase())
 

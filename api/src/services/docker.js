@@ -21,6 +21,7 @@ const ISOLATED_NETWORK = 'acronym-isolated';
 // Per-deployed-container resource limits (pure; unit-tested in util/limits).
 const { containerLimits } = require('../util/limits');
 const { buildLimits } = require('../util/build');
+const { cpuPercentFromSnapshot } = require('../util/stats');
 
 function isDockerUnavailableError(err) {
   return ['ENOENT', 'ECONNREFUSED', 'EACCES'].includes(err && err.code);
@@ -249,19 +250,7 @@ async function getContainerStats(containerId) {
     });
   });
 
-  const cpuDelta =
-    stats.cpu_stats.cpu_usage.total_usage -
-    stats.precpu_stats.cpu_usage.total_usage;
-  const systemDelta =
-    stats.cpu_stats.system_cpu_usage - stats.precpu_stats.system_cpu_usage;
-  const numCPUs =
-    stats.cpu_stats.online_cpus ||
-    (stats.cpu_stats.cpu_usage.percpu_usage
-      ? stats.cpu_stats.cpu_usage.percpu_usage.length
-      : 1);
-
-  const cpu_percent =
-    systemDelta > 0 ? (cpuDelta / systemDelta) * numCPUs * 100 : 0;
+  const cpu_percent = cpuPercentFromSnapshot(stats);
 
   const memory_mb = stats.memory_stats.usage / (1024 * 1024);
   const memory_limit_mb = stats.memory_stats.limit / (1024 * 1024);

@@ -46,16 +46,22 @@ function fmtBytes(n) {
 const labels = computed(() => props.history.map((p) => p.label))
 const hasHistory = computed(() => props.history.length > 0)
 
+function safeMetric(value, fallback = null) {
+  const number = Number(value)
+  return Number.isFinite(number) ? Math.max(0, number) : fallback
+}
+function validMetrics(values) {
+  return values.map((value) => safeMetric(value)).filter((value) => value != null)
+}
 function avg(values) {
-  const valid = values.filter((v) => Number.isFinite(v))
+  const valid = validMetrics(values)
   if (!valid.length) return null
-  return valid.reduce((sum, v) => sum + v, 0) / valid.length
+  return valid.reduce((sum, value) => sum + value, 0) / valid.length
 }
 function peak(values) {
-  const valid = values.filter((v) => Number.isFinite(v))
+  const valid = validMetrics(values)
   return valid.length ? Math.max(...valid) : null
 }
-
 // Each chart gets its own options object — Chart.js mutates options internally,
 // so sharing one instance across both charts causes scale/tooltip cross-talk.
 function makeOptions() {
@@ -88,7 +94,7 @@ const cpuData = computed(() => ({
   datasets: [
     {
       label: 'CPU %',
-      data: props.history.map((p) => p.cpu),
+      data: props.history.map((p) => safeMetric(p.cpu, 0)),
       borderColor: 'rgba(242,243,245,0.9)',
       backgroundColor: 'rgba(242,243,245,0.08)',
       borderWidth: 2,
@@ -113,9 +119,10 @@ const memData = computed(() => ({
   ]
 }))
 
-const cpuVal = computed(() =>
-  props.latest && props.latest.cpu_percent != null ? `${props.latest.cpu_percent.toFixed(1)}%` : '–'
-)
+const cpuVal = computed(() => {
+  const value = safeMetric(props.latest?.cpu_percent)
+  return value == null ? '–' : value.toFixed(1) + '%'
+})
 const memVal = computed(() => {
   if (!props.latest) return '–'
   const used = props.latest.memory_mb
