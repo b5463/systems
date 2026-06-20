@@ -313,7 +313,7 @@ onMounted(() => { loadUsers(); loadServerInfo(); loadSessions() })
 
       <!-- Change password -->
       <div class="card stack">
-        <div class="section-label">Change password</div>
+        <h2 class="section-label">Change password</h2>
         <div class="field-group">
           <label class="field-label" for="ap-cur-pw">Current password</label>
           <div class="input-wrap">
@@ -357,7 +357,7 @@ onMounted(() => { loadUsers(); loadServerInfo(); loadSessions() })
       <!-- Two-factor -->
       <div class="card stack">
         <div class="spread">
-          <div class="section-label">Two-factor authentication</div>
+          <h2 class="section-label">Two-factor authentication</h2>
           <span class="chip" :class="twoFAEnabled ? 'ok' : ''">{{ twoFAEnabled ? 'On' : 'Off' }}</span>
         </div>
 
@@ -401,7 +401,7 @@ onMounted(() => { loadUsers(); loadServerInfo(); loadSessions() })
       <!-- Sessions -->
       <div class="card stack">
         <div class="spread">
-          <div class="section-label">Active sessions</div>
+          <h2 class="section-label">Active sessions</h2>
           <button v-if="otherSessionCount > 0" class="btn btn-sm btn-ghost" :disabled="revoking" @click="revokeSessions">
             <span v-if="revoking" class="spinner"></span><span v-else>Sign out {{ otherSessionCount }} other{{ otherSessionCount === 1 ? '' : 's' }}</span>
           </button>
@@ -443,7 +443,7 @@ onMounted(() => { loadUsers(); loadServerInfo(); loadSessions() })
       <!-- Admins -->
       <div class="card stack">
         <div class="spread">
-          <div class="section-label">Administrators</div>
+          <h2 class="section-label">Administrators</h2>
           <button v-if="!showAddForm && !atCap && otherAdmins.length > 0" class="btn btn-sm btn-ghost" @click="showAddForm = true">Add admin</button>
           <span v-else-if="atCap" class="small dim">2 / 2</span>
         </div>
@@ -483,7 +483,7 @@ onMounted(() => { loadUsers(); loadServerInfo(); loadSessions() })
 
           <!-- Add form -->
           <div v-if="showAddForm" class="stack" style="gap:8px; margin-top:6px">
-            <div class="section-label" style="margin:0">New admin</div>
+            <h2 class="section-label" style="margin:0">New admin</h2>
             <div class="field-group">
               <label class="field-label" for="add-username">Username</label>
               <input id="add-username" v-model="newUsername" autocapitalize="none" autocorrect="off" />
@@ -505,7 +505,7 @@ onMounted(() => { loadUsers(); loadServerInfo(); loadSessions() })
 
       <!-- Limits & retention -->
       <div class="card stack">
-        <div class="section-label">Limits &amp; retention</div>
+        <h2 class="section-label">Limits &amp; retention</h2>
         <div class="kv"><span class="k">Max upload size</span><span class="v mono">{{ uploadLimitMb }} MB</span></div>
         <div class="kv"><span class="k">Release retention</span><span class="v mono">{{ releaseRetentionVal }} releases</span></div>
         <div class="hint">
@@ -515,7 +515,7 @@ onMounted(() => { loadUsers(); loadServerInfo(); loadSessions() })
 
       <!-- Security & audit -->
       <div class="card" style="padding:0">
-        <div class="section-label" style="padding:14px 16px 6px">Security &amp; audit</div>
+        <h2 class="section-label" style="padding:14px 16px 6px">Security &amp; audit</h2>
         <RouterLink class="conn-row sa-link" :to="{ name: 'events' }">
           <div style="flex:1"><div class="c-name">Audit log</div><div class="c-sub">Admin and system actions</div></div>
           <span class="small dim"><Icon name="arrow-right" /></span>

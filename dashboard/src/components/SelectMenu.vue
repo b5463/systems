@@ -7,6 +7,7 @@ let smCounter = 0
 import { ref, computed, nextTick, onMounted, onBeforeUnmount } from 'vue'
 
 const props = defineProps({
+  id: { type: String, default: undefined },
   modelValue: { type: String, default: '' },
   options: { type: Array, required: true }, // [{ value: string, label: string }]
   placeholder: { type: String, default: 'Select…' },
@@ -114,6 +115,7 @@ onBeforeUnmount(() => {
 <template>
   <div ref="rootRef" class="select-menu" :class="{ open }">
     <button
+      :id="id"
       class="select-trigger"
       type="button"
       role="combobox"

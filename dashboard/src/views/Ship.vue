@@ -327,7 +327,7 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
       </div>
     </div>
     <div class="card">
-      <div class="section-label">Build log</div>
+      <h2 class="section-label">Build log</h2>
       <LogConsole :slug="deployedSlug" mode="build" @finished="onBuildFinished" />
     </div>
     <div v-if="buildResult === 'error'" class="hint">
@@ -345,7 +345,7 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
     <!-- LEFT: configuration -->
     <div class="stack">
       <div class="card stack">
-        <div class="section-label">System</div>
+        <h2 class="section-label">System</h2>
         <div class="field" style="margin:0">
           <label class="label" for="name">Name</label>
           <input id="name" v-model="name" placeholder="Notes API" autocorrect="off" />
@@ -359,7 +359,7 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
           <div v-else class="hint">Becomes the URL below — choose carefully, it can't be changed after deploy.</div>
         </div>
         <div class="field" style="margin:0">
-          <label class="label">{{ LOCAL_MODE ? 'Local URL' : 'Public URL' }}</label>
+          <div class="label">{{ LOCAL_MODE ? 'Local URL' : 'Public URL' }}</div>
           <div class="url-preview url-preview-lg">
             <template v-if="LOCAL_MODE"><span class="scheme">http://</span><span class="slug">localhost</span>:<span class="slug">port</span></template>
             <template v-else><span class="scheme">{{ SCHEME }}://</span><span class="slug">{{ slug || 'your-system' }}</span>.{{ BASE_DOMAIN }}</template>
@@ -369,7 +369,7 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
       </div>
 
       <div class="card stack">
-        <div class="section-label">Visibility</div>
+        <h2 class="section-label">Visibility</h2>
         <div class="segmented">
           <button v-for="v in VISIBILITY" :key="v.key" type="button" :class="{ active: visibility === v.key }" :disabled="v.after" :title="v.after ? 'Set after the first deploy' : ''" @click="visibility = v.key">{{ v.label }}</button>
         </div>
@@ -377,12 +377,12 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
       </div>
 
       <div class="card stack">
-        <div class="section-label">Build</div>
+        <h2 class="section-label">Build</h2>
         <div class="hint">SYSTEMS. auto-detects Vue/Vite, static, Node, and Dockerfile builds from your archive. Custom overrides can be added in Settings after the first deploy.</div>
       </div>
 
       <div class="card stack">
-        <div class="section-label">Environment variables</div>
+        <h2 class="section-label">Environment variables</h2>
         <div v-if="envVarPairs.length" class="env-pairs">
           <div v-for="(pair, i) in envVarPairs" :key="i" class="env-row">
             <input v-model="pair.key" class="env-key" placeholder="KEY" autocapitalize="none" autocorrect="off" spellcheck="false" />
@@ -398,7 +398,7 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
     <!-- RIGHT: upload + lifecycle -->
     <div class="stack">
       <div class="card stack">
-        <div class="step-head"><span class="step-num" :class="{ active: !file, done: !!file }">1</span><div class="section-label">Source archive</div></div>
+        <div class="step-head"><span class="step-num" :class="{ active: !file, done: !!file }">1</span><h2 class="section-label">Source archive</h2></div>
         <div class="dropzone" :class="{ over: dragOver, 'has-file': !!file }" @click="fileInput && fileInput.click()" @dragover.prevent="dragOver = true" @dragleave.prevent="dragOver = false" @drop.prevent="onDrop">
           <Icon name="upload" class="dz-ico" />
           <div v-if="file"><strong style="font-size: 15px">{{ file.name }}</strong><div class="small dim">{{ fmtSize(file.size) }} · click to change</div></div>
@@ -410,7 +410,7 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
       </div>
 
       <div class="card stack">
-        <div class="section-label">Deployment plan</div>
+        <h2 class="section-label">Deployment plan</h2>
         <div class="plan-note">Dry-run values below are known before upload. Build detection happens after SYSTEMS. extracts the archive.</div>
         <div class="detect-row">
           <span class="kv"><span class="k">Type</span><span class="v dim">{{ analysis ? analysis.projectType : (analyzing ? 'Analyzing archive…' : (file ? 'Waiting for analysis' : 'Choose an archive above')) }}</span></span>
@@ -437,7 +437,7 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
       </div>
 
       <div class="card stack">
-        <div class="section-label">Host readiness</div>
+        <h2 class="section-label">Host readiness</h2>
         <div v-if="systemsCount === null" class="hint">Checking first-deploy host readiness…</div>
         <div v-else-if="firstDeploy" class="host-ready">
           <div v-for="r in hostReadiness" :key="r.label" class="host-ready-row">
@@ -453,7 +453,7 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
       </div>
 
       <div class="card stack">
-        <div class="section-label">Ship</div>
+        <h2 class="section-label">Ship</h2>
         <div class="lifecycle">
           <template v-for="(step, i) in LIFECYCLE" :key="step">
             <span class="lc-step"><span class="lc-dot"></span>{{ step }}</span>
@@ -523,7 +523,7 @@ function openSystem() { router.push({ name: 'system-detail', params: { slug: dep
 .env-row { display: flex; gap: 6px; align-items: center; }
 .env-key { width: 130px; flex-shrink: 0; font-family: var(--mono); font-size: 13px; }
 .env-val { flex: 1; min-width: 0; font-family: var(--mono); font-size: 13px; }
-.env-remove { background: none; border: none; cursor: pointer; color: var(--text-dim); font-size: 18px; line-height: 1; padding: 0 4px; }
+.env-remove { display: inline-grid; place-items: center; width: 44px; height: 44px; padding: 0; background: none; border: none; cursor: pointer; color: var(--text-dim); font-size: 18px; line-height: 1; }
 .env-remove:hover { color: var(--danger); }
 .readiness { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .readiness li { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-dim); }

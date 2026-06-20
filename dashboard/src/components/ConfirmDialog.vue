@@ -66,8 +66,8 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown))
           <h3 :id="titleId" style="margin:0">{{ title }}</h3>
           <div class="stack" style="gap:10px"><slot /></div>
           <template v-if="requireText">
-            <label class="label" style="margin:0">Type <span class="mono" style="color:var(--text)">{{ requireText }}</span> to confirm</label>
-            <input ref="inputEl" v-model="typed" :placeholder="requireText" aria-label="Type to confirm" autocapitalize="none" autocorrect="off" @keydown.enter="confirm" />
+            <label class="label" style="margin:0" :for="`${titleId}-confirmation`">Type <span class="mono" style="color:var(--text)">{{ requireText }}</span> to confirm</label>
+            <input :id="`${titleId}-confirmation`" ref="inputEl" v-model="typed" :placeholder="requireText" autocapitalize="none" autocorrect="off" @keydown.enter="confirm" />
           </template>
           <div class="btn-row">
             <button class="btn" :disabled="busy" @click="close">Cancel</button>

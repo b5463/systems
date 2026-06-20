@@ -567,9 +567,9 @@ select.is-invalid {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
-  min-width: 40px;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
   border-radius: 10px;
   background: transparent;
   border: none;
@@ -1068,7 +1068,7 @@ select.is-invalid {
 :root.density-compact .card { padding: 12px; }
 :root.density-compact .stack { gap: 10px; }
 :root.density-compact .btn { min-height: 38px; padding-inline: 12px; font-size: 13px; }
-:root.density-compact .btn-sm { min-height: 32px; padding-inline: 10px; font-size: 12.5px; }
+:root.density-compact .btn-sm { min-height: 44px; padding-inline: 10px; font-size: 12.5px; }
 :root.density-compact input,
 :root.density-compact textarea,
 :root.density-compact select { padding: 9px 11px; }
@@ -1234,6 +1234,7 @@ select.is-invalid {
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--text-muted);
+  margin-top: 0;
   margin-bottom: 12px;
 }
 
@@ -1400,10 +1401,10 @@ select.is-invalid {
 .btn-ghost { background: transparent; border-color: var(--border-soft); }
 .btn-ghost:hover { background: var(--bg-elevated); border-color: var(--border); }
 
-.btn-sm { min-height: 36px; padding: 0 12px; font-size: 13px; }
+.btn-sm { min-height: 44px; padding: 0 12px; font-size: 13px; }
 
 /* Icon-only button — square, no text */
-.btn-icon { min-width: 36px; padding: 0; border-radius: var(--radius-sm); }
+.btn-icon { min-width: 44px; padding: 0; border-radius: var(--radius-sm); }
 .btn-icon.btn-lg { min-width: 46px; min-height: 46px; }
 
 /* ---------- Banner / callout ---------- */
@@ -1691,7 +1692,7 @@ select.is-invalid {
 
   /* buttons touch-friendly but not massive */
   .btn { min-height: 42px; }
-  .btn-sm { min-height: 36px; }
+  .btn-sm { min-height: 44px; }
   .btn-row { gap: 8px; }
 
   /* tabs scroll cleanly, comfortable targets */
@@ -1853,6 +1854,7 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
   .route-enter-active,
   .route-leave-active { transition: none; }
   .sdot.warn { animation: none; }
+  .spinner { animation-duration: 3s; }
 }
 
 /* ============================================================

@@ -320,7 +320,7 @@ onMounted(() => { load(); loadCleanup(); })
     </div>
 
     <!-- Infrastructure (locked target stack) -->
-    <div class="section-label">Infrastructure</div>
+    <h2 class="section-label">Infrastructure</h2>
     <div class="card" style="padding:0; margin-bottom: 22px">
       <div class="conn-row">
         <span class="conn-ico"><Icon name="docker" /></span>
@@ -348,7 +348,7 @@ onMounted(() => { load(); loadCleanup(); })
     </div>
 
     <!-- SYSTEMS. runtime -->
-    <div class="section-label">SYSTEMS. runtime</div>
+    <h2 class="section-label">SYSTEMS. runtime</h2>
     <div class="card" style="padding:0; margin-bottom: 22px">
       <div class="conn-row">
         <div class="c-name" style="flex:1">Dashboard</div>
@@ -395,7 +395,7 @@ onMounted(() => { load(); loadCleanup(); })
     </div>
 
     <!-- Disk cleanup -->
-    <div v-if="cleanupInfo" class="section-label">Disk cleanup</div>
+    <h2 v-if="cleanupInfo" class="section-label">Disk cleanup</h2>
     <div v-if="cleanupInfo" class="card stack" style="margin-bottom: 22px">
       <!-- Docker storage breakdown — shows where space is actually used -->
       <template v-if="cleanupInfo.storage && cleanupInfo.storage.available">
@@ -440,7 +440,7 @@ onMounted(() => { load(); loadCleanup(); })
     </div>
 
     <!-- Backup and restore -->
-    <div class="section-label">Backup and restore</div>
+    <h2 class="section-label">Backup and restore</h2>
     <div class="card stack" style="margin-bottom: 22px">
       <div class="kv"><span class="k">Destination</span><span class="v mono small">{{ backupDetails.destination }}</span></div>
       <div class="kv"><span class="k">Last successful backup</span><span class="v">{{ backupDetails.last }}</span></div>
@@ -458,7 +458,7 @@ onMounted(() => { load(); loadCleanup(); })
     </div>
 
     <!-- Platform -->
-    <div class="section-label">Platform</div>
+    <h2 class="section-label">Platform</h2>
     <div class="card" style="margin-bottom: 22px">
       <div class="kv"><span class="k">Version</span><span class="v mono">SYSTEMS. {{ info.platform.version }}</span></div>
       <div v-if="info.platform.stage" class="kv"><span class="k">Stage</span><span class="v">{{ info.platform.stage }}</span></div>
@@ -473,7 +473,7 @@ onMounted(() => { load(); loadCleanup(); })
     </div>
 
     <!-- Deployed-system defaults -->
-    <div v-if="defaults" class="section-label">Deployed-system defaults</div>
+    <h2 v-if="defaults" class="section-label">Deployed-system defaults</h2>
     <div v-if="defaults" class="card" style="margin-bottom: 22px">
       <div class="kv"><span class="k">Memory limit</span><span class="v mono">{{ defaults.memMb }} MB</span></div>
       <div class="kv"><span class="k">CPU limit</span><span class="v mono">{{ defaults.cpu }} cores</span></div>
@@ -483,7 +483,7 @@ onMounted(() => { load(); loadCleanup(); })
     </div>
 
     <!-- V2 feature flags -->
-    <div v-if="info.features" class="section-label">V2 features</div>
+    <h2 v-if="info.features" class="section-label">V2 features</h2>
     <div v-if="info.features" class="card" style="margin-bottom: 22px">
       <div class="kv"><span class="k">Dockerfile mode</span><span class="v">{{ info.features.dockerfileMode ? 'Enabled' : 'Disabled' }}</span></div>
       <div class="kv"><span class="k">Shell console</span><span class="v">{{ info.features.shellConsole ? 'Enabled' : 'Disabled' }}</span></div>
@@ -503,7 +503,7 @@ onMounted(() => { load(); loadCleanup(); })
     </div>
 
     <!-- Notifications -->
-    <div v-if="info.features" class="section-label">Notifications</div>
+    <h2 v-if="info.features" class="section-label">Notifications</h2>
     <div v-if="info.features" class="card stack" style="margin-bottom: 22px">
       <div class="kv">
         <span class="k">Outbound webhook</span>

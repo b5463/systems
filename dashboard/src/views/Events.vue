@@ -339,16 +339,16 @@ onBeforeUnmount(() => clearTimeout(textDebounce))
   <div class="card stack" style="gap: 10px; margin-bottom: 20px">
     <div class="row flex-wrap" style="gap: 10px">
       <div class="field-group" style="min-width:150px; flex:1">
-        <label class="field-label">Category</label>
-        <SelectMenu v-model="filterCategory" :options="categoryMenuOptions" placeholder="All categories" />
+        <label class="field-label" for="ev-category">Category</label>
+        <SelectMenu id="ev-category" v-model="filterCategory" :options="categoryMenuOptions" placeholder="All categories" />
       </div>
       <div class="field-group" style="min-width:160px; flex:1">
-        <label class="field-label">Event type</label>
-        <SelectMenu v-model="filterAction" :options="filteredActionOptions" placeholder="All event types" />
+        <label class="field-label" for="ev-action">Event type</label>
+        <SelectMenu id="ev-action" v-model="filterAction" :options="filteredActionOptions" placeholder="All event types" />
       </div>
       <div class="field-group" style="min-width:130px; flex:1">
-        <label class="field-label">Result</label>
-        <SelectMenu v-model="filterSeverity" :options="severityMenuOptions" placeholder="Any result" />
+        <label class="field-label" for="ev-severity">Result</label>
+        <SelectMenu id="ev-severity" v-model="filterSeverity" :options="severityMenuOptions" placeholder="Any result" />
       </div>
       <div class="field-group" style="min-width:130px; flex:1">
         <label class="field-label" for="ev-target">Target</label>
@@ -491,7 +491,7 @@ onBeforeUnmount(() => clearTimeout(textDebounce))
   <!-- TIMELINE VIEW -->
   <template v-else>
     <div v-for="group in grouped" :key="group.key" style="margin-bottom: 24px">
-      <div class="section-label">{{ group.key }}</div>
+      <h2 class="section-label">{{ group.key }}</h2>
       <div class="timeline">
         <div v-for="(e, idx) in group.items" :key="e.id" class="tl-item">
           <div class="tl-rail">

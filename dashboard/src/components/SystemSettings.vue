@@ -239,7 +239,7 @@ async function provisionDb() {
   <div v-if="error" class="error-box">{{ error }}</div>
 
   <div class="card stack">
-    <div class="section-label">Current env keys</div>
+    <h2 class="section-label">Current env keys</h2>
     <div v-if="!envKeys.length" class="muted small">No environment variables set.</div>
     <div v-else class="row flex-wrap" style="gap:8px">
       <span v-for="k in envKeys" :key="k" class="chip">
@@ -262,7 +262,7 @@ async function provisionDb() {
   </div>
 
   <div class="card stack">
-    <div class="section-label">Add / update variables</div>
+    <h2 class="section-label">Add / update variables</h2>
     <div class="hint">Adding or changing a variable keeps the others. Values aren't shown again once saved.</div>
     <div v-for="(row, i) in envVars" :key="i" class="row">
       <input v-model="row.key" aria-label="Variable name" placeholder="Variable name" autocapitalize="characters" autocorrect="off" spellcheck="false" />
@@ -306,7 +306,7 @@ async function provisionDb() {
 
   <!-- Visibility -->
   <div class="card stack">
-    <div class="section-label">Visibility</div>
+    <h2 class="section-label">Visibility</h2>
     <div class="segmented">
       <button type="button" :class="{ active: system.visibility === 'public' && !wantPassword }" :disabled="visSaving" @click="selectVis('public')">Public</button>
       <button type="button" :class="{ active: system.visibility === 'private' && !wantPassword }" :disabled="visSaving" @click="selectVis('private')">Private</button>
@@ -329,7 +329,7 @@ async function provisionDb() {
   <!-- Root domain (primary system) -->
   <div class="card stack">
     <div class="spread">
-      <div class="section-label">Root domain</div>
+      <h2 class="section-label">Root domain</h2>
       <span class="chip" :class="system.is_primary ? 'ok' : ''">{{ system.is_primary ? 'On' : 'Off' }}</span>
     </div>
     <div class="hint">
@@ -383,7 +383,7 @@ async function provisionDb() {
 
   <!-- GitHub deploy-on-push (only when enabled on the server) -->
   <div v-if="features.githubDeploys" class="card stack">
-    <div class="spread"><div class="section-label">GitHub deploy-on-push</div><span class="chip">Experimental</span></div>
+    <div class="spread"><h2 class="section-label">GitHub deploy-on-push</h2><span class="chip">Experimental</span></div>
     <div class="hint">Advanced / optional — off by default and enabled on the server. Map this system to a repo. A push to the branch triggers a redeploy (requires the webhook configured in GitHub).</div>
     <div class="field" style="margin:0">
       <label class="label" for="repo">Repository</label>
@@ -401,7 +401,7 @@ async function provisionDb() {
 
   <!-- Database provisioning (only when enabled on the server) -->
   <div v-if="features.dbProvisioning" class="card stack">
-    <div class="spread"><div class="section-label">Database</div><span class="chip">Experimental</span></div>
+    <div class="spread"><h2 class="section-label">Database</h2><span class="chip">Experimental</span></div>
     <div class="hint">Advanced / optional — off by default and enabled on the server. Provision a dedicated Postgres database + role. The <span class="mono">DATABASE_URL</span> is stored (encrypted) and injected on the next deploy.</div>
     <div v-if="provisionedUrl" class="kv"><span class="k">DATABASE_URL</span><span class="v mono small row gap-sm" style="justify-content:flex-end">{{ provisionedUrl }}<CopyButton :text="provisionedUrl" label="DATABASE_URL" /></span></div>
     <div v-if="provisionMsg" class="notice">{{ provisionMsg }}</div>
@@ -413,11 +413,15 @@ async function provisionDb() {
 
 <style scoped>
 .chip-x {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
   background: none;
   border: none;
   color: var(--text-dim);
   cursor: pointer;
-  padding: 0 0 0 4px;
+  padding: 0;
   font-size: 10px;
   line-height: 1;
 }

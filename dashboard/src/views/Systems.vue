@@ -236,7 +236,7 @@ onBeforeUnmount(() => clearInterval(timer))
   <template v-else>
     <!-- Needs attention -->
     <template v-if="needsAttention.length">
-      <div class="section-label">Needs attention</div>
+      <h2 class="section-label">Needs attention</h2>
       <div class="attention-grid">
         <div v-for="s in needsAttention" :key="s.slug" class="card attention-card">
           <div class="spread" style="align-items:flex-start">
@@ -264,14 +264,14 @@ onBeforeUnmount(() => clearInterval(timer))
     <!-- Latest deploy + server mini-status, side by side on desktop -->
     <div class="grid grid-2" style="margin-bottom: 22px; align-items:stretch">
       <div v-if="latest" class="card card-tap" role="button" tabindex="0" @click="open(latest)" @keydown.enter="open(latest)" @keydown.space.prevent="open(latest)">
-        <div class="section-label">Latest deploy</div>
+        <h2 class="section-label">Latest deploy</h2>
         <div class="spread">
           <div style="min-width:0"><div class="sc-name">{{ latest.name }}</div><div class="mono small dim">{{ endpointText(latest) }}</div></div>
           <div class="row gap-sm"><span class="small muted">{{ fmtAgo(latest.updated_at || latest.created_at) }}</span><StatusBadge :project="latest" /></div>
         </div>
       </div>
       <div class="card">
-        <div class="section-label">Server</div>
+        <h2 class="section-label">Server</h2>
         <div v-if="server" class="server-mini">
           <span><span class="sdot" :class="statusTone(server.docker.status)"></span>Docker {{ statusLabel(server.docker.status) }}</span>
           <span><span class="sdot" :class="statusTone(server.caddy.status)"></span>Caddy {{ statusLabel(server.caddy.status) }}</span>
@@ -284,7 +284,7 @@ onBeforeUnmount(() => clearInterval(timer))
 
     <!-- All systems -->
     <div class="spread" style="margin-bottom:10px; gap:10px; flex-wrap:wrap">
-      <div class="section-label" style="margin:0">All systems · {{ active.length }}</div>
+      <h2 class="section-label" style="margin:0">All systems · {{ active.length }}</h2>
       <div class="row gap-sm" style="flex-wrap:wrap">
         <button v-if="active.length" class="btn btn-sm btn-ghost" @click="selectMode ? exitSelect() : enterSelect()">{{ selectMode ? 'Cancel' : 'Select' }}</button>
         <template v-if="active.length > 4">
@@ -325,7 +325,7 @@ onBeforeUnmount(() => clearInterval(timer))
 
     <!-- Deleted (history kept; purge from detail) -->
     <template v-if="deleted.length">
-      <div class="section-label" style="margin-top:22px">Deleted · {{ deleted.length }}</div>
+      <h2 class="section-label" style="margin-top:22px">Deleted · {{ deleted.length }}</h2>
       <div class="card" style="padding:0">
         <div v-for="s in deleted" :key="s.id" class="conn-row" style="cursor:pointer" role="button" tabindex="0" :aria-label="`Open ${s.name}`" @click="open(s)" @keydown.enter="open(s)" @keydown.space.prevent="open(s)">
           <div style="flex:1; min-width:0"><div class="c-name">{{ s.name }}</div><div class="c-sub mono">{{ hostFor(s.slug) }}</div></div>

@@ -386,7 +386,7 @@ onBeforeUnmount(() => {
     <div class="page-head" style="margin-bottom:18px">
       <div>
         <div class="row gap-sm">
-          <RouterLink class="btn btn-sm btn-ghost" :to="{ name: 'systems' }" style="min-height:32px;padding:0 10px">
+          <RouterLink class="btn btn-sm btn-ghost" :to="{ name: 'systems' }" style="min-height:44px;padding:0 10px">
             <Icon name="arrow-left" :size="15" />
             Systems
           </RouterLink>
@@ -468,7 +468,7 @@ onBeforeUnmount(() => {
 
       <!-- Truth model -->
       <div>
-        <div class="section-label">Status</div>
+        <h2 class="section-label">Status</h2>
         <div class="truth">
           <div
             v-for="cell in truth"
@@ -487,7 +487,7 @@ onBeforeUnmount(() => {
 
       <!-- Actions -->
       <div>
-        <div class="section-label">Actions</div>
+        <h2 class="section-label">Actions</h2>
 
         <!-- For error/building states the contextual callout above is the action
              surface; here we only show actions that can succeed right now. -->
@@ -537,7 +537,7 @@ onBeforeUnmount(() => {
       <!-- Configured vs observed state -->
       <div class="grid grid-2">
         <div class="card">
-          <div class="section-label">Configured plan</div>
+          <h2 class="section-label">Configured plan</h2>
           <div class="kv"><span class="k">Planned endpoint</span><span class="v mono small">{{ system.visibility === 'private' ? 'Private — no public route' : publicHost }}</span></div>
           <div class="kv"><span class="k">Planned port</span><span class="v mono">{{ system.port ?? '-' }}</span></div>
           <div class="kv"><span class="k">Requested visibility</span><span class="v">{{ (system.visibility || 'public').charAt(0).toUpperCase() + (system.visibility || 'public').slice(1) }}</span></div>
@@ -545,7 +545,7 @@ onBeforeUnmount(() => {
           <div class="kv"><span class="k">Created</span><span class="v small">{{ fmtDateTime(system.created_at) }}</span></div>
         </div>
         <div class="card">
-          <div class="section-label">Observed runtime</div>
+          <h2 class="section-label">Observed runtime</h2>
           <div v-if="isRunning && overviewStat" class="kv"><span class="k">CPU / RAM</span><span class="v mono">{{ (overviewStat.cpu_percent ?? 0).toFixed(1) }}% · {{ (overviewStat.memory_mb ?? 0).toFixed(0) }} MB</span></div>
           <div class="kv"><span class="k">Container</span><span class="v mono small">{{ hasRuntimeContainer ? String(system.container_id).slice(0,12) : 'No container observed' }}</span></div>
           <div class="kv"><span class="k">Image</span><span class="v mono small">{{ system.image_id ? String(system.image_id).replace('sha256:','').slice(0,12) : 'No built image' }}</span></div>
@@ -566,7 +566,7 @@ onBeforeUnmount(() => {
       </div>
 
       <div v-if="showBuildLog" class="card">
-        <div class="section-label">Redeploy build log</div>
+        <h2 class="section-label">Redeploy build log</h2>
         <LogConsole :slug="system.slug" mode="build" @finished="onRedeployFinished" />
       </div>
     </div>
@@ -646,7 +646,7 @@ onBeforeUnmount(() => {
       <SystemSettings v-if="tab === 'Settings'" :slug="system.slug" :system="system" @update="system = $event" @reload="loadSystem" />
 
       <div class="card stack">
-        <div class="section-label danger-label">Danger zone</div>
+        <h2 class="section-label danger-label">Danger zone</h2>
         <div class="hint"><strong>Delete</strong> stops the container and removes the public route but keeps history. <strong>Purge</strong> removes everything permanently.</div>
         <div class="btn-row">
           <button class="btn btn-danger" @click="openDelete">Delete</button>
