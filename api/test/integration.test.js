@@ -20,32 +20,58 @@ const { db } = require('../src/db');
 const totp = require('../src/util/totp');
 
 let app;
-let token;
+let cookie;
+let csrf;
 
 before(async () => {
   app = await buildApp();
   await app.ready();
-  db.prepare('INSERT INTO users (username, password_hash) VALUES (?, ?)').run('root', bcrypt.hashSync('password123', 12));
-  const res = await app.inject({ method: 'POST', url: '/api/auth/login', payload: { username: 'root', password: 'password123' } });
-  token = res.json().token;
+  db.prepare('INSERT INTO users (username, password_hash) VALUES (?, ?)').run('root', bcrypt.hashSync('correct-horse-battery', 12));
+  const res = await app.inject({ method: 'POST', url: '/api/auth/login', payload: { username: 'root', password: 'correct-horse-battery' } });
+  cookie = res.headers['set-cookie'].split(';')[0];
+  csrf = res.json().csrfToken;
 });
 
 after(async () => { if (app) await app.close(); });
 
-const auth = () => ({ authorization: `Bearer ${token}` });
+const auth = () => ({ cookie, 'x-csrf-token': csrf });
 
-test('auth: protected routes reject missing token', async () => {
+test('auth: protected routes reject a missing session', async () => {
   const res = await app.inject({ method: 'GET', url: '/api/projects' });
   assert.equal(res.statusCode, 401);
 });
 
-test('auth: login issues a usable token', async () => {
-  assert.ok(token && token.length > 20);
+test('auth: login issues a usable HttpOnly cookie session', async () => {
+  assert.match(cookie, /^systems_session=/);
+  assert.ok(csrf && csrf.length > 20);
+  const login = await app.inject({ method: 'POST', url: '/api/auth/login', payload: { username: 'root', password: 'correct-horse-battery' } });
+  assert.match(login.headers['set-cookie'], /HttpOnly/);
+  assert.match(login.headers['set-cookie'], /SameSite=Strict/);
   const res = await app.inject({ method: 'GET', url: '/api/projects', headers: auth() });
   assert.equal(res.statusCode, 200);
   assert.deepEqual(res.json().projects, []);
 });
 
+
+test('auth: bearer credentials are not accepted', async () => {
+  const raw = cookie.slice(cookie.indexOf('=') + 1);
+  const res = await app.inject({ method: 'GET', url: '/api/projects', headers: { authorization: `Bearer ${raw}` } });
+  assert.equal(res.statusCode, 401);
+});
+
+test('auth: authenticated mutations require the session-bound CSRF token', async () => {
+  const missing = await app.inject({ method: 'POST', url: '/api/auth/refresh', headers: { cookie } });
+  assert.equal(missing.statusCode, 403);
+  const forged = await app.inject({ method: 'POST', url: '/api/auth/refresh', headers: { cookie, 'x-csrf-token': 'forged' } });
+  assert.equal(forged.statusCode, 403);
+  const valid = await app.inject({ method: 'POST', url: '/api/auth/refresh', headers: auth() });
+  assert.equal(valid.statusCode, 200);
+});
+
+test('auth: rejects a cross-origin request even with valid session credentials', async () => {
+  const res = await app.inject({ method: 'GET', url: '/api/projects', headers: { ...auth(), origin: 'https://evil.example' } });
+  assert.equal(res.statusCode, 403);
+});
 test('auth: bad credentials are rejected', async () => {
   const res = await app.inject({ method: 'POST', url: '/api/auth/login', payload: { username: 'root', password: 'nope' } });
   assert.equal(res.statusCode, 401);
@@ -66,10 +92,63 @@ test('server/info: risky features are off by default', async () => {
 });
 
 test('admin: two-admin hard cap enforced', async () => {
-  const second = await app.inject({ method: 'POST', url: '/api/admin/users', headers: auth(), payload: { username: 'second', password: 'password123' } });
+  const second = await app.inject({ method: 'POST', url: '/api/admin/users', headers: auth(), payload: { username: 'second', password: 'correct-horse-battery' } });
   assert.equal(second.statusCode, 201);
-  const third = await app.inject({ method: 'POST', url: '/api/admin/users', headers: auth(), payload: { username: 'third', password: 'password123' } });
+  const third = await app.inject({ method: 'POST', url: '/api/admin/users', headers: auth(), payload: { username: 'third', password: 'correct-horse-battery' } });
   assert.equal(third.statusCode, 409);
+});
+
+
+test('admin: persistent IP bans validate, enforce, and can be removed', async () => {
+  const created = await app.inject({
+    method: 'POST', url: '/api/admin/ip-bans', headers: auth(),
+    payload: { ip: '203.0.113.7', reason: 'security test' },
+  });
+  assert.equal(created.statusCode, 201);
+  const id = created.json().ban.id;
+
+  const blocked = await app.inject({
+    method: 'GET', url: '/api/projects', headers: auth(), remoteAddress: '203.0.113.7',
+  });
+  assert.equal(blocked.statusCode, 403);
+
+  const removed = await app.inject({ method: 'DELETE', url: `/api/admin/ip-bans/${id}`, headers: auth() });
+  assert.equal(removed.statusCode, 200);
+});
+test('admin: CIDR bans block addresses in range and refuse the admin\'s own range', async () => {
+  const created = await app.inject({
+    method: 'POST', url: '/api/admin/ip-bans', headers: auth(),
+    payload: { ip: '198.51.100.0/24', reason: 'cidr test' },
+  });
+  assert.equal(created.statusCode, 201);
+  const id = created.json().ban.id;
+
+  const inRange = await app.inject({ method: 'GET', url: '/api/projects', headers: auth(), remoteAddress: '198.51.100.42' });
+  assert.equal(inRange.statusCode, 403);
+  const outOfRange = await app.inject({ method: 'GET', url: '/api/projects', headers: auth(), remoteAddress: '198.51.101.42' });
+  assert.equal(outOfRange.statusCode, 200);
+
+  // The test client's address is 127.0.0.1 — a range containing it must be refused.
+  const selfRange = await app.inject({ method: 'POST', url: '/api/admin/ip-bans', headers: auth(), payload: { ip: '127.0.0.0/8' } });
+  assert.equal(selfRange.statusCode, 400);
+  // An overly broad prefix is rejected outright.
+  const broad = await app.inject({ method: 'POST', url: '/api/admin/ip-bans', headers: auth(), payload: { ip: '0.0.0.0/0' } });
+  assert.equal(broad.statusCode, 400);
+
+  await app.inject({ method: 'DELETE', url: `/api/admin/ip-bans/${id}`, headers: auth() });
+});
+
+test('security: hardened response headers are present on every reply', async () => {
+  const res = await app.inject({ method: 'GET', url: '/api/projects', headers: auth() });
+  assert.equal(res.headers['x-content-type-options'], 'nosniff');
+  assert.equal(res.headers['x-frame-options'], 'DENY');
+  assert.equal(res.headers['referrer-policy'], 'no-referrer');
+  assert.equal(res.headers['cross-origin-opener-policy'], 'same-origin');
+  assert.match(res.headers['content-security-policy'], /default-src 'none'/);
+  assert.ok(res.headers['permissions-policy']);
+  assert.equal(res.headers['x-powered-by'], undefined);
+  // HSTS only outside dev (no NODE_ENV=production in tests).
+  assert.equal(res.headers['strict-transport-security'], undefined);
 });
 
 test('webhook + upload endpoints are 404 while flags are off', async () => {
@@ -146,33 +225,34 @@ test('2fa: setup -> enable -> login requires code', async () => {
   assert.equal(enable.statusCode, 200);
 
   // Login without code now demands a second factor.
-  const noCode = await app.inject({ method: 'POST', url: '/api/auth/login', payload: { username: 'root', password: 'password123' } });
+  const noCode = await app.inject({ method: 'POST', url: '/api/auth/login', payload: { username: 'root', password: 'correct-horse-battery' } });
   assert.equal(noCode.statusCode, 401);
   assert.equal(noCode.json().twoFactorRequired, true);
 
   // Login with a valid code succeeds.
-  const withCode = await app.inject({ method: 'POST', url: '/api/auth/login', payload: { username: 'root', password: 'password123', code: totp.totp(secret) } });
+  const withCode = await app.inject({ method: 'POST', url: '/api/auth/login', payload: { username: 'root', password: 'correct-horse-battery', code: totp.totp(secret) } });
   assert.equal(withCode.statusCode, 200);
-  assert.ok(withCode.json().token);
+  assert.match(withCode.headers['set-cookie'], /HttpOnly/);
+  assert.ok(withCode.json().csrfToken);
 });
 
-test('sessions: changing password revokes old tokens', async () => {
-  // Get a fresh token (2fa is on now), then change password and confirm the
-  // pre-change token stops working.
-  const login = await app.inject({ method: 'POST', url: '/api/auth/login', payload: { username: 'root', password: 'password123', code: totp.totp(db.prepare('SELECT totp_secret FROM users WHERE username = ?').get('root').totp_secret) } });
-  const oldToken = login.json().token;
+test('sessions: changing password rotates the cookie and revokes the old session', async () => {
+  const login = await app.inject({ method: 'POST', url: '/api/auth/login', payload: { username: 'root', password: 'correct-horse-battery', code: totp.totp(db.prepare('SELECT totp_secret FROM users WHERE username = ?').get('root').totp_secret) } });
+  const oldCookie = login.headers['set-cookie'].split(';')[0];
+  const oldCsrf = login.json().csrfToken;
 
   const change = await app.inject({
     method: 'POST', url: '/api/auth/change-password',
-    headers: { authorization: `Bearer ${oldToken}` },
-    payload: { currentPassword: 'password123', newPassword: 'password456' },
+    headers: { cookie: oldCookie, 'x-csrf-token': oldCsrf },
+    payload: { currentPassword: 'correct-horse-battery', newPassword: 'correct-horse-staple' },
   });
   assert.equal(change.statusCode, 200);
-  const newToken = change.json().token;
+  const newCookie = change.headers['set-cookie'].split(';')[0];
+  const newCsrf = change.json().csrfToken;
+  assert.notEqual(newCookie, oldCookie);
 
-  // Old token is now rejected; the freshly issued one works.
-  const oldUse = await app.inject({ method: 'GET', url: '/api/projects', headers: { authorization: `Bearer ${oldToken}` } });
+  const oldUse = await app.inject({ method: 'GET', url: '/api/projects', headers: { cookie: oldCookie } });
   assert.equal(oldUse.statusCode, 401);
-  const newUse = await app.inject({ method: 'GET', url: '/api/projects', headers: { authorization: `Bearer ${newToken}` } });
+  const newUse = await app.inject({ method: 'GET', url: '/api/projects', headers: { cookie: newCookie, 'x-csrf-token': newCsrf } });
   assert.equal(newUse.statusCode, 200);
 });

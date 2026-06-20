@@ -71,7 +71,7 @@ async function waitFor(fn, description, timeoutMs = 120000) {
   throw new Error(`Timed out waiting for ${description}${last ? `: ${last.message}` : ''}`);
 }
 
-test('Docker E2E: zip → deploy → HTTP 200 → redeploy → rollback', {
+test('Docker E2E: zip â†’ deploy â†’ HTTP 200 â†’ redeploy â†’ rollback', {
   skip: !enabled,
   timeout: 240000,
 }, async (t) => {
@@ -95,13 +95,18 @@ test('Docker E2E: zip → deploy → HTTP 200 → redeploy → rollback', {
   const { buildApp } = require('../src/app');
   const app = await buildApp({ logger: false });
   const origin = await app.listen({ host: '127.0.0.1', port: 0 });
-  let token;
+  let cookie;
+  let csrf;
 
   async function api(url, options = {}) {
     const headers = new Headers(options.headers || {});
-    if (token) headers.set('authorization', `Bearer ${token}`);
+    if (cookie) headers.set('cookie', cookie);
+    if (cookie && !['GET', 'HEAD'].includes(options.method || 'GET')) headers.set('x-csrf-token', csrf);
     const response = await fetch(`${origin}${url}`, { ...options, headers });
     const body = await response.json().catch(() => ({}));
+    const setCookie = response.headers.get('set-cookie');
+    if (setCookie) cookie = setCookie.split(';')[0];
+    if (body.csrfToken) csrf = body.csrfToken;
     assert.ok(response.ok, `${options.method || 'GET'} ${url}: ${response.status} ${JSON.stringify(body)}`);
     return body;
   }
@@ -124,7 +129,7 @@ test('Docker E2E: zip → deploy → HTTP 200 → redeploy → rollback', {
   }
 
   t.after(async () => {
-    if (token) {
+    if (cookie) {
       await api(`/api/projects/${slug}/purge`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -136,12 +141,11 @@ test('Docker E2E: zip → deploy → HTTP 200 → redeploy → rollback', {
     await fs.rm(dataDir, { recursive: true, force: true });
   });
 
-  const login = await api('/api/auth/login', {
+  await api('/api/auth/login', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ username: 'e2e', password: 'deploy-test-password' }),
   });
-  token = login.token;
 
   const v1 = zip({ 'index.html': '<!doctype html><title>v1</title><h1>deploy-e2e-v1</h1>' });
   await upload('/api/deploy', v1, { name: 'Deploy E2E', slug, visibility: 'private' });

@@ -46,7 +46,7 @@ const showConfirmPw = ref(false)
 async function changePassword() {
   pwMsg.value = ''; pwError.value = ''
   if (!currentPassword.value || !newPassword.value) return (pwError.value = 'Both current and new password are required.')
-  if (newPassword.value.length < 8) return (pwError.value = 'New password must be at least 8 characters.')
+  if (newPassword.value.length < 15) return (pwError.value = 'New password must be at least 15 characters.')
   if (newPassword.value !== confirmPassword.value) return (pwError.value = 'New passwords do not match.')
   pwSaving.value = true
   try {
@@ -109,8 +109,7 @@ async function enable2FA() {
   if (!tfaCode.value) return (tfaError.value = 'Enter the 6-digit code.')
   tfaBusy.value = true
   try {
-    const data = await api.post('/auth/2fa/enable', { code: tfaCode.value })
-    if (data && data.token) auth.setToken(data.token)
+    await api.post('/auth/2fa/enable', { code: tfaCode.value })
     tfaSecret.value = ''; tfaOtpauth.value = ''; tfaCode.value = ''
     tfaMsg.value = 'Two-factor enabled.'
     await auth.fetchMe()
@@ -124,8 +123,7 @@ async function disable2FA() {
   if (!tfaPassword.value || !tfaCode.value) return (tfaError.value = 'Password and a current code are required.')
   tfaBusy.value = true
   try {
-    const data = await api.post('/auth/2fa/disable', { password: tfaPassword.value, code: tfaCode.value })
-    if (data && data.token) auth.setToken(data.token)
+    await api.post('/auth/2fa/disable', { password: tfaPassword.value, code: tfaCode.value })
     tfaPassword.value = ''; tfaCode.value = ''
     tfaMsg.value = 'Two-factor disabled.'
     await auth.fetchMe()
@@ -136,20 +134,9 @@ async function disable2FA() {
 
 /* ---------- Sessions ---------- */
 const currentSession = computed(() => {
-  try {
-    const token = auth.token
-    if (!token) return null
-    const raw = token.split('.')[1]
-    const padded = raw.replace(/-/g, '+').replace(/_/g, '/') + '=='.slice((raw.length % 4) || 4)
-    const payload = JSON.parse(atob(padded))
-    if (!payload.iat) return null
-    const since = new Date(payload.iat * 1000)
-    const pad = n => String(n).padStart(2, '0')
-    return {
-      since: since.toLocaleDateString([], { month: 'short', day: 'numeric' }) +
-             ' at ' + pad(since.getHours()) + ':' + pad(since.getMinutes())
-    }
-  } catch { return null }
+  const created = auth.user && auth.user.sessionCreatedAt
+  if (!created) return null
+  return { since: new Date(created.endsWith('Z') ? created : `${created}Z`).toLocaleString() }
 })
 
 const revoking = ref(false)
@@ -158,8 +145,7 @@ async function revokeSessions() {
   revokeMsg.value = ''
   revoking.value = true
   try {
-    const data = await api.post('/auth/revoke-sessions')
-    if (data && data.token) auth.setToken(data.token)
+    await api.post('/auth/revoke-sessions')
     revokeMsg.value = 'Other sessions signed out.'
     await loadSessions()
   } catch (e) {
@@ -259,7 +245,7 @@ const showAddForm = ref(false)
 async function addUser() {
   addUserError.value = ''
   if (!newUsername.value || !newUserPassword.value) return (addUserError.value = 'Username and password are required.')
-  if (newUserPassword.value.length < 8) return (addUserError.value = 'Password must be at least 8 characters.')
+  if (newUserPassword.value.length < 15) return (addUserError.value = 'Password must be at least 15 characters.')
   addingUser.value = true
   try {
     await api.post('/admin/users', { username: newUsername.value, password: newUserPassword.value })
@@ -360,7 +346,7 @@ onMounted(() => { loadUsers(); loadServerInfo(); loadSessions() })
           </div>
         </div>
         <div v-if="capsOn" class="caps-warn small"><Icon name="caps-lock" /> Caps Lock is on</div>
-        <div class="hint">At least 8 characters. Mixing case, digits and symbols makes it stronger.</div>
+        <div class="hint">At least 15 characters. Prefer a long, unique passphrase; composition tricks are not required.</div>
         <div v-if="pwError" class="error-box">{{ pwError }}</div>
         <div v-else-if="pwMsg" class="notice">{{ pwMsg }}</div>
         <button class="btn btn-primary btn-block" :disabled="pwSaving" @click="changePassword">

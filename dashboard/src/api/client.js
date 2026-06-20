@@ -1,14 +1,14 @@
 // Lightweight fetch wrapper around the deployment platform REST API.
-// Auto-attaches the bearer token and handles 401 by clearing auth + redirecting.
+// Sends the HttpOnly session cookie and a CSRF header on state-changing requests.
 
 import { useAuthStore } from '../stores/auth'
 import router from '../router'
 
 const BASE = '/api'
 
-function authHeader() {
+function csrfHeader() {
   const auth = useAuthStore()
-  return auth.token ? { Authorization: `Bearer ${auth.token}` } : {}
+  return auth.csrfToken ? { 'X-CSRF-Token': auth.csrfToken } : {}
 }
 
 function jsonRequest(method, body) {
@@ -17,7 +17,7 @@ function jsonRequest(method, body) {
     method,
     headers: {
       ...(hasBody ? { 'Content-Type': 'application/json' } : {}),
-      ...authHeader()
+      ...csrfHeader()
     },
     body: hasBody ? JSON.stringify(body) : undefined
   }
@@ -48,6 +48,7 @@ async function handle(res) {
       (body && body.error) || (body && body.message) || `Request failed (${res.status})`
     throw new ApiError(message, res.status, body)
   }
+  if (body && body.csrfToken) useAuthStore().setCsrf(body.csrfToken)
   return body
 }
 
@@ -62,7 +63,7 @@ export class ApiError extends Error {
 
 export const api = {
   async get(path) {
-    const res = await fetch(BASE + path, { headers: { ...authHeader() } })
+    const res = await fetch(BASE + path)
     return handle(res)
   },
 
@@ -84,7 +85,7 @@ export const api = {
   async del(path) {
     const res = await fetch(BASE + path, {
       method: 'DELETE',
-      headers: { ...authHeader() }
+      headers: { ...csrfHeader() }
     })
     return handle(res)
   },
@@ -98,7 +99,7 @@ export const api = {
       xhr.open('POST', BASE + path)
 
       const auth = useAuthStore()
-      if (auth.token) xhr.setRequestHeader('Authorization', `Bearer ${auth.token}`)
+      if (auth.csrfToken) xhr.setRequestHeader('X-CSRF-Token', auth.csrfToken)
 
       const form = new FormData()
       for (const [k, v] of Object.entries(fields)) form.append(k, v)
@@ -154,7 +155,7 @@ export const api = {
         const buf = await blob.arrayBuffer()
         const res = await fetch(`${BASE}/upload/${id}/chunk?index=${i}`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/octet-stream', ...authHeader() },
+          headers: { 'Content-Type': 'application/octet-stream', ...csrfHeader() },
           body: buf
         })
         if (!res.ok) {

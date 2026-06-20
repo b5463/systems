@@ -11,7 +11,7 @@
   <img src="https://img.shields.io/badge/version-2.0.0--rc.1-5fb0d4" alt="version" />
   <img src="https://img.shields.io/badge/Vue%203%20%C2%B7%20Fastify-1a1c22" alt="stack" />
   <img src="https://img.shields.io/badge/PWA-installable-45c267" alt="PWA" />
-  <img src="https://img.shields.io/badge/license-MIT-585c66" alt="MIT" />
+  <img src="https://img.shields.io/badge/license-PolyForm%20Noncommercial-585c66" alt="PolyForm Noncommercial" />
 </p>
 
 Drop in a zip and SYSTEMS. works out how to build it, runs it in a hardened
@@ -113,7 +113,7 @@ DNS points the domains at the server; SYSTEMS. handles routing from there.
 | Containers | Docker (isolated network; bounded build concurrency/resources and per-container limits) |
 | Reverse proxy | Caddy (it generates the route files; local dev still uses nginx) |
 | Internal DB | SQLite; optional Postgres provisions databases for deployed apps |
-| Auth | JWT bearer token, bcrypt password hashes, optional TOTP two-factor, sign-out-everywhere |
+| Auth | HttpOnly/Secure/SameSite cookie sessions, session-bound CSRF, bcrypt password hashes, optional TOTP, revocation, login backoff |
 
 The Caddy integration and optional per-system Postgres provisioning are wired;
 the SYSTEMS. control-plane store itself remains SQLite. See
@@ -250,7 +250,7 @@ you actually need to run:
 
 | Key | What it's for |
 | --- | --- |
-| `JWT_SECRET` | Signs admin session tokens. Long random string. |
+| `JWT_SECRET` | Signs the HttpOnly admin session credential. Long random string. |
 | `ENV_SECRET` | AES-256-GCM key encrypting per-system env vars at rest. |
 | `ADMIN_USERS` | First admin(s), `user:password` (two max, no public signup). |
 | `BASE_DOMAIN` | Root domain (e.g. `acronym.sk`). |
@@ -371,5 +371,8 @@ for databases provisioned to deployed apps.
 
 ## License
 
-[MIT](LICENSE) © Acronym ([acronym.sk](https://acronym.sk)). Use it, fork it,
-ship it.
+[PolyForm Noncommercial 1.0.0](LICENSE) © Acronym ([acronym.sk](https://acronym.sk)).
+Use it, study it, fork it, and modify it for any **noncommercial** purpose, with
+the copyright notice kept intact. You may **not** sell it, run it as a paid
+service, use it commercially, or pass it off as your own work. Need a commercial
+license? Contact [acronym.sk](https://acronym.sk).

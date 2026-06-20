@@ -1,35 +1,29 @@
 import { defineStore } from 'pinia'
 
-const TOKEN_KEY = 'acronym_token'
-
 export const useAuthStore = defineStore('auth', {
   state: () => ({
-    token: localStorage.getItem(TOKEN_KEY) || null,
     user: null,
-    ready: false // becomes true once initial validation completes
+    csrfToken: null,
+    ready: false
   }),
 
   getters: {
-    isAuthenticated: (s) => !!s.token
+    isAuthenticated: (s) => !!s.user
   },
 
   actions: {
-    setToken(token) {
-      this.token = token
-      if (token) localStorage.setItem(TOKEN_KEY, token)
-      else localStorage.removeItem(TOKEN_KEY)
+    setCsrf(token) {
+      this.csrfToken = token || null
     },
 
     clear() {
-      this.token = null
       this.user = null
-      localStorage.removeItem(TOKEN_KEY)
+      this.csrfToken = null
+      // Remove credentials left by versions that used localStorage bearer JWTs.
+      localStorage.removeItem('acronym_token')
     },
 
     async login(username, password, code) {
-      // Direct fetch (not the shared client) so we can read the response body
-      // on a 401 — the login endpoint signals twoFactorRequired that way, and
-      // the shared client otherwise drops the body + redirects on any 401.
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -44,18 +38,14 @@ export const useAuthStore = defineStore('auth', {
         err.twoFactorRequired = !!(data && data.twoFactorRequired)
         throw err
       }
-      this.setToken(data.token)
+      this.setCsrf(data.csrfToken)
       await this.fetchMe()
       return data
     },
 
     async logout() {
       const { api } = await import('../api/client')
-      try {
-        await api.post('/auth/logout')
-      } catch {
-        // ignore — clear locally regardless
-      }
+      try { await api.post('/auth/logout') } catch { /* clear locally regardless */ }
       this.clear()
     },
 
@@ -63,29 +53,24 @@ export const useAuthStore = defineStore('auth', {
       const { api } = await import('../api/client')
       const me = await api.get('/auth/me')
       this.user = me
+      this.setCsrf(me.csrfToken)
       return me
     },
 
     async refresh() {
-      if (!this.token) return
+      if (!this.user) return
       const { api } = await import('../api/client')
       try {
         const data = await api.post('/auth/refresh')
-        if (data && data.token) this.setToken(data.token)
-      } catch {
-        // a failed refresh on a still-valid token is non-fatal
-      }
+        if (data && data.csrfToken) this.setCsrf(data.csrfToken)
+      } catch { /* a failed refresh is non-fatal until the session expires */ }
     },
 
-    // Called once at app startup: validate any persisted token.
     async init() {
-      if (this.token) {
-        try {
-          await this.fetchMe()
-        } catch {
-          this.clear()
-        }
-      }
+      // The HttpOnly credential cannot be inspected by JavaScript. Ask the
+      // server whether the browser has a valid session on every cold start.
+      localStorage.removeItem('acronym_token')
+      try { await this.fetchMe() } catch { this.clear() }
       this.ready = true
     }
   }

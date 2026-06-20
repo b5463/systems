@@ -2,7 +2,7 @@
   "name": "systems-api",
   "version": "2.0.0-rc.1",
   "description": "SYSTEMS. API — self-hosted deployment engine (Node.js + Fastify)",
-  "license": "MIT",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",

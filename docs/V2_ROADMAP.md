@@ -63,8 +63,7 @@ Other pieces from this stage:
   `routes` table, persisted editable settings.
 - Visibility modes: public route, password-protected (basic auth where safe),
   private (no public route).
-- Auth remains JWT bearer-token based; login lockout/backoff is implemented,
-  while HTTP-only cookie sessions plus CSRF remain backlog.
+- Auth uses HttpOnly/SameSite cookie sessions (Secure + __Host- in production), session-bound CSRF, strict Origin checks, rotation/revocation, login backoff, and a persistent operator IP denylist.
 - Build timeouts and resource-limit enforcement; the delete-vs-purge split.
 - Windows-first server deployment guide and `.env`.
 
@@ -85,15 +84,17 @@ Still needs the Windows host to confirm (can't be exercised without Docker):
 
 ## V2 — Full deployment engine
 
-The original target list:
+The original target list (built items struck through; see "what's actually
+built" below for the gating detail):
 
-- 2 GB streaming/chunked uploads.
-- Managed databases for systems.
-- Workers/bots (non-HTTP long-running processes).
-- GitHub deploys (push-to-deploy).
-- Backups and restores (DB plus per-system).
-- In-dashboard shell console (beyond per-container exec).
-- Advanced metrics and alerting.
+- ~~2 GB streaming/chunked uploads.~~ **Built** (off by default).
+- ~~Managed databases for systems.~~ **Built** (off by default).
+- ~~Workers/bots (non-HTTP long-running processes).~~ **Built** (host-validation pending).
+- ~~GitHub deploys (push-to-deploy).~~ **Built** (off by default — riskiest flag).
+- ~~Backups and restores (DB plus per-system).~~ **Built and on.**
+- ~~In-dashboard shell console (beyond per-container exec).~~ **Built** (off by default).
+- Advanced metrics and alerting — ~~threshold alerting~~ **done**; longer metrics
+  history still pending.
 
 ## V2 — what's actually built
 
@@ -168,9 +169,13 @@ Maintainability & tooling:
 
 Current backlog status:
 
-- Auth: HTTP-only cookie sessions + CSRF (replacing the localStorage bearer
-  token). _(Login lockout/backoff is now in — escalating per-IP backoff on top
-  of the rate limit.)_
+- ~~Auth: HTTP-only cookie sessions + CSRF, login lockout/backoff.~~ **Done.**
+  Browser JWT exposure and query/bearer fallbacks are removed; mutations require
+  a session-bound CSRF header; Origin is checked; sensitive changes rotate sessions.
+  A persistent audited IP denylist (exact IP **and CIDR range**) is enforced
+  pre-auth through the admin API, and every response carries hardened headers
+  (locked-down CSP, HSTS in production, frame-deny, nosniff, Referrer/Permissions
+  policies).
 - ~~Per-build resource ceilings and a concurrent-build cap.~~ **Done.**
   `MAX_CONCURRENT_BUILDS` gates admission (default one), while
   `BUILD_CPU_LIMIT`, `BUILD_MEMORY_MB`, and `BUILD_TIMEOUT_SECONDS` bound each
@@ -208,18 +213,20 @@ Theme: once the Windows host validation is done, take everything that's wired
 into something you'd trust in production on one box. Mostly closing the backlog
 above, in priority order:
 
-- **Auth hardening:** cookie sessions + CSRF, login lockout/backoff. This is the
-  main security debt and should land first.
-- **Build safety:** enforce `BUILD_TIMEOUT_SECONDS`, cap concurrent builds, and
-  add per-build resource ceilings so a bad build can't wedge the host.
+- ~~**Auth hardening:** cookie sessions + CSRF, login lockout/backoff.~~ **Done.**
+  Also includes strict Origin checks, session rotation/revocation, no bearer/query
+  fallback, 15-character password minimums, safe proxy-trust defaults, exact-IP
+  and CIDR-range IP bans, and hardened response headers (CSP/HSTS/frame-deny/nosniff).
+- ~~**Build safety:** enforce build timeouts, concurrent-build admission, and
+  per-build resource ceilings.~~ **Done.**
 - **Per-system limits in the UI:** wire CPU/memory/PIDs/restart/log/health-path
   overrides to the existing limits mapping.
-- **Disk hygiene:** safe, scoped pruning of old images and release files
-  (never touching a rollback target), surfaced on the Server screen with the
-  existing disk warnings.
+- ~~**Disk hygiene:** safe pruning of old images/releases without touching rollback
+  targets, surfaced on Server.~~ **Done.**
 - **Settings out of `.env`:** DB-backed, editable settings where it's safe to.
-- **Observability:** longer metrics history, threshold alerts (disk, backup
-  overdue, health, resource pressure) routed through the existing notifications.
+- **Observability:** longer metrics history remains. ~~Threshold alerts for disk,
+  backup age, Docker, and Postgres transitions routed through notifications.~~ **Done.**
+  Health/resource-pressure alert coverage is still pending.
 - **Polish the gated features:** flip them on after host validation with the UX
   rough edges sanded — GitHub deploy status in the UI, notification formatting
   for Slack/Discord/email, large-upload progress.

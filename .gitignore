@@ -9,3 +9,10 @@ nginx/conf.d/*.conf
 
 # Generated UI screenshots (visual artifacts, not source)
 shots/
+
+# AI agent / assistant tooling — local only, not project source
+.agents/
+.claude/
+graphify-out/
+.mcp.json
+CLAUDE.md
