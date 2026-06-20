@@ -183,7 +183,7 @@ async function projectsRoutes(fastify, options) {
       basicUser = null; basicHash = null;
     }
 
-    let published = false;
+    let published;
     const errors = [];
     try {
       const r = await proxy.publishRoute({ slug, port: project.port, visibility, basicUser, basicHash, apex: !!project.is_primary });
@@ -215,7 +215,7 @@ async function projectsRoutes(fastify, options) {
     if (project.visibility === 'private') return reply.code(400).send({ error: 'Private systems have no public route to publish.' });
     if (project.status !== 'running') return reply.code(409).send({ error: 'The system must be running to publish a route.' });
 
-    let published = false;
+    let published;
     let reason;
     try {
       const r = await proxy.publishRoute({ slug, port: project.port, visibility: project.visibility, basicUser: project.basic_user, basicHash: project.basic_hash, apex: !!project.is_primary });
@@ -245,11 +245,15 @@ async function projectsRoutes(fastify, options) {
     const { slug } = request.params;
     const project = loadOr404(reply, slug);
     if (!project) return;
-    if (project.visibility === 'private') {
-      return reply.code(400).send({ error: 'Private systems have no public URL to check.' });
+    // Probe the published public URL when there is one; otherwise probe the
+    // container's host port (so a running private/unpublished/local system
+    // reports real health instead of a false "unreachable" against a domain
+    // that doesn't resolve here).
+    const target = health.targetFor(project);
+    if (!target) {
+      return reply.code(400).send({ error: 'Nothing to check — the system is not running and has no published route.' });
     }
-    const host = `${slug}.${process.env.BASE_DOMAIN || 'acronym.sk'}`;
-    const result = await health.checkSystem(host, '/');
+    const result = await health.checkSystem(target, '/');
     db.prepare(`UPDATE projects SET health_state = ?, health_status = ?, health_response_ms = ?, health_checked_at = ? WHERE slug = ?`)
       .run(result.state, result.httpStatus, result.responseMs, result.checkedAt, slug);
     auditLog({ user_id: request.user.id, action: result.state === 'healthy' ? 'health_ok' : 'health_fail', target: slug, detail: `${result.state} ${result.httpStatus ?? ''}`.trim(), ip: request.ip });

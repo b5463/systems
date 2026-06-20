@@ -9,6 +9,7 @@
     "dev": "node --watch src/index.js",
     "dev:local": "node --env-file=../.env --watch src/index.js",
     "test": "node --test",
+    "test:e2e": "node --test test/deploy.e2e.test.js",
     "test:coverage": "node --test --experimental-test-coverage --test-coverage-exclude=\"src/routes/**\" --test-coverage-exclude=\"src/services/**\" --test-coverage-exclude=\"src/db/**\" --test-coverage-exclude=\"src/index.js\" --test-coverage-exclude=\"src/app.js\" --test-coverage-lines=70 --test-coverage-functions=65 --test-coverage-branches=55",
     "lint": "eslint src test"
   },

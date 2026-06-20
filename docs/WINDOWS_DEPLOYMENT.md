@@ -43,12 +43,13 @@ Route files are named `C:\ProgramData\SYSTEMS\caddy\systems.d\{slug}.caddy`.
 If Windows Caddy struggles with absolute `import` globs, set the working
 directory to `C:\ProgramData\SYSTEMS\caddy` and use `import systems.d\*.caddy`.
 
-## 4. Postgres (preferably containerized)
-Postgres is the production database; SQLite is the current default. The
-`POSTGRES_*` wiring is already in place, so on the host you run Postgres and
-point SYSTEMS. at it via `POSTGRES_*` in `.env`. Run it as a Docker container in
-the stack with data on a named volume. Bind it to `127.0.0.1` only and never
-publish 5432 publicly.
+## 4. Postgres (optional, preferably containerized)
+The SYSTEMS. control-plane database currently remains SQLite. Run Postgres only
+when you need opt-in per-system database provisioning
+(`ENABLE_DB_PROVISIONING=true` and `POSTGRES_ADMIN_URL`) or want the Server page
+to report its reachability. Use a named volume, bind it to `127.0.0.1` only, and
+never publish port 5432 publicly. The control-plane Postgres/Prisma cutover is a
+separate future migration described in `POSTGRES_PRISMA_MIGRATION.md`.
 
 ## 5. Create the data layout
 `scripts\setup-windows.ps1` creates these (idempotent):
@@ -163,8 +164,8 @@ See also: [`SECURITY.md`](SECURITY.md), [`OPERATIONS.md`](OPERATIONS.md),
 ## Deploy flow (what the platform does)
 
 `upload → validate zip (zip-slip guarded, ≤ UPLOAD_MAX_MB) → detect type →
-build (Vue/Vite or static) → run hardened container → publish route per
-visibility → reload Caddy → (optional) health/HTTPS check → mark live`.
+build → run hardened container → publish route per visibility → reload Caddy →
+mark running → schedule a detached health/HTTPS check`.
 
 - **Slugs** are validated and reserved names are rejected (`www, api, admin,
   dashboard, server, system(s), auth, login, proxy, docker, caddy, …`).
@@ -177,8 +178,11 @@ visibility → reload Caddy → (optional) health/HTTPS check → mark live`.
 - **Delete vs Purge:** delete stops the container and removes the route but keeps
   history; purge removes the container, images, route, release files and all
   records, and requires typing the slug.
-- **Health check** runs a real HTTP(S) request and stores status and response
-  time; results are honest (`healthy / unhealthy / timeout / unreachable`).
+- **Health check** runs automatically after deploy/redeploy and can also be
+  triggered from System detail. It stores status and response time; results are
+  honest (`healthy / unhealthy / timeout / unreachable`). Published routes are
+  checked over their real public HTTP(S) URL. Systems without a route fall back
+  to their loopback host port. The current check path is `/`.
 - **Release retention** trims deploy history beyond `RELEASE_RETENTION_DEFAULT`.
 
 ### Caddy container networking
@@ -191,8 +195,8 @@ one part that needs the real host to confirm; it can't be exercised in a
 Docker-less CI/dev box.
 
 ### Postgres
-The internal store runs on SQLite today. Postgres is the production database and
-it's already wired: the `POSTGRES_*` settings and a `pg_dump`-based backup are in
-place, and the Server screen reports Postgres Connected only when `POSTGRES_HOST`
-is actually reachable. Cutting the internal store over to Postgres is a
-dedicated, tested migration step on the host. Take a backup first.
+The internal store runs on SQLite today. `POSTGRES_HOST` enables a reachability
+probe on the Server screen, while `POSTGRES_ADMIN_URL` is used only by optional
+per-system database provisioning. The PowerShell backup script can dump a
+configured Postgres service, but there is no implemented control-plane migration
+runner or Postgres-backed platform store yet.

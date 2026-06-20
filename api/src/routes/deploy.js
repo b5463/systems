@@ -7,6 +7,7 @@ const dockerService = require('../services/docker');
 const { extractZip, detectProjectType, generateDockerfile } = require('../services/zip');
 const proxy = require('../services/proxy');
 const notify = require('../services/notify');
+const health = require('../services/health');
 const { slugError } = require('../util/slug');
 const { pub } = require('../util/project');
 const { MAX_MULTIPART_BYTES } = require('../util/upload');
@@ -87,10 +88,12 @@ function finishBuild(slug, status) {
     for (const cb of listeners) cb(null, status);
     buildListeners.delete(slug);
   }
-  setTimeout(() => {
+  const cleanupTimer = setTimeout(() => {
     buildLogs.delete(slug);
     buildStatus.delete(slug);
   }, 5 * 60 * 1000);
+  // Build-log retention must not keep short-lived tools/tests alive.
+  cleanupTimer.unref?.();
 }
 
 // Per-stage failure context: a human-readable label and a concrete next step.
@@ -210,6 +213,27 @@ async function analyzeArchive(zipPath) {
   }
 }
 
+// After a deploy, probe real health (detached — never delays the "done" signal)
+// so the dashboard reflects the running app instead of a stale/false status.
+// Retries briefly while the container boots.
+function probeHealthSoon(slug) {
+  (async () => {
+    for (let i = 0; i < 4; i++) {
+      await new Promise((r) => setTimeout(r, i === 0 ? 800 : 2000));
+      const fresh = db.prepare('SELECT slug, port, route_published FROM projects WHERE slug = ?').get(slug);
+      if (!fresh) return;
+      const target = health.targetFor(fresh);
+      if (!target) return;
+      try {
+        const hr = await health.checkSystem(target, '/');
+        db.prepare('UPDATE projects SET health_state = ?, health_status = ?, health_response_ms = ?, health_checked_at = ? WHERE slug = ?')
+          .run(hr.state, hr.httpStatus, hr.responseMs, hr.checkedAt, slug);
+        if (hr.state === 'healthy') return;
+      } catch { /* keep trying */ }
+    }
+  })().catch(() => {});
+}
+
 async function runBuildPipeline(slug, zipPath, extractDir, port, userId, ip, envVars = {}) {
   let stage = 'extract';
   try {
@@ -284,6 +308,7 @@ async function runBuildPipeline(slug, zipPath, extractDir, port, userId, ip, env
     auditLog({ user_id: userId, action: 'deploy', target: slug, detail: `port:${port} ${visibility}`, ip });
     notify.send({ kind: 'deploy', slug, detail: 'deployed' }).catch(() => {});
     finishBuild(slug, 'done');
+    probeHealthSoon(slug);
   } catch (err) {
     failBuild({ slug, stage, err, userId, ip, tag: 'deploy' });
   } finally {
@@ -381,6 +406,7 @@ async function runRedeployPipeline(slug, zipPath, extractDir, userId, ip) {
     auditLog({ user_id: userId, action: 'redeploy', target: slug, ip });
     notify.send({ kind: 'redeploy', slug, detail: 'redeployed' }).catch(() => {});
     finishBuild(slug, 'done');
+    probeHealthSoon(slug);
   } catch (err) {
     failBuild({ slug, stage, err, userId, ip, tag: 'redeploy' });
   } finally {

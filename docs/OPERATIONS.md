@@ -25,6 +25,7 @@ Running, watching, and looking after SYSTEMS. day to day.
 | Two-factor / sign out other sessions | **Admin** (Two-factor, Session) |
 | Back up now | **Server → Back up now** |
 | Review activity | **Events** (filter by type / system / admin) |
+| Re-check system health | **System detail → Overview → Check health** (running, non-private systems) |
 
 ## Lifecycle states
 
@@ -51,6 +52,20 @@ On boot and every `RECONCILE_INTERVAL_SEC` (default 30; `0` disables), SYSTEMS.
 checks each system's stored status against the real Docker state and corrects
 it, so a crash or host reboot doesn't leave a stale "running" row. Corrections
 are recorded in the audit log as action `reconcile`.
+
+## Application health checks
+
+Successful deploys and redeploys schedule a background probe after the build is
+reported done, retrying briefly while the container starts. A published route is
+checked through its public URL; a system without a published route is checked
+through `http://127.0.0.1:<host-port>`. With `LOCAL_MODE=true`, the host port is
+always used even if a route is marked published. This makes local, unpublished, and private
+runtime health observable without creating a public route. The manual dashboard
+button is currently shown only for running, non-private systems.
+
+The probe currently requests `/`; per-system health-path configuration remains
+backlog. HTTP 2xx and 3xx are healthy, 4xx/5xx are unhealthy, and transport
+failures are recorded as timeout or unreachable.
 
 ## Backups (quick note)
 

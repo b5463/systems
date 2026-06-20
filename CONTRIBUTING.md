@@ -25,6 +25,7 @@ cd api
 npm run lint
 npm test
 npm run test:coverage     # enforces a coverage floor on src/util/*
+npm run test:e2e          # real deploy/redeploy/rollback; requires Docker
 
 # Dashboard
 cd dashboard

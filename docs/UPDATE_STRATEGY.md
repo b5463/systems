@@ -17,7 +17,8 @@ Back up first, update second, verify third, roll back if anything fails.
 3. **Pull/update code** — `git pull --ff-only`.
 4. **Install dependencies** — API (`npm install --production`) + dashboard (`npm install`).
 5. **Build** — `npm run build` (dashboard).
-6. **Run migrations** — the Postgres migration runner on the production store; SQLite migrations are idempotent on boot.
+6. **Run migrations** — currently a placeholder in the script; SQLite migrations
+   run idempotently on API boot. No Postgres control-plane runner exists yet.
 7. **Restart services** — `docker compose up -d --build`.
 8. **Reload Caddy** — `caddy reload` (service) or via container.
 9. **Verify:**

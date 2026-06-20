@@ -29,8 +29,8 @@ metrics, and one-click rollback, all from a single dashboard.
 </p>
 
 **Where it's at:** 2.0 release candidate. The code is all here and tested; what's
-left is proving the live pieces — Docker, Caddy, Postgres, HTTPS — on the real
-Windows host.
+left is proving the live pieces — Docker, Caddy, optional Postgres, HTTPS — on
+the real Windows host.
 
 ## What you get
 
@@ -112,10 +112,11 @@ DNS points the domains at the server; SYSTEMS. handles routing from there.
 | API | Node.js + Fastify |
 | Containers | Docker (isolated bridge network, per-container resource limits) |
 | Reverse proxy | Caddy (it generates the route files; local dev still uses nginx) |
-| Internal DB | SQLite by default; Postgres is supported, you just point it at one |
+| Internal DB | SQLite; optional Postgres provisions databases for deployed apps |
 | Auth | JWT bearer token, bcrypt password hashes, optional TOTP two-factor, sign-out-everywhere |
 
-The Caddy and Postgres code is all here — you connect it on the real server. See
+The Caddy integration and optional per-system Postgres provisioning are wired;
+the SYSTEMS. control-plane store itself remains SQLite. See
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and the
 [Windows checklist](docs/WINDOWS_VALIDATION_CHECKLIST.md).
 
@@ -140,7 +141,8 @@ SYSTEMS. is your control panel, not a service, so access is locked down:
   one stays behind its `.env` flag because the riskier ones pull or run external
   code, so you turn them on deliberately.
 - **Still needs a real server to confirm:** Node API/worker runtimes, Caddy
-  routing, Postgres, HTTPS — the parts only a live host can prove out. See
+  routing, optional per-app Postgres provisioning, and HTTPS — the parts only a
+  live host can prove out. See
   [`docs/V2_ROADMAP.md`](docs/V2_ROADMAP.md).
 
 ## Preparing a project to deploy
@@ -186,8 +188,13 @@ is fine — it's unwrapped for you):
 - **Secrets / env vars:** don't bake them into the image. Deploy first, then add
   them per system under **System detail → Settings** — they're stored encrypted
   and injected into the container (saving them recreates it).
-- **Health:** set the **health path** in Settings; your app should return a 2xx
-  there so the dashboard can show an honest healthy/unreachable state.
+- **Health:** SYSTEMS. probes `/` shortly after deploy/redeploy and stores the
+  observed state, HTTP status, response time, and check time. Published systems
+  are checked through their real public URL (including DNS, TLS, and the proxy);
+  private and unpublished systems fall back to `127.0.0.1:<host-port>`;
+  `LOCAL_MODE=true` forces that target even when a route is marked published.
+  A 2xx or 3xx response is healthy. Per-system health paths are not configurable
+  yet.
 - **After it's live:** it's served at `{slug}.<base>`; choose Public,
   password-protected, or Private (no public route) in Settings.
 
@@ -210,7 +217,7 @@ Full pipeline details and routing are in [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.
 ```bash
 # API (full functionality needs a Docker socket)
 cp .env.example .env            # set JWT_SECRET, ENV_SECRET, ADMIN_USERS
-cd api && npm install && npm run dev      # http://localhost:3000
+cd api && npm install && npm run dev:local # http://localhost:3000; reads ../.env
 
 # Dashboard
 cd dashboard && npm install && npm run dev   # proxies /api to :3000
@@ -219,7 +226,8 @@ cd dashboard && npm install && npm run dev   # proxies /api to :3000
 Run the tests:
 
 ```bash
-cd api && npm test               # unit + route/integration tests (app.inject)
+cd api && npm test               # unit + route/integration tests (Docker E2E skipped)
+cd api && npm run test:e2e       # real zip → container → HTTP → redeploy → rollback; requires Docker
 ```
 
 ## Configuration
@@ -236,6 +244,8 @@ you actually need to run:
 | `CORS_ORIGIN` | Locked to the dashboard origin. |
 | `REVERSE_PROXY` | `caddy` (production) or `nginx` (dev default). |
 | `RECONCILE_INTERVAL_SEC` | How often status is reconciled against Docker (0 disables). |
+| `PUBLIC_SCHEME` | Scheme used for public health probes (`https` by default). |
+| `LOCAL_MODE` | Probe system host ports directly; use with the local Vite/API setup. |
 
 Riskier capabilities are **off by default** and opt-in per flag:
 
@@ -281,10 +291,16 @@ with PowerShell scripts in [`scripts/`](scripts) (`setup`, `deploy`, `backup`,
 `verify-hardening`). Data lives under `C:\ProgramData\SYSTEMS`. Linux is the
 development path.
 
-The pieces that only a live box can prove — Docker, Caddy, Postgres, HTTPS, DNS —
+The pieces that only a live box can prove — Docker, Caddy, optional Postgres,
+HTTPS, DNS —
 say "requires host validation" in the UI and docs until you've run them on the
 actual machine. The [Windows checklist](docs/WINDOWS_VALIDATION_CHECKLIST.md) is
 the punch list.
+
+The root [`docker-compose.yml`](docker-compose.yml) is the older Linux/dev nginx
+stack. It does not represent the Windows + Caddy production topology and only
+passes the small environment subset declared in that file. Use the Windows
+scripts and guide for the production path.
 
 ## Security
 
@@ -308,11 +324,13 @@ off by default behind `.env` flags until you validate them on the host.
 with Docker Desktop / WSL2) and a wildcard DNS record.
 
 **Is it production-ready?** It's a 2.0 release candidate: the code is here and
-tested, and the live pieces (Caddy, Postgres, HTTPS) are wired pending validation
-on a real host — see the [Windows checklist](docs/WINDOWS_VALIDATION_CHECKLIST.md).
+tested, and the live pieces (Caddy, optional per-app Postgres, HTTPS) remain
+pending validation on a real host — see the
+[Windows checklist](docs/WINDOWS_VALIDATION_CHECKLIST.md).
 
-**Linux?** Linux is the dev path (nginx + SQLite); Windows + Caddy + Postgres is
-the production target.
+**Linux?** Linux is the dev path (nginx + SQLite); Windows + Caddy is the
+production target. The control-plane store remains SQLite; Postgres is optional
+for databases provisioned to deployed apps.
 
 ## Documentation
 

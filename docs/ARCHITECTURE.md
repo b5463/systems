@@ -27,7 +27,7 @@ system runs in. Here's how they fit together.
                             └──────────┬──────────────────┘
                                        │
                             ┌──────────▼──────────┐
-                            │ Internal DB          │  Postgres (prod) / SQLite (dev)
+                            │ Internal DB          │  SQLite (current control-plane store)
                             └─────────────────────┘
 ```
 
@@ -41,8 +41,10 @@ system runs in. Here's how they fit together.
   `{slug}.*`/path routes to each system's container.
 - **Deployed systems** — one container per system on an isolated bridge network
   (`enable_icc=false`), with dropped capabilities and `no-new-privileges`.
-- **Internal DB** — platform state (admins, systems, deployments, events, env
-  metadata, route records, metrics snapshots).
+- **Internal DB** — SQLite stores platform state (admins, systems, deployments,
+  events, env metadata, route records, metrics snapshots). Optional Postgres
+  support provisions databases for deployed apps; it does not replace this
+  control-plane store.
 
 ## 2. Internal data model
 
@@ -113,6 +115,14 @@ Deploys are serialized by an in-process lock (`withDeployLock`), so two builds
 never race over ports or routes; a failed build cleans up its temp dir and
 image rather than leaving a half-state.
 
+After a successful deploy or redeploy, the API schedules a detached health
+probe (four short boot-window attempts). A published route is probed through
+`PUBLIC_SCHEME://<slug>.<BASE_DOMAIN>`, exercising DNS, TLS, and the proxy. When
+there is no published route but a host port exists—private or unpublished
+systems—the probe uses `http://127.0.0.1:<port>`. `LOCAL_MODE=true` forces the
+host-port target even when a route is marked published. Results are persisted
+without delaying the build-log `done` event. The current health path is `/`.
+
 ## 5. Background services & operations
 
 Beyond request handling, the API runs a few in-process jobs, started in
@@ -137,13 +147,14 @@ their flags, since both pull or run external code. See
 [`OPERATIONS.md`](OPERATIONS.md), [`GITHUB_DEPLOYS.md`](GITHUB_DEPLOYS.md),
 [`DATABASES.md`](DATABASES.md), and [`NOTIFICATIONS.md`](NOTIFICATIONS.md).
 
-## 6. SQLite + nginx vs Postgres + Caddy
+## 6. SQLite, nginx, Caddy, and optional Postgres
 
-SQLite and nginx are the current dev defaults; Postgres and Caddy are the
-production targets, both wired and pending host validation. Each was built as its
-own reviewable cutover rather than swapped in alongside everything else. The
-Server screen reports whichever components are actually in use, and never claims
-Caddy or Postgres are live when they aren't.
+SQLite is the current control-plane database in every environment. Nginx is the
+legacy Linux/dev proxy path; Caddy is the Windows production target and remains
+pending host validation. Postgres connectivity is used for optional per-system
+database provisioning and reachability reporting. A control-plane migration to
+Postgres is only a plan (`POSTGRES_PRISMA_MIGRATION.md`), not current wiring. The
+Server screen reports only components it can actually observe.
 
 Still not done: migrating auth from a localStorage JWT to HTTP-only cookie
 sessions + CSRF (see [`SECURITY.md`](SECURITY.md)).

@@ -37,6 +37,10 @@ generated Caddy route (dry-run, via `POST /api/deploy/plan`) before you upload.
 - [ ] Check `https://{slug}.acronym.sk` (deployed system)
 - [ ] Check HTTPS certificate issued
 - [ ] Run a health check from the system's detail page
+- [ ] Deploy/redeploy and confirm health is populated automatically after the
+      container boot window (without delaying the build completion signal)
+- [ ] Make a system private and confirm an API health check uses its local host
+      port without publishing a route (the current UI hides the manual button)
 - [ ] Test visibility: public / private (no route) / password (basic auth)
 - [ ] Set a system **primary** (Settings → Root domain); confirm `https://acronym.sk`
       serves it and `systems.acronym.sk` still loads the dashboard (needs the root

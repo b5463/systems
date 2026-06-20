@@ -6,6 +6,7 @@ const path = require('path');
 const { db, auditLog } = require('../db');
 const dockerService = require('./docker');
 const notify = require('./notify');
+const health = require('./health');
 const { reconcileStatus } = require('../util/reconcile');
 const { evaluateAlerts, alertDelta } = require('../util/alerts');
 
@@ -119,6 +120,33 @@ async function reconcileOnce() {
         }
       }
 
+      // Local development has no DNS/TLS route. Refresh persisted health from
+      // each running system's host port so old public-probe failures self-correct
+      // on boot and during the normal reconciliation cycle.
+      if (health.isLocalMode()) {
+        const runningProjects = db.prepare(
+          `SELECT slug, port, route_published, health_state
+           FROM projects WHERE status = 'running' AND port IS NOT NULL`
+        ).all();
+        await Promise.all(runningProjects.map(async (project) => {
+          const target = health.targetFor(project);
+          if (!target) return;
+          const observed = await health.checkSystem(target, '/');
+          db.prepare(
+            `UPDATE projects
+             SET health_state = ?, health_status = ?, health_response_ms = ?, health_checked_at = ?
+             WHERE slug = ?`
+          ).run(observed.state, observed.httpStatus, observed.responseMs, observed.checkedAt, project.slug);
+          if (observed.state !== project.health_state) {
+            auditLog({
+              action: observed.state === 'healthy' ? 'health_ok' : 'health_fail',
+              target: project.slug,
+              detail: `${observed.state} ${observed.httpStatus ?? ''}`.trim(),
+            });
+          }
+        }));
+      }
+
       // Recover interrupted builds: a row stuck in 'building' past ~3x the build
       // timeout can't finish (the in-process build died with a restart), and
       // reconcileStatus deliberately skips 'building' — so handle it explicitly.
@@ -160,7 +188,8 @@ async function reconcileOnce() {
 }
 
 function start() {
-  const sec = Number(process.env.RECONCILE_INTERVAL_SEC) || 30;
+  const configured = Number(process.env.RECONCILE_INTERVAL_SEC);
+  const sec = Number.isFinite(configured) ? configured : 30;
   if (sec <= 0) return; // explicitly disabled
   reconcileOnce().catch(() => {});
   timer = setInterval(() => { reconcileOnce().catch(() => {}); }, sec * 1000);

@@ -6,7 +6,8 @@ the dangerous backend and server changes isolated rather than bundled in.
 
 **Where it's at:** 2.0 release candidate (`2.0.0-rc.1`). The "V2 features" below
 are built and wired, just off by default behind their `.env` flags. Caddy and
-Postgres are wired too, pending validation on the real Windows host. Since the
+optional per-system Postgres provisioning are wired pending validation on the
+real Windows host; the control-plane database remains SQLite. Since the
 feature work landed there's also been a hardening, UX, and maintainability pass
 (see "2.0-rc — hardening, UX & maintainability" below).
 
@@ -49,14 +50,16 @@ deleted section).
 
 Other pieces from this stage:
 
-- Postgres internal DB plus the SQLite-to-Postgres migration script.
+- SQLite control-plane DB; a Postgres/Prisma cutover is documented as a
+  migration plan, not implemented.
 - Caddy reverse proxy: `Caddyfile` plus generated `systems.d/` route files;
   automatic HTTPS; certbot removed.
 - Schema: `visibility` (public / password / private), `deploy_type`, an explicit
   `routes` table, persisted editable settings.
 - Visibility modes: public route, password-protected (basic auth where safe),
   private (no public route).
-- Auth hardening: HTTP-only cookie sessions plus CSRF, login lockout.
+- Auth remains JWT bearer-token based; login lockout/backoff is implemented,
+  while HTTP-only cookie sessions plus CSRF remain backlog.
 - Build timeouts and resource-limit enforcement; the delete-vs-purge split.
 - Windows-first server deployment guide and `.env`.
 
@@ -64,8 +67,8 @@ Still needs the Windows host to confirm (can't be exercised without Docker):
 
 - Container naming `systems-{slug}` on a shared Caddy network (ICC) so Caddy
   reaches apps by name; the Caddy and Postgres compose/service wiring.
-- The SQLite-to-Postgres internal-store cutover (schema is Postgres-ready; do it
-  as a dedicated, backed-up migration).
+- The SQLite-to-Postgres internal-store cutover (currently a design plan only;
+  implement and test a runner as a dedicated, backed-up migration).
 - Live Caddy reload/validate plus end-to-end HTTPS issuance.
 
 ## V1.5 — More runtimes (built, host-validation pending)

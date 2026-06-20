@@ -5,10 +5,13 @@ notes call out where the production Caddy proxy differs from the dev nginx setup
 
 ## Supported sources
 
-- Vue/Vite source zip (built to static, served from a static container)
-- Static-site zip
-- Node API and custom Dockerfile are detected too, but stay behind their `.env`
-  flags until you enable them
+- Vue/Vite source and other Node project zips
+- Python project zips (`requirements.txt` or `pyproject.toml`)
+- Static-site zips
+- Custom Dockerfiles, gated by `ENABLE_DOCKERFILE_MODE`
+
+Node and Python generation paths are active in code but still require end-to-end
+validation on the target Docker host.
 
 The build type is **auto-detected** from the archive contents:
 
@@ -28,10 +31,11 @@ upload (multipart, size-capped)
   → generate Dockerfile (unless one is present)
   → docker build     (streamed to the build log over WebSocket)
   → run container    (hardened: CapDrop ALL, no-new-privileges, mem/CPU caps,
-                      isolated bridge network, restart on-failure)
+                      isolated bridge network, configurable restart policy)
   → assign free host port (4000–5000 range)
   → write route file + reload reverse proxy
   → mark running → live
+  → schedule health probe (public URL, or loopback host port without a route)
 ```
 
 ### Redeploy & rollback

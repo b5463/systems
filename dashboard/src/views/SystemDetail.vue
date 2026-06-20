@@ -98,7 +98,7 @@ const canRestart = computed(() => (isRunning.value || (system.value?.status === 
 const canRedeploy = computed(() => !!system.value && !isBuilding.value && !redeploying.value)
 const canRollback = computed(() => !!system.value?.previous_image_id && !isBuilding.value && !rollingBack.value)
 // Health probes the public endpoint — only meaningful for a running, non-private system.
-const canHealthCheck = computed(() => isRunning.value && (system.value?.visibility !== 'private') && !checkingHealth.value)
+const canHealthCheck = computed(() => isRunning.value && (LOCAL_MODE || system.value?.visibility !== 'private') && !checkingHealth.value)
 // Open only when there's a usable endpoint: a published route, or local testing (host port).
 const canOpen = computed(() => isRunning.value && (!!system.value?.route_published || LOCAL_MODE))
 // What the Open control actually opens — be explicit so it's never ambiguous.
@@ -160,7 +160,7 @@ const truth = computed(() => {
   return [
     { key: 'Container', tone: containerTone, val: containerLabel },
     { key: 'Route', tone: routePublished ? 'ok' : (vis === 'private' ? 'idle' : 'warn'), val: routePublished ? 'Published' : (vis === 'private' ? 'None (private)' : 'Not published') },
-    { key: 'HTTPS', tone: hs ? (health.tone === 'error' ? 'error' : 'ok') : 'idle', val: vis === 'private' ? '—' : (hs ? (health.tone === 'error' ? 'Failed' : 'Valid') : 'Not measured yet') },
+    { key: 'HTTPS', tone: LOCAL_MODE || vis === 'private' ? 'idle' : (hs ? (health.tone === 'error' ? 'error' : 'ok') : 'idle'), val: LOCAL_MODE ? 'Not applicable (local)' : (vis === 'private' ? '—' : (hs ? (health.tone === 'error' ? 'Failed' : 'Valid') : 'Not measured yet')) },
     { key: 'Health', tone: health.tone, val: health.val },
     { key: 'Visibility', tone: 'idle', val: vis.charAt(0).toUpperCase() + vis.slice(1) },
     { key: 'Runtime', tone: 'idle', val: runtimeLabel.value }
