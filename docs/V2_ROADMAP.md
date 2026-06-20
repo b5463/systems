@@ -166,13 +166,15 @@ Maintainability & tooling:
 
 ## Not built yet (the honest backlog)
 
-None of this is wired today:
+Current backlog status:
 
 - Auth: HTTP-only cookie sessions + CSRF (replacing the localStorage bearer
   token). _(Login lockout/backoff is now in — escalating per-IP backoff on top
   of the rate limit.)_
-- Per-build resource ceilings and a concurrent-build cap. _(Build-timeout
-  enforcement via `BUILD_TIMEOUT_SECONDS` is now in; deploys are serialized.)_
+- ~~Per-build resource ceilings and a concurrent-build cap.~~ **Done.**
+  `MAX_CONCURRENT_BUILDS` gates admission (default one), while
+  `BUILD_CPU_LIMIT`, `BUILD_MEMORY_MB`, and `BUILD_TIMEOUT_SECONDS` bound each
+  Docker build.
 - Per-system resource overrides in the UI — `util/limits.js` already accepts
   them; the store and UI don't exist yet.
 - ~~Automated disk cleanup~~ — **Done.** `POST /api/server/cleanup` removes
@@ -189,18 +191,16 @@ None of this is wired today:
 Low-impact niceties, consciously deferred — worth doing but not worth churning
 working code for right now:
 
-- Drive the Ship deploy-lifecycle rail from real build phases (parse the build
-  log) instead of the current decorative sweep — or visually mark it as a
-  reference legend so it never reads as live progress.
-- Per-cell tooltips / a small legend on the Overview "truth grid" (what
-  "Auto-detected", "Not measured yet", "None (private)" mean).
-- Co-locate Purge next to Delete (Purge currently lives only in Settings, one
-  level deeper than Delete) and note in the Delete dialog that the system stays
-  recoverable until purged.
-- First-run framing on the login screen (where the initial admin comes from),
-  for the genuine first boot.
-- A "what to do next" line paired with the Failed/Crashed states on the Systems
-  cards (the detail-page callout already does this).
+- ~~Clarify the Ship deploy-lifecycle rail~~ — **Done.** It is explicitly labeled
+  as a pipeline reference and directs operators to the build log for live state.
+- ~~Per-cell tooltips / a small legend on the Overview truth grid.~~
+  **Done.** Every cell explains its source and neutral/not-applicable states.
+- ~~Co-locate Purge next to Delete~~ — **Done.** Both appear in the Overview and
+  Settings danger areas, with the recoverable-delete/permanent-purge distinction.
+- ~~First-run framing on the login screen~~ — **Done.** The login explains that
+  the initial administrator comes from `ADMIN_USERS` and that signup is closed.
+- ~~Pair Failed/Crashed cards with a next action~~ — **Done.** Attention cards
+  direct the operator to logs and the appropriate restart, redeploy, or rollback.
 
 ## v2.5 — Finish and harden the single host
 

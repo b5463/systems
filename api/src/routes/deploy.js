@@ -13,11 +13,13 @@ const { pub } = require('../util/project');
 const { MAX_MULTIPART_BYTES } = require('../util/upload');
 const { tmpZip, tmpDir } = require('../util/tmp');
 const { features } = require('../util/flags');
+const { BuildGate } = require('../util/build');
 
 // In-memory build log buffers keyed by slug
 const buildLogs = new Map();
 const buildStatus = new Map();
 const buildListeners = new Map();
+const buildGate = new BuildGate();
 
 const RELEASE_RETENTION = () => Number(process.env.RELEASE_RETENTION_DEFAULT) || 3;
 
@@ -315,6 +317,7 @@ async function runBuildPipeline(slug, zipPath, extractDir, port, userId, ip, env
   } catch (err) {
     failBuild({ slug, stage, err, userId, ip, tag: 'deploy' });
   } finally {
+    buildGate.release(slug);
     try {
       await fsp.rm(zipPath, { force: true });
       await fsp.rm(extractDir, { recursive: true, force: true });
@@ -413,6 +416,7 @@ async function runRedeployPipeline(slug, zipPath, extractDir, userId, ip) {
   } catch (err) {
     failBuild({ slug, stage, err, userId, ip, tag: 'redeploy' });
   } finally {
+    buildGate.release(slug);
     try {
       await fsp.rm(zipPath, { force: true });
       await fsp.rm(extractDir, { recursive: true, force: true });
@@ -434,14 +438,15 @@ async function beginDeploy({ name, slug, visibility = 'public', zipPath, userId,
 
   const existing = db.prepare('SELECT id FROM projects WHERE slug = ? OR name = ?').get(slug, name);
   if (existing) return { ok: false, code: 409, error: 'A project with this name or slug already exists' };
+  if (!buildGate.tryAcquire(slug)) {
+    return { ok: false, code: 429, error: 'Build capacity is full. Wait for the active build to finish and try again.' };
+  }
 
-  // Serialize port allocation + INSERT: findFreePort awaits Docker, so two
-  // concurrent deploys could otherwise pick the same port before either row
-  // commits. The lock makes the chosen port visible to the next call's scan.
-  // findFreePort reaches the Docker daemon — if it's unreachable, fail with a
-  // clear 503 (not a generic 500) and create no project row.
-  let port, project, conflict;
+  let handedOff = false;
   try {
+    // Serialize port allocation + INSERT so concurrent deploys cannot claim the
+    // same host port. Build concurrency is controlled separately by buildGate.
+    let port, project, conflict;
     await withDeployLock(async () => {
       if (db.prepare('SELECT id FROM projects WHERE slug = ? OR name = ?').get(slug, name)) { conflict = true; return; }
       const dbPorts = db.prepare('SELECT port FROM projects WHERE port IS NOT NULL').all();
@@ -450,7 +455,6 @@ async function beginDeploy({ name, slug, visibility = 'public', zipPath, userId,
       db.prepare(`INSERT INTO projects (name, slug, port, status, visibility) VALUES (?, ?, ?, 'building', ?)`).run(name, slug, port, visibility);
       project = db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug);
 
-      // Persist encrypted env vars at deploy time if any were provided and ENV_SECRET is set
       if (Object.keys(envVars).length > 0 && process.env.ENV_SECRET) {
         try {
           const { encryptEnvVars } = require('./env');
@@ -461,24 +465,26 @@ async function beginDeploy({ name, slug, visibility = 'public', zipPath, userId,
         }
       }
     });
+    if (conflict) return { ok: false, code: 409, error: 'A project with this name or slug already exists' };
+
+    buildLogs.set(slug, []);
+    buildStatus.set(slug, 'building');
+    const extractDir = tmpDir();
+    setImmediate(() => {
+      runBuildPipeline(slug, zipPath, extractDir, port, userId, ip, envVars).catch((err) => {
+        console.error('[deploy] Unhandled pipeline error:', err);
+      });
+    });
+    handedOff = true;
+    return { ok: true, project: pub(project) };
   } catch (err) {
     if (dockerService.isDockerUnavailableError(err)) {
       return { ok: false, code: 503, error: 'Docker is not reachable. Start Docker and try again.' };
     }
     throw err;
+  } finally {
+    if (!handedOff) buildGate.release(slug);
   }
-  if (conflict) return { ok: false, code: 409, error: 'A project with this name or slug already exists' };
-
-  buildLogs.set(slug, []);
-  buildStatus.set(slug, 'building');
-
-  const extractDir = tmpDir();
-  setImmediate(() => {
-    runBuildPipeline(slug, zipPath, extractDir, port, userId, ip, envVars).catch((err) => {
-      console.error('[deploy] Unhandled pipeline error:', err);
-    });
-  });
-  return { ok: true, project: pub(project) };
 }
 
 // Kick a redeploy of an existing system from an already-saved zip. Shared by
@@ -488,20 +494,31 @@ async function beginRedeploy({ slug, zipPath, userId, ip }) {
   if (!project) return { ok: false, code: 404, error: 'Project not found' };
   if (project.status === 'building') return { ok: false, code: 409, error: 'Build already in progress' };
   if (!zipPath) return { ok: false, code: 400, error: 'Missing file upload' };
+  if (!buildGate.tryAcquire(slug)) {
+    return { ok: false, code: 429, error: 'Build capacity is full. Wait for the active build to finish and try again.' };
+  }
 
-  db.prepare(`UPDATE projects SET status = 'building', updated_at = datetime('now') WHERE slug = ?`).run(slug);
-  buildLogs.set(slug, []);
-  buildStatus.set(slug, 'building');
+  let handedOff = false;
+  try {
+    db.prepare(`UPDATE projects SET status = 'building', updated_at = datetime('now') WHERE slug = ?`).run(slug);
+    buildLogs.set(slug, []);
+    buildStatus.set(slug, 'building');
 
-  const extractDir = tmpDir();
-  setImmediate(() => {
-    runRedeployPipeline(slug, zipPath, extractDir, userId, ip).catch((err) => {
-      console.error('[redeploy] Unhandled pipeline error:', err);
+    const extractDir = tmpDir();
+    setImmediate(() => {
+      runRedeployPipeline(slug, zipPath, extractDir, userId, ip).catch((err) => {
+        console.error('[redeploy] Unhandled pipeline error:', err);
+      });
     });
-  });
-  return { ok: true, slug };
+    handedOff = true;
+    return { ok: true, slug };
+  } catch (err) {
+    db.prepare("UPDATE projects SET status = ?, updated_at = datetime('now') WHERE slug = ?").run(project.status, slug);
+    throw err;
+  } finally {
+    if (!handedOff) buildGate.release(slug);
+  }
 }
-
 async function deployRoutes(fastify, options) {
   // Dry-run plan: validate the slug and show exactly what WOULD happen —
   // planned container name, public host, generated Caddy route file and the

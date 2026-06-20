@@ -73,6 +73,9 @@ upload (multipart, size-capped)
 | Max upload | 100 MB (hard cap 500 MB in transport) | `UPLOAD_MAX_MB` |
 | Large (chunked) upload cap | 2048 MB, off unless enabled | `ENABLE_LARGE_UPLOADS` / `V2_UPLOAD_MAX_MB` |
 | Build timeout | 600s, **enforced** — the build is torn down if it exceeds this | `BUILD_TIMEOUT_SECONDS` |
+| Concurrent builds | 1 | `MAX_CONCURRENT_BUILDS` |
+| Per-build CPU | 1 CPU | `BUILD_CPU_LIMIT` |
+| Per-build memory | 1024 MB (swap disabled above the same ceiling) | `BUILD_MEMORY_MB` |
 | Release retention | 3 (automatic pruning not implemented yet) | `RELEASE_RETENTION_DEFAULT` |
 
 ## Beyond the defaults

@@ -20,6 +20,7 @@ const ISOLATED_NETWORK = 'acronym-isolated';
 
 // Per-deployed-container resource limits (pure; unit-tested in util/limits).
 const { containerLimits } = require('../util/limits');
+const { buildLimits } = require('../util/build');
 
 function isDockerUnavailableError(err) {
   return ['ENOENT', 'ECONNREFUSED', 'EACCES'].includes(err && err.code);
@@ -75,7 +76,7 @@ async function buildImage(projectSlug, buildContextPath, onProgress) {
 
     docker.buildImage(
       { context: buildContextPath, src: fs.readdirSync(buildContextPath) },
-      { t: tag, rm: true, forcerm: true },
+      { t: tag, rm: true, forcerm: true, ...buildLimits() },
       (err, stream) => {
         if (err) return finish(reject, err);
 

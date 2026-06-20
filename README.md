@@ -110,7 +110,7 @@ DNS points the domains at the server; SYSTEMS. handles routing from there.
 | --- | --- |
 | Frontend | Vue 3 + Vite (PWA) |
 | API | Node.js + Fastify |
-| Containers | Docker (isolated bridge network, per-container resource limits) |
+| Containers | Docker (isolated network; bounded build concurrency/resources and per-container limits) |
 | Reverse proxy | Caddy (it generates the route files; local dev still uses nginx) |
 | Internal DB | SQLite; optional Postgres provisions databases for deployed apps |
 | Auth | JWT bearer token, bcrypt password hashes, optional TOTP two-factor, sign-out-everywhere |

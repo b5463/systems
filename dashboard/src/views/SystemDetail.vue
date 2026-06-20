@@ -163,13 +163,13 @@ const truth = computed(() => {
       : { tone: 'idle', val: LOCAL_MODE || vis === 'private' ? 'Not applicable' : 'Not measured yet' }
 
   return [
-    { key: 'Container', tone: containerTone, val: containerLabel },
-    { key: 'Route', tone: routePublished ? 'ok' : (vis === 'private' ? 'idle' : 'warn'), val: routePublished ? 'Published' : (vis === 'private' ? 'None (private)' : 'Not published') },
-    { key: 'Route proof', tone: routeProof.tone, val: routeProof.val },
-    { key: 'HTTPS', tone: LOCAL_MODE || vis === 'private' ? 'idle' : (hs ? (health.tone === 'error' ? 'error' : 'ok') : 'idle'), val: LOCAL_MODE ? 'Not applicable (local)' : (vis === 'private' ? '—' : (hs ? (health.tone === 'error' ? 'Failed' : 'Valid') : 'Not measured yet')) },
-    { key: 'Health', tone: health.tone, val: health.val },
-    { key: 'Visibility', tone: 'idle', val: vis.charAt(0).toUpperCase() + vis.slice(1) },
-    { key: 'Runtime', tone: 'idle', val: runtimeLabel.value }
+    { key: 'Container', tone: containerTone, val: containerLabel, help: 'Observed Docker container state.' },
+    { key: 'Route', tone: routePublished ? 'ok' : (vis === 'private' ? 'idle' : 'warn'), val: routePublished ? 'Published' : (vis === 'private' ? 'None (private)' : 'Not published'), help: 'Whether SYSTEMS. has published a reverse-proxy route. Private systems intentionally have none.' },
+    { key: 'Route proof', tone: routeProof.tone, val: routeProof.val, help: 'Authenticated end-to-end proof that the public route reaches this deployment.' },
+    { key: 'HTTPS', tone: LOCAL_MODE || vis === 'private' ? 'idle' : (hs ? (health.tone === 'error' ? 'error' : 'ok') : 'idle'), val: LOCAL_MODE ? 'Not applicable (local)' : (vis === 'private' ? '—' : (hs ? (health.tone === 'error' ? 'Failed' : 'Valid') : 'Not measured yet')), help: 'TLS result for the public endpoint. Local mode and private systems do not use public HTTPS.' },
+    { key: 'Health', tone: health.tone, val: health.val, help: 'Latest HTTP probe result. Not measured yet means no probe result has been recorded.' },
+    { key: 'Visibility', tone: 'idle', val: vis.charAt(0).toUpperCase() + vis.slice(1), help: 'Public systems have a route; private systems are host-port only.' },
+    { key: 'Runtime', tone: 'idle', val: runtimeLabel.value, help: 'Runtime detected from the uploaded archive during deployment. Auto-detected means no deployment has completed yet.' }
   ]
 })
 
@@ -470,11 +470,19 @@ onBeforeUnmount(() => {
       <div>
         <div class="section-label">Status</div>
         <div class="truth">
-          <div v-for="cell in truth" :key="cell.key" class="t-cell">
-            <div class="t-key">{{ cell.key }}</div>
+          <div
+            v-for="cell in truth"
+            :key="cell.key"
+            class="t-cell"
+            tabindex="0"
+            :title="cell.help"
+            :aria-label="`${cell.key}: ${cell.val}. ${cell.help}`"
+          >
+            <div class="t-key">{{ cell.key }} <span class="truth-help" aria-hidden="true">?</span></div>
             <div class="t-val"><span class="sdot" :class="cell.tone"></span>{{ cell.val }}</div>
           </div>
         </div>
+        <div class="truth-legend">Hover or focus a status cell for its meaning. Grey states are neutral or not applicable, not failures.</div>
       </div>
 
       <!-- Actions -->
@@ -518,8 +526,9 @@ onBeforeUnmount(() => {
           <div class="ag-label">Danger</div>
           <div class="btn-row">
             <button class="btn btn-danger" @click="openDelete">Delete system</button>
+            <button class="btn btn-danger" @click="openPurge">Purge…</button>
           </div>
-          <div class="hint">Deleting stops and removes the container and route. The deployment record is kept until you purge it.</div>
+          <div class="hint">Delete is recoverable: it removes the container and route but keeps the record. Purge permanently removes the system and its retained data.</div>
         </div>
       </div>
 

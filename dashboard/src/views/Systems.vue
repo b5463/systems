@@ -247,6 +247,11 @@ onBeforeUnmount(() => clearInterval(timer))
             <StatusBadge :project="s" />
           </div>
           <div v-if="s.last_error" class="attention-error mono small">{{ s.last_error }}</div>
+          <div class="attention-next small">
+            {{ s.status === 'error'
+              ? (isCrashed(s) ? 'Next: review runtime logs, then restart or roll back.' : 'Next: review the build log, correct the archive or configuration, then redeploy.')
+              : 'Next: open the system and start it when you are ready.' }}
+          </div>
           <div class="row gap-sm flex-wrap">
             <RouterLink class="btn btn-sm" :to="detailLink(s)">View failure</RouterLink>
             <RouterLink v-if="s.container_id" class="btn btn-sm btn-ghost" :to="detailLink(s, 'Logs')">View logs</RouterLink>
@@ -418,6 +423,7 @@ onBeforeUnmount(() => clearInterval(timer))
   margin-bottom: 20px;
 }
 .attention-card { display: flex; flex-direction: column; gap: 12px; }
+.attention-next { color: var(--text-muted); line-height: 1.45; }
 .attention-error {
   padding: 8px 10px;
   background: var(--bg-input);

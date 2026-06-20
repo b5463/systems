@@ -76,6 +76,10 @@ async function submit() {
           </div>
 
           <div class="login-card-body">
+            <div class="first-run-note">
+              <strong>First time here?</strong>
+              <span>Your initial administrator is configured in <code>ADMIN_USERS</code>. SYSTEMS. has no public signup.</span>
+            </div>
             <div class="login-fieldset">
               <label class="login-field" for="u">
                 <span>Username</span>
@@ -275,6 +279,22 @@ async function submit() {
   width: 100%;
   max-width: 560px;
 }
+
+.first-run-note {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 18px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.025);
+  color: #aeb4bf;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.first-run-note strong { color: #e5e7eb; }
+.first-run-note code { color: #d7dae0; }
 
 .login-fieldset {
   display: flex;

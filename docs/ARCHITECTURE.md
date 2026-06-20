@@ -111,9 +111,11 @@ flowchart LR
   R -. redeploy .-> P[Snapshot previous image<br/>for one-click rollback]
 ```
 
-Deploys are serialized by an in-process lock (`withDeployLock`), so two builds
-never race over ports or routes; a failed build cleans up its temp dir and
-image rather than leaving a half-state.
+Port allocation and project insertion are serialized by an in-process lock
+(`withDeployLock`), so deploys cannot claim the same port. Build admission is
+separately bounded by `MAX_CONCURRENT_BUILDS` (default one), and each Docker
+build has CPU, memory, and time ceilings. A failed build cleans up its temp dir
+rather than leaving a half-state.
 
 After a successful deploy or redeploy, the API schedules a detached health
 probe (four short boot-window attempts). A published route is probed through

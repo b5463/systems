@@ -31,7 +31,7 @@ The "not yet" column is the genuinely unbuilt work, not a release timeline.
 | Docker socket | Internal to API container only | — |
 | Docker/Caddy admin API | Never public; Caddy admin bound to localhost | — |
 | Postgres | Wired; not publicly exposed (SQLite is the local dev file) | — |
-| Uploaded code | Treated as untrusted; zip-slip prevented; entry/size caps; **build timeout** (`BUILD_TIMEOUT_SECONDS`, default 600s) | per-build resource ceilings, concurrent-build cap |
+| Uploaded code | Treated as untrusted; zip-slip prevented; entry/size caps; build concurrency, CPU, memory, and time ceilings | isolate builds from the Docker daemon |
 | Container hardening | `CapDrop ALL`, `no-new-privileges`, mem/CPU caps, ICC off | — |
 | Custom Dockerfile | Built, admin-only, off behind `ENABLE_DOCKERFILE_MODE` | — |
 
@@ -62,8 +62,6 @@ The "not yet" column is the genuinely unbuilt work, not a release timeline.
 
 - Cookie-based sessions (HTTP-only, Secure in prod, SameSite) + CSRF tokens, to
   replace the localStorage bearer token.
-- Per-build **resource** ceilings and a concurrent-build cap (the build *timeout*
-  `BUILD_TIMEOUT_SECONDS` is now enforced; deploys are already serialized).
 - Env var masking in the UI with explicit reveal + audit on reveal.
 
 ## Change safety
