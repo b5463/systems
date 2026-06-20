@@ -125,13 +125,13 @@ async function reconcileOnce() {
       // on boot and during the normal reconciliation cycle.
       if (health.isLocalMode()) {
         const runningProjects = db.prepare(
-          `SELECT slug, port, route_published, health_state
+          `SELECT slug, port, route_published, health_state, health_path
            FROM projects WHERE status = 'running' AND port IS NOT NULL`
         ).all();
         await Promise.all(runningProjects.map(async (project) => {
           const target = health.targetFor(project);
           if (!target) return;
-          const observed = await health.checkSystem(target, '/');
+          const observed = await health.checkSystem(target, project.health_path || '/');
           db.prepare(
             `UPDATE projects
              SET health_state = ?, health_status = ?, health_response_ms = ?, health_checked_at = ?

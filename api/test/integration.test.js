@@ -198,6 +198,58 @@ test('repo mapping: validates owner/name and clears on null', async () => {
   assert.equal(cleared.json().project.repo, null);
 });
 
+test('metrics history: supports seven-day windows with bounded downsampling', async () => {
+  const project = db.prepare(`INSERT INTO projects (name, slug, port, status) VALUES ('Metrics','metrics',4332,'running') RETURNING id`).get();
+  const insert = db.prepare(`
+    INSERT INTO stats_history (project_id, cpu_percent, memory_mb, memory_limit_mb, rx_bytes, tx_bytes, recorded_at)
+    VALUES (?, ?, ?, 512, 0, 0, datetime('now', ?))
+  `);
+  const seed = db.transaction(() => {
+    for (let i = 0; i < 400; i += 1) insert.run(project.id, i % 100, 100 + i, `-${i} seconds`);
+  });
+  seed();
+
+  const response = await app.inject({
+    method: 'GET', url: '/api/projects/metrics/stats/history?hours=168', headers: auth(),
+  });
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.json().hours, 168);
+  assert.equal(response.json().retentionHours, 168);
+  assert.ok(response.json().points.length > 0);
+  assert.ok(response.json().points.length <= 360);
+});
+test('limits: persists validated per-system overrides and exposes a stable shape', async () => {
+  db.prepare(`INSERT INTO projects (name, slug, port, status) VALUES ('Limited','limited',4331,'running')`).run();
+  const saved = await app.inject({
+    method: 'PATCH', url: '/api/projects/limited/limits', headers: auth(),
+    payload: {
+      memoryMb: 768,
+      cpuLimit: 1.5,
+      pidsLimit: 300,
+      restartPolicy: 'on-failure',
+      logMaxSize: '25m',
+      logMaxFile: 4,
+      healthPath: '/ready',
+    },
+  });
+  assert.equal(saved.statusCode, 200);
+  assert.deepEqual(saved.json().project.limits, {
+    memoryMb: 768,
+    cpuLimit: 1.5,
+    pidsLimit: 300,
+    restartPolicy: 'on-failure',
+    logMaxSize: '25m',
+    logMaxFile: 4,
+    healthPath: '/ready',
+  });
+  assert.equal(saved.json().appliesOn, 'next-container-recreation');
+
+  const invalid = await app.inject({
+    method: 'PATCH', url: '/api/projects/limited/limits', headers: auth(),
+    payload: { memoryMb: 32, healthPath: 'ready' },
+  });
+  assert.equal(invalid.statusCode, 400);
+});
 test('visibility: rejects an unsafe basic-auth username (Caddy injection guard)', async () => {
   db.prepare(`INSERT INTO projects (name, slug, port, status, visibility) VALUES ('Vis','vis',4322,'running','public')`).run();
   const res = await app.inject({

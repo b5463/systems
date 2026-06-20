@@ -6,7 +6,25 @@ const { db } = require('../db');
 // plaintext, but a bcrypt hash should never be exposed to clients. Centralized
 // so no route can forget it.
 function pub(p) {
-  if (p) delete p.basic_hash;
+  if (p) {
+    delete p.basic_hash;
+    p.limits = {
+      memoryMb: p.limit_memory_mb ?? null,
+      cpuLimit: p.limit_cpu ?? null,
+      pidsLimit: p.limit_pids ?? null,
+      restartPolicy: p.limit_restart_policy || null,
+      logMaxSize: p.limit_log_max_size || null,
+      logMaxFile: p.limit_log_max_file ?? null,
+      healthPath: p.health_path || '/',
+    };
+    delete p.limit_memory_mb;
+    delete p.limit_cpu;
+    delete p.limit_pids;
+    delete p.limit_restart_policy;
+    delete p.limit_log_max_size;
+    delete p.limit_log_max_file;
+    delete p.health_path;
+  }
   return p;
 }
 

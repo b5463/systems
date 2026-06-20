@@ -96,6 +96,16 @@ try { db.exec(`ALTER TABLE projects ADD COLUMN deploy_branch TEXT NOT NULL DEFAU
 // acronym.sk -> portfolio, while the dashboard stays on systems.acronym.sk.
 try { db.exec(`ALTER TABLE projects ADD COLUMN is_primary INTEGER NOT NULL DEFAULT 0`); } catch {}
 
+// Per-system runtime overrides. NULL means inherit the DEFAULT_CONTAINER_*
+// server setting; health_path is independent and is used by every health probe.
+try { db.exec(`ALTER TABLE projects ADD COLUMN limit_memory_mb INTEGER`); } catch {}
+try { db.exec(`ALTER TABLE projects ADD COLUMN limit_cpu REAL`); } catch {}
+try { db.exec(`ALTER TABLE projects ADD COLUMN limit_pids INTEGER`); } catch {}
+try { db.exec(`ALTER TABLE projects ADD COLUMN limit_restart_policy TEXT`); } catch {}
+try { db.exec(`ALTER TABLE projects ADD COLUMN limit_log_max_size TEXT`); } catch {}
+try { db.exec(`ALTER TABLE projects ADD COLUMN limit_log_max_file INTEGER`); } catch {}
+try { db.exec(`ALTER TABLE projects ADD COLUMN health_path TEXT NOT NULL DEFAULT '/'`); } catch {}
+
 // Tamper-evident audit log: each row links to the previous via a SHA-256 hash
 // chain (see util/audit). Rows written before this migration keep NULL hashes
 // and verification simply starts at the first hashed row.

@@ -4,6 +4,7 @@ const fsp = require('fs/promises');
 const path = require('path');
 const { db, auditLog } = require('../db');
 const dockerService = require('../services/docker');
+const { projectContainerOptions } = require('../util/limits');
 const { extractZip, detectProjectType, generateDockerfile } = require('../services/zip');
 const proxy = require('../services/proxy');
 const notify = require('../services/notify');
@@ -222,12 +223,12 @@ function probeHealthSoon(slug) {
   (async () => {
     for (let i = 0; i < 4; i++) {
       await new Promise((r) => setTimeout(r, i === 0 ? 800 : 2000));
-      const fresh = db.prepare('SELECT slug, port, route_published FROM projects WHERE slug = ?').get(slug);
+      const fresh = db.prepare('SELECT slug, port, route_published, health_path FROM projects WHERE slug = ?').get(slug);
       if (!fresh) return;
       const target = health.targetFor(fresh);
       if (!target) return;
       try {
-        const hr = await health.checkSystem(target, '/');
+        const hr = await health.checkSystem(target, fresh.health_path || '/');
         const routeAttestation = fresh.route_published && !health.isLocalMode()
           ? await health.checkAttestation(target, slug)
           : { state: 'not_applicable', checkedAt: new Date().toISOString() };
@@ -270,7 +271,10 @@ async function runBuildPipeline(slug, zipPath, extractDir, port, userId, ip, env
     stage = 'container';
     const containerPort = (await dockerService.imageExposedPort(imageId)) || 3000;
     appendBuildLog(slug, `[deploy] Starting container — host ${port} → container ${containerPort}...\n`);
-    const containerId = await dockerService.runContainer(slug, imageId, port, envVars, { containerPort });
+    const runtimeProject = db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug);
+    const containerId = await dockerService.runContainer(
+      slug, imageId, port, envVars, projectContainerOptions(runtimeProject, { containerPort })
+    );
     appendBuildLog(slug, `[deploy] Container started: ${containerId}\n`);
 
     stage = 'route';
@@ -394,7 +398,9 @@ async function runRedeployPipeline(slug, zipPath, extractDir, userId, ip) {
 
     const containerPort = (await dockerService.imageExposedPort(newImageId)) || 3000;
     appendBuildLog(slug, `[redeploy] Starting new container — host ${port} → container ${containerPort}...\n`);
-    const newContainerId = await dockerService.runContainer(slug, newImageId, port, envVars, { containerPort });
+    const newContainerId = await dockerService.runContainer(
+      slug, newImageId, port, envVars, projectContainerOptions(project, { containerPort })
+    );
     appendBuildLog(slug, `[redeploy] Container started: ${newContainerId}\n`);
 
     db.prepare(`

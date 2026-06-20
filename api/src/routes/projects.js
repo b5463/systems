@@ -8,6 +8,7 @@ const dockerService = require('../services/docker');
 const proxy = require('../services/proxy');
 const health = require('../services/health');
 const { confirmMatches } = require('../util/thresholds');
+const { projectContainerOptions } = require('../util/limits');
 const { pub, loadOr404 } = require('../util/project');
 const { DATA_DIR } = require('../util/paths');
 
@@ -238,6 +239,72 @@ async function projectsRoutes(fastify, options) {
     return { project: pub(db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug)) };
   });
 
+  // Persist per-system container overrides. Docker log/resource settings are
+  // applied on the next container recreation; the health path is used at once.
+  fastify.patch('/api/projects/:slug/limits', {
+    preHandler: [fastify.authenticate],
+    schema: {
+      body: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          memoryMb: { type: ['integer', 'null'], minimum: 64, maximum: 32768 },
+          cpuLimit: { type: ['number', 'null'], minimum: 0.1, maximum: 32 },
+          pidsLimit: { type: ['integer', 'null'], minimum: 32, maximum: 4096 },
+          restartPolicy: { type: ['string', 'null'], enum: ['no', 'on-failure', 'unless-stopped', 'always', null] },
+          logMaxSize: { type: ['string', 'null'], pattern: '^[1-9][0-9]{0,4}[kKmMgG]$' },
+          logMaxFile: { type: ['integer', 'null'], minimum: 1, maximum: 20 },
+          healthPath: { type: 'string', minLength: 1, maxLength: 200 },
+        },
+      },
+    },
+  }, async (request, reply) => {
+    const { slug } = request.params;
+    const project = loadOr404(reply, slug);
+    if (!project) return;
+    if (project.status === 'deleted') return reply.code(409).send({ error: 'System is deleted.' });
+
+    const body = request.body || {};
+    const pick = (key, current) => Object.hasOwn(body, key) ? body[key] : current;
+    const healthPath = String(pick('healthPath', project.health_path || '/')).trim();
+    if (!/^\/[A-Za-z0-9._~!$&'()*+,;=:@%/-]*$/.test(healthPath)) {
+      return reply.code(400).send({ error: 'Health path must start with / and contain only URL path characters.' });
+    }
+
+    const values = {
+      memoryMb: pick('memoryMb', project.limit_memory_mb),
+      cpuLimit: pick('cpuLimit', project.limit_cpu),
+      pidsLimit: pick('pidsLimit', project.limit_pids),
+      restartPolicy: pick('restartPolicy', project.limit_restart_policy),
+      logMaxSize: pick('logMaxSize', project.limit_log_max_size),
+      logMaxFile: pick('logMaxFile', project.limit_log_max_file),
+    };
+
+    db.prepare(`
+      UPDATE projects SET
+        limit_memory_mb = ?, limit_cpu = ?, limit_pids = ?,
+        limit_restart_policy = ?, limit_log_max_size = ?, limit_log_max_file = ?,
+        health_path = ?, updated_at = datetime('now')
+      WHERE slug = ?
+    `).run(
+      values.memoryMb, values.cpuLimit, values.pidsLimit,
+      values.restartPolicy, values.logMaxSize, values.logMaxFile,
+      healthPath, slug
+    );
+
+    auditLog({
+      user_id: request.user.id,
+      action: 'limits_update',
+      target: slug,
+      detail: JSON.stringify({ ...values, healthPath }),
+      ip: request.ip,
+    });
+    return {
+      project: pub(db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug)),
+      appliesOn: 'next-container-recreation',
+    };
+  });
+
   // Run a real health + HTTPS check against the public URL and store the result.
   fastify.post('/api/projects/:slug/health', {
     preHandler: [fastify.authenticate],
@@ -253,7 +320,7 @@ async function projectsRoutes(fastify, options) {
     if (!target) {
       return reply.code(400).send({ error: 'Nothing to check — the system is not running and has no published route.' });
     }
-    const result = await health.checkSystem(target, '/');
+    const result = await health.checkSystem(target, project.health_path || '/');
     const routeAttestation = project.route_published && !health.isLocalMode()
       ? await health.checkAttestation(target, slug)
       : { state: 'not_applicable', checkedAt: new Date().toISOString() };
@@ -302,7 +369,9 @@ async function projectsRoutes(fastify, options) {
       }
 
       // Start a new container from the previous image, same port + env vars.
-      const newContainerId = await dockerService.runContainer(slug, targetImageId, project.port, envVars);
+      const newContainerId = await dockerService.runContainer(
+        slug, targetImageId, project.port, envVars, projectContainerOptions(project)
+      );
 
       // Swap current <-> previous so a subsequent rollback returns to the
       // version we just rolled away from.

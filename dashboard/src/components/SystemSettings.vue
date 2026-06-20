@@ -140,6 +140,72 @@ async function removeKey() {
   }
 }
 
+/* Runtime limits */
+const currentLimits = props.system.limits || {}
+const memoryMb = ref(currentLimits.memoryMb == null ? '' : String(currentLimits.memoryMb))
+const cpuLimit = ref(currentLimits.cpuLimit == null ? '' : String(currentLimits.cpuLimit))
+const pidsLimit = ref(currentLimits.pidsLimit == null ? '' : String(currentLimits.pidsLimit))
+const restartPolicy = ref(currentLimits.restartPolicy || '')
+const logMaxSize = ref(currentLimits.logMaxSize || '')
+const logMaxFile = ref(currentLimits.logMaxFile == null ? '' : String(currentLimits.logMaxFile))
+const healthPath = ref(currentLimits.healthPath || '/')
+const limitsSaving = ref(false)
+const limitsMsg = ref('')
+
+const optionalNumber = (value) => value === '' ? null : Number(value)
+const limitsIssues = computed(() => {
+  const issues = []
+  const check = (value, label, min, max, integer = false) => {
+    if (value === '') return
+    const n = Number(value)
+    if (!Number.isFinite(n) || n < min || n > max || (integer && !Number.isInteger(n))) {
+      issues.push(`${label} must be ${integer ? 'a whole number ' : ''}between ${min} and ${max}.`)
+    }
+  }
+  check(memoryMb.value, 'Memory', 64, 32768, true)
+  check(cpuLimit.value, 'CPU', 0.1, 32)
+  check(pidsLimit.value, 'PIDs', 32, 4096, true)
+  check(logMaxFile.value, 'Log files', 1, 20, true)
+  if (logMaxSize.value && !/^[1-9][0-9]{0,4}[kKmMgG]$/.test(logMaxSize.value)) {
+    issues.push('Log size must look like 10m, 500k, or 1g.')
+  }
+  if (!/^\/[A-Za-z0-9._~!$&'()*+,;=:@%/-]*$/.test(healthPath.value.trim())) {
+    issues.push('Health path must start with / and contain only URL path characters.')
+  }
+  return issues
+})
+function resetLimits() {
+  memoryMb.value = ''
+  cpuLimit.value = ''
+  pidsLimit.value = ''
+  restartPolicy.value = ''
+  logMaxSize.value = ''
+  logMaxFile.value = ''
+  healthPath.value = '/'
+}
+async function saveLimits() {
+  if (limitsIssues.value.length) return
+  limitsSaving.value = true
+  limitsMsg.value = ''
+  try {
+    const data = await api.patch(`/projects/${props.slug}/limits`, {
+      memoryMb: optionalNumber(memoryMb.value),
+      cpuLimit: optionalNumber(cpuLimit.value),
+      pidsLimit: optionalNumber(pidsLimit.value),
+      restartPolicy: restartPolicy.value || null,
+      logMaxSize: logMaxSize.value.trim() || null,
+      logMaxFile: optionalNumber(logMaxFile.value),
+      healthPath: healthPath.value.trim()
+    })
+    if (data && data.project) emit('update', data.project)
+    limitsMsg.value = 'Saved. Health checks use the new path now; container limits apply on the next env-triggered recreation, rollback, or redeploy.'
+  } catch (e) {
+    limitsMsg.value = e.message || 'Failed to save runtime limits.'
+  } finally {
+    limitsSaving.value = false
+  }
+}
+
 /* Visibility */
 const visSaving = ref(false)
 const visUser = ref('')
@@ -324,6 +390,58 @@ async function provisionDb() {
         <span v-else>{{ system.visibility === 'password' ? 'Update credentials' : 'Enable password protection' }}</span>
       </button>
     </template>
+  </div>
+
+  <!-- Runtime limits -->
+  <div class="card stack">
+    <div class="spread">
+      <h2 class="section-label">Runtime limits</h2>
+      <button class="btn btn-sm btn-ghost" type="button" :disabled="limitsSaving" @click="resetLimits">Use server defaults</button>
+    </div>
+    <div class="hint">Blank limit fields inherit the server defaults. Container limits apply on the next env-triggered recreation, rollback, or redeploy; the health path applies immediately.</div>
+    <div class="grid grid-2 limits-grid">
+      <div class="field" style="margin:0">
+        <label class="label" for="limit-memory">Memory (MB)</label>
+        <input id="limit-memory" v-model="memoryMb" type="number" min="64" max="32768" step="64" placeholder="Server default" />
+      </div>
+      <div class="field" style="margin:0">
+        <label class="label" for="limit-cpu">CPU cores</label>
+        <input id="limit-cpu" v-model="cpuLimit" type="number" min="0.1" max="32" step="0.1" placeholder="Server default" />
+      </div>
+      <div class="field" style="margin:0">
+        <label class="label" for="limit-pids">PIDs</label>
+        <input id="limit-pids" v-model="pidsLimit" type="number" min="32" max="4096" step="1" placeholder="Server default" />
+      </div>
+      <div class="field" style="margin:0">
+        <label class="label" for="limit-restart">Restart policy</label>
+        <select id="limit-restart" v-model="restartPolicy">
+          <option value="">Server default</option>
+          <option value="unless-stopped">Unless stopped</option>
+          <option value="on-failure">On failure</option>
+          <option value="always">Always</option>
+          <option value="no">Never</option>
+        </select>
+      </div>
+      <div class="field" style="margin:0">
+        <label class="label" for="limit-log-size">Log file size</label>
+        <input id="limit-log-size" v-model="logMaxSize" placeholder="Server default (for example 10m)" autocapitalize="none" />
+      </div>
+      <div class="field" style="margin:0">
+        <label class="label" for="limit-log-files">Log files retained</label>
+        <input id="limit-log-files" v-model="logMaxFile" type="number" min="1" max="20" step="1" placeholder="Server default" />
+      </div>
+    </div>
+    <div class="field" style="margin:0">
+      <label class="label" for="health-path">Health-check path</label>
+      <input id="health-path" v-model="healthPath" placeholder="/" autocapitalize="none" autocorrect="off" spellcheck="false" />
+    </div>
+    <ul v-if="limitsIssues.length" class="env-issues">
+      <li v-for="issue in limitsIssues" :key="issue">{{ issue }}</li>
+    </ul>
+    <div v-if="limitsMsg" class="notice">{{ limitsMsg }}</div>
+    <button class="btn btn-primary" type="button" :disabled="limitsSaving || limitsIssues.length > 0" @click="saveLimits">
+      <span v-if="limitsSaving" class="spinner"></span><span v-else>Save runtime limits</span>
+    </button>
   </div>
 
   <!-- Root domain (primary system) -->

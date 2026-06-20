@@ -93,8 +93,8 @@ built" below for the gating detail):
 - ~~GitHub deploys (push-to-deploy).~~ **Built** (off by default — riskiest flag).
 - ~~Backups and restores (DB plus per-system).~~ **Built and on.**
 - ~~In-dashboard shell console (beyond per-container exec).~~ **Built** (off by default).
-- Advanced metrics and alerting — ~~threshold alerting~~ **done**; longer metrics
-  history still pending.
+- Advanced metrics and alerting — ~~threshold alerting~~ **done**; ~~longer metrics
+  history~~ **done** (seven-day retention with bounded downsampling).
 
 ## V2 — what's actually built
 
@@ -180,16 +180,17 @@ Current backlog status:
   `MAX_CONCURRENT_BUILDS` gates admission (default one), while
   `BUILD_CPU_LIMIT`, `BUILD_MEMORY_MB`, and `BUILD_TIMEOUT_SECONDS` bound each
   Docker build.
-- Per-system resource overrides in the UI — `util/limits.js` already accepts
-  them; the store and UI don't exist yet.
+- ~~Per-system resource overrides in the UI.~~ **Done.** CPU, memory, PIDs,
+  restart policy, log rotation, and health-path overrides are stored per system,
+  editable in Settings, and applied across every container recreation path.
 - ~~Automated disk cleanup~~ — **Done.** `POST /api/server/cleanup` removes
   orphaned managed images and release dirs without touching rollback targets.
   Preview via `GET /api/server/cleanup/preview`; surfaced on the Server screen.
 - Persisted, editable settings in Admin (still `.env`-driven).
 - ~~Threshold alerting~~ — **Done.** `evaluateAlerts` checks disk %, backup age,
   Docker, and Postgres on every reconcile cycle; `alertDelta` fires a webhook
-  only on first-seen transitions (raised → notify, not every poll). Full metrics
-  history still pending.
+  only on first-seen transitions (raised → notify, not every poll). ~~Longer metrics
+  history~~ **Done** with seven-day retention and bounded downsampling.
 
 ## UX polish backlog (nice-to-have)
 
@@ -219,12 +220,12 @@ above, in priority order:
   and CIDR-range IP bans, and hardened response headers (CSP/HSTS/frame-deny/nosniff).
 - ~~**Build safety:** enforce build timeouts, concurrent-build admission, and
   per-build resource ceilings.~~ **Done.**
-- **Per-system limits in the UI:** wire CPU/memory/PIDs/restart/log/health-path
-  overrides to the existing limits mapping.
+- ~~**Per-system limits in the UI:** wire CPU/memory/PIDs/restart/log/health-path
+  overrides to the existing limits mapping.~~ **Done.**
 - ~~**Disk hygiene:** safe pruning of old images/releases without touching rollback
   targets, surfaced on Server.~~ **Done.**
 - **Settings out of `.env`:** DB-backed, editable settings where it's safe to.
-- **Observability:** longer metrics history remains. ~~Threshold alerts for disk,
+- **Observability:** ~~longer metrics history~~ **done**. ~~Threshold alerts for disk,
   backup age, Docker, and Postgres transitions routed through notifications.~~ **Done.**
   Health/resource-pressure alert coverage is still pending.
 - **Polish the gated features:** flip them on after host validation with the UX

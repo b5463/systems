@@ -1,7 +1,7 @@
 'use strict';
 const { test } = require('node:test');
 const assert = require('node:assert');
-const { containerLimits } = require('../src/util/limits');
+const { containerLimits, projectContainerOptions } = require('../src/util/limits');
 
 test('defaults map correctly', () => {
   const l = containerLimits({}, {});
@@ -34,4 +34,25 @@ test('per-system overrides win over env', () => {
   const l = containerLimits({ memoryMb: 256, cpuLimit: 0.25 }, { DEFAULT_CONTAINER_MEMORY_MB: '512' });
   assert.equal(l.Memory, 256 * 1024 * 1024);
   assert.equal(l.CpuQuota, 25000);
+});
+
+test('project rows map persisted overrides without clobbering runtime options', () => {
+  const opts = projectContainerOptions({
+    limit_memory_mb: 768,
+    limit_cpu: 1.5,
+    limit_pids: 300,
+    limit_restart_policy: 'on-failure',
+    limit_log_max_size: '25m',
+    limit_log_max_file: 4,
+  }, { containerPort: 8080 });
+
+  assert.deepEqual(opts, {
+    containerPort: 8080,
+    memoryMb: 768,
+    cpuLimit: 1.5,
+    pidsLimit: 300,
+    restartPolicy: 'on-failure',
+    logMaxSize: '25m',
+    logMaxFile: 4,
+  });
 });

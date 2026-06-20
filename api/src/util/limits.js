@@ -25,4 +25,16 @@ function containerLimits(opts = {}, env = process.env) {
   };
 }
 
-module.exports = { containerLimits };
+function projectContainerOptions(project = {}, extra = {}) {
+  return {
+    ...extra,
+    memoryMb: project.limit_memory_mb ?? undefined,
+    cpuLimit: project.limit_cpu ?? undefined,
+    pidsLimit: project.limit_pids ?? undefined,
+    restartPolicy: project.limit_restart_policy || undefined,
+    logMaxSize: project.limit_log_max_size || undefined,
+    logMaxFile: project.limit_log_max_file ?? undefined,
+  };
+}
+
+module.exports = { containerLimits, projectContainerOptions };

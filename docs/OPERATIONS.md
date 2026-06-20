@@ -80,6 +80,8 @@ failures are recorded as timeout or unreachable.
 - Release retention defaults to `3` (`RELEASE_RETENTION_DEFAULT`). Automated
   pruning isn't built yet, so old images accumulate. Prune them by hand with
   care, and never prune an image a system or its rollback points to.
+- Runtime metrics retain seven days by default (`STATS_RETENTION_HOURS=168`).
+  Wider chart windows are downsampled server-side to keep responses bounded.
 
 ---
 

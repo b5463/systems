@@ -56,7 +56,7 @@ async function statsRoutes(fastify, options) {
         // Occasionally trim old history so the table doesn't grow without bound
         // (this endpoint is polled for every running system on an interval).
         if (Math.random() < 0.02) {
-          const hours = Number(process.env.STATS_RETENTION_HOURS) || 24;
+          const hours = Number(process.env.STATS_RETENTION_HOURS) || 168;
           db.prepare(
             `DELETE FROM stats_history WHERE project_id = ? AND julianday(recorded_at) < julianday('now', ?)`
           ).run(project.id, `-${hours} hours`);
@@ -74,7 +74,7 @@ async function statsRoutes(fastify, options) {
 
   /**
    * GET /api/projects/:slug/stats/history?hours=1
-   * Returns recorded stats points within the time window (default 1h, max 24h).
+   * Returns at most ~360 downsampled points within the configured retention.
    */
   fastify.get('/api/projects/:slug/stats/history', {
     preHandler: [fastify.authenticate],
@@ -84,19 +84,30 @@ async function statsRoutes(fastify, options) {
     const project = loadOr404(reply, slug);
     if (!project) return;
 
+    const retentionHours = Math.max(1, Math.min(24 * 30, Number(process.env.STATS_RETENTION_HOURS) || 168));
     let hours = Number(request.query.hours);
     if (!Number.isFinite(hours) || hours <= 0) hours = 1;
-    if (hours > 24) hours = 24;
+    hours = Math.min(hours, retentionHours);
 
+    // Keep chart payloads bounded at roughly 360 points. A one-hour view uses
+    // ten-second buckets; wider windows are averaged into proportionally larger
+    // buckets instead of shipping every stored poll to the browser.
+    const bucketSeconds = Math.max(10, Math.ceil((hours * 3600) / 360));
     const points = db.prepare(`
-      SELECT cpu_percent, memory_mb, rx_bytes, tx_bytes, recorded_at
+      SELECT
+        AVG(cpu_percent) AS cpu_percent,
+        AVG(memory_mb) AS memory_mb,
+        AVG(rx_bytes) AS rx_bytes,
+        AVG(tx_bytes) AS tx_bytes,
+        MAX(recorded_at) AS recorded_at
       FROM stats_history
       WHERE project_id = ?
         AND recorded_at >= strftime('%Y-%m-%dT%H:%M:%SZ', 'now', ?)
-      ORDER BY recorded_at ASC, id ASC
-    `).all(project.id, `-${hours} hours`);
+      GROUP BY CAST(CAST(strftime('%s', recorded_at) AS INTEGER) / ? AS INTEGER)
+      ORDER BY recorded_at ASC
+    `).all(project.id, `-${hours} hours`, bucketSeconds);
 
-    return { points };
+    return { points, hours, retentionHours };
   });
 }
 

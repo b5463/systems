@@ -37,7 +37,21 @@ const history = ref([])
 const latestStats = ref(null)
 const overviewStat = ref(null)
 let statsTimer = null
+let lastHistoryAppendAt = 0
 const historyMinutes = ref(0)
+const historyHours = ref(1)
+const HISTORY_RANGES = [
+  { hours: 1, label: '1h' },
+  { hours: 6, label: '6h' },
+  { hours: 24, label: '24h' },
+  { hours: 168, label: '7d' }
+]
+function metricTimeLabel(value) {
+  const date = value instanceof Date ? value : new Date(value)
+  return historyHours.value > 24
+    ? date.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+    : date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+}
 
 /* Deployments */
 const deployHistory = ref([])
@@ -217,19 +231,24 @@ async function pollStats() {
   try {
     const s = await api.get(`/projects/${props.slug}/stats`)
     latestStats.value = s
-    history.value.push({ label: new Date().toLocaleTimeString(), cpu: s.cpu_percent ?? 0, mem: s.memory_mb ?? 0 })
-    if (history.value.length > 60) history.value.shift()
+    const now = Date.now()
+    const bucketMs = Math.max(10, Math.ceil((historyHours.value * 3600) / 360)) * 1000
+    if (!lastHistoryAppendAt || now - lastHistoryAppendAt >= bucketMs) {
+      history.value.push({ label: metricTimeLabel(new Date(now)), cpu: s.cpu_percent ?? 0, mem: s.memory_mb ?? 0 })
+      if (history.value.length > 360) history.value.shift()
+      lastHistoryAppendAt = now
+    }
   } catch { /* transient */ }
 }
 async function loadStatsHistory() {
   try {
-    const data = await api.get(`/projects/${props.slug}/stats/history?hours=1`)
+    const data = await api.get(`/projects/${props.slug}/stats/history?hours=${historyHours.value}`)
     const points = data.points || []
     if (points.length) {
       history.value = points.map((p) => ({
-        label: new Date(p.recorded_at).toLocaleTimeString(),
+        label: metricTimeLabel(p.recorded_at),
         cpu: p.cpu_percent ?? 0, mem: p.memory_mb ?? 0
-      })).slice(-60)
+      }))
       const first = new Date(points[0].recorded_at).getTime()
       const last = new Date(points[points.length - 1].recorded_at).getTime()
       const mins = Math.round((last - first) / 60000)
@@ -237,9 +256,19 @@ async function loadStatsHistory() {
     }
   } catch { /* best-effort */ }
 }
+async function setHistoryRange(hours) {
+  if (historyHours.value === hours) return
+  historyHours.value = hours
+  history.value = []
+  historyMinutes.value = 0
+  await loadStatsHistory()
+  lastHistoryAppendAt = Date.now()
+}
+
 async function startStats() {
   stopStats()
   history.value = []; latestStats.value = null; historyMinutes.value = 0
+  lastHistoryAppendAt = 0
   await loadStatsHistory()
   pollStats()
   statsTimer = setInterval(pollStats, 2000)
@@ -621,7 +650,19 @@ onBeforeUnmount(() => {
         </div>
       </div>
       <template v-else>
-        <div v-if="historyMinutes > 0" class="small muted" style="margin-bottom:10px">Showing last {{ historyMinutes }} minutes</div>
+        <div class="spread" style="margin-bottom:10px; gap:10px; flex-wrap:wrap">
+          <div class="segmented" aria-label="Metrics history range">
+            <button
+              v-for="range in HISTORY_RANGES"
+              :key="range.hours"
+              type="button"
+              :class="{ active: historyHours === range.hours }"
+              :aria-pressed="historyHours === range.hours"
+              @click="setHistoryRange(range.hours)"
+            >{{ range.label }}</button>
+          </div>
+          <span v-if="historyMinutes > 0" class="small muted">{{ historyMinutes }} minutes of recorded data</span>
+        </div>
         <!-- mount only when visible so Chart.js sizes the canvas correctly -->
         <StatsCharts v-if="tab === 'Metrics'" :history="history" :latest="latestStats" />
       </template>

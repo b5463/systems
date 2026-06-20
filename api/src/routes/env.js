@@ -3,6 +3,7 @@
 const crypto = require('crypto');
 const { db, auditLog } = require('../db');
 const dockerService = require('../services/docker');
+const { projectContainerOptions } = require('../util/limits');
 const { loadOr404 } = require('../util/project');
 
 function getEncryptionKey() {
@@ -133,7 +134,9 @@ async function envRoutes(fastify, options) {
       }
       await dockerService.removeContainer(project.container_id, true);
 
-      const newContainerId = await dockerService.runContainer(slug, project.image_id, project.port, merged);
+      const newContainerId = await dockerService.runContainer(
+        slug, project.image_id, project.port, merged, projectContainerOptions(project)
+      );
 
       db.prepare(`
         UPDATE projects SET status = 'running', container_id = ?, updated_at = datetime('now') WHERE slug = ?

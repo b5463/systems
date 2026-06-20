@@ -77,6 +77,7 @@ upload (multipart, size-capped)
 | Per-build CPU | 1 CPU | `BUILD_CPU_LIMIT` |
 | Per-build memory | 1024 MB (swap disabled above the same ceiling) | `BUILD_MEMORY_MB` |
 | Release retention | 3 (automatic pruning not implemented yet) | `RELEASE_RETENTION_DEFAULT` |
+| Metrics history | 168 hours (7 days; responses downsampled) | `STATS_RETENTION_HOURS` |
 
 ## Beyond the defaults
 
