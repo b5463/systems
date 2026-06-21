@@ -1,0 +1,1813 @@
+# SYSTEMS. V4 — App Builder Integration Guide
+
+**Document status:** Developer guide, reviewed and corrected  
+**Target audience:** Developers building products, apps, APIs, workers, desktop tools or external systems that must be accepted by SYSTEMS. V4  
+**Platform role:** SYSTEMS. is Acronym’s private control plane for building, deploying, operating, publishing and commercialising digital products.  
+**Public role:** Acronym is the public-facing portfolio, storefront and customer surface.
+
+---
+
+## 1. Purpose
+
+This guide defines what an application must provide to be accepted by SYSTEMS. V4.
+
+A SYSTEMS.-ready app must be deployable, observable, secure, commercially attachable and operationally recoverable. It must also be able to report its health, expose or emit product analytics, and integrate with entitlements, subscriptions and product-key/licence validation when applicable.
+
+The goal is not to force every app to share one database or one framework. The goal is to make every product speak a common operational and commercial protocol.
+
+This reviewed version fixes the earlier endpoint ambiguity: all routes now use `/api/...`; no `/v1/...` path family remains. It also clarifies that apps consume effective entitlements, while SYSTEMS. handles entitlement grants, revocations and source-of-truth resolution internally.
+
+---
+
+## 2. Canonical API namespace
+
+All SYSTEMS. V4 app integrations use `/api/...` URLs. Do not use `/v1/...` URL paths.
+
+Canonical app-facing paths:
+
+```text
+/api/ingest/heartbeat       external or managed app health reporting
+/api/ingest/releases        release/version reporting
+/api/ingest/errors          scrubbed error reporting
+/api/ingest/events          product analytics events
+/api/ingest/metrics         bounded operational/product metrics
+/api/entitlements/check     effective access checks for hosted apps
+/api/licensing/redeem       product-key redemption
+/api/licensing/activate     licence/device/account activation
+/api/licensing/validate     licence lease validation/refresh
+/api/licensing/deactivate   device/account activation removal
+```
+
+The request payload may still include versioned schemas such as `systems.event.v1`, `systems.heartbeat.v1` or `systems.license.validate.v1`. Versioning belongs in the protocol schema, not the URL path.
+
+Authentication rules:
+
+```text
+Admin dashboard APIs use administrator sessions.
+App ingestion APIs use scoped integration keys.
+Webhook endpoints use signatures.
+Customer/product access never uses SYSTEMS. administrator JWTs.
+```
+
+---
+
+## 3. App acceptance levels
+
+SYSTEMS. V4 should classify applications into acceptance levels.
+
+```text
+Level 0 — Static/marketing compatible
+Level 1 — Managed web app compatible
+Level 2 — Commercial product compatible
+Level 3 — Licensed/subscription product compatible
+Level 4 — External system integrated
+Level 5 — Fully SYSTEMS.-native product
+```
+
+### Level 0 — Static/marketing compatible
+
+Required for static sites, landing pages and portfolios.
+
+The app must provide:
+
+- Build command or static output directory.
+- No required runtime secrets for public rendering.
+- Cacheable assets.
+- Health endpoint or static availability check.
+- Safe fallback page.
+- No hardcoded production-only URLs unless documented.
+
+### Level 1 — Managed web app compatible
+
+Required for web apps deployed by SYSTEMS.
+
+The app must provide:
+
+- Dockerfile or supported framework detection.
+- Runtime port configuration through `PORT`.
+- Health endpoint.
+- Environment-variable configuration.
+- Graceful shutdown.
+- Logs to stdout/stderr.
+- No local-only absolute paths.
+- No secrets committed to the repository.
+- No assumption that the app runs as root.
+
+### Level 2 — Commercial product compatible
+
+Required for products shown or sold through Acronym.
+
+The app must provide:
+
+- Product metadata.
+- Public launch/demo route or documented access mode.
+- Analytics event emission.
+- User registration or activation event reporting where applicable.
+- Entitlement-aware access boundary if the product has paid access.
+- Terms/privacy/legal links where user-facing.
+- Safe unauthorised, expired and payment-failed states.
+
+### Level 3 — Licensed/subscription product compatible
+
+Required for paid apps with product keys, licences, seats, devices or subscriptions.
+
+The app must provide:
+
+- Licence redemption or entitlement-check integration.
+- Subscription state handling.
+- Grace-period behaviour.
+- Offline/temporary SYSTEMS. outage behaviour where relevant.
+- Access revocation support.
+- Product-key abuse resistance.
+- Signed entitlement validation.
+- Local cache of last known valid entitlement.
+
+### Level 4 — External system integrated
+
+Required for apps hosted outside SYSTEMS. but monitored/commercialised by it.
+
+The app must provide:
+
+- Scoped SYSTEMS. integration API key.
+- Heartbeat reporting.
+- Release reporting.
+- Error reporting.
+- Product analytics events.
+- Entitlement/licence validation if paid.
+- Stable external system ID mapping.
+- No administrator credentials embedded in the external app.
+
+### Level 5 — Fully SYSTEMS.-native product
+
+Best-practice target for important Acronym products.
+
+The app must provide everything above plus:
+
+- Preview/prod environment parity.
+- Structured operational metadata.
+- Robust entitlement SDK integration.
+- Typed analytics events.
+- Versioned API contract.
+- Migration and rollback safety.
+- Full customer-access lifecycle handling.
+- Security self-checks.
+- Automated acceptance tests.
+
+---
+
+## 4. Required project structure
+
+A SYSTEMS.-ready repository should use predictable structure.
+
+Recommended:
+
+```text
+app-root/
+├── systems.app.json
+├── Dockerfile
+├── .dockerignore
+├── README.md
+├── src/
+├── public/
+├── tests/
+├── migrations/
+├── scripts/
+│   ├── build-check.*
+│   └── systems-smoke-test.*
+└── docs/
+    ├── RUNBOOK.md
+    ├── ENVIRONMENT.md
+    ├── SECURITY.md
+    └── INTEGRATION.md
+```
+
+For simple static apps, `Dockerfile` may be generated by SYSTEMS. if framework detection is reliable.
+
+For serious commercial products, include the Dockerfile explicitly.
+
+---
+
+## 5. Required manifest: `systems.app.json`
+
+Every product should include a manifest. This lets SYSTEMS. classify, build, run and inspect the app without guessing.
+
+Example:
+
+```json
+{
+  "schema": "systems.app.v4",
+  "app": {
+    "name": "Plot",
+    "slug": "plot",
+    "type": "web-app",
+    "runtime": "node",
+    "productStage": "preview",
+    "commercialMode": "subscription",
+    "requiresEntitlements": true,
+    "requiresLicensing": false
+  },
+  "build": {
+    "strategy": "dockerfile",
+    "dockerfile": "Dockerfile",
+    "context": ".",
+    "buildCommand": "npm run build",
+    "outputDirectory": null
+  },
+  "runtime": {
+    "portEnv": "PORT",
+    "defaultPort": 3000,
+    "healthPath": "/api/health",
+    "readinessPath": "/api/ready",
+    "shutdownSignal": "SIGTERM",
+    "startupTimeoutSeconds": 60
+  },
+  "environments": {
+    "required": ["production", "preview"],
+    "optional": ["development"]
+  },
+  "systems": {
+    "capabilities": [
+      "health",
+      "analytics",
+      "entitlements",
+      "subscriptions",
+      "release-reporting"
+    ],
+    "integrationVersion": "2026-06"
+  },
+  "security": {
+    "runsAsRoot": false,
+    "requiresDockerSocket": false,
+    "requiresPrivilegedMode": false,
+    "requiresOutboundInternet": true,
+    "storesPersonalData": true,
+    "storesPaymentData": false
+  }
+}
+```
+
+### Manifest rules
+
+- `slug` must pass SYSTEMS. slug rules.
+- `healthPath` must not require customer login.
+- `readyPath` may check database and critical dependencies.
+- `requiresEntitlements` must be true for paid hosted products.
+- `storesPaymentData` should almost always be false because Stripe owns payment data.
+- Apps must not request privileged Docker access unless explicitly approved.
+
+---
+
+## 6. Environment variables
+
+Apps must be configurable entirely through environment variables.
+
+Required standard variables:
+
+```env
+NODE_ENV=production
+PORT=3000
+
+SYSTEMS_APP_ID=
+SYSTEMS_PRODUCT_ID=
+SYSTEMS_ENVIRONMENT=production
+SYSTEMS_PUBLIC_URL=
+SYSTEMS_API_BASE_URL=
+SYSTEMS_INTEGRATION_KEY=
+
+SYSTEMS_ENTITLEMENT_AUDIENCE=
+SYSTEMS_ANALYTICS_ENABLED=true
+SYSTEMS_HEALTH_REPORTING_ENABLED=true
+```
+
+Common optional variables:
+
+```env
+DATABASE_URL=
+REDIS_URL=
+SENTRY_DSN=
+APP_BASE_URL=
+PUBLIC_BASE_URL=
+LOG_LEVEL=info
+
+STRIPE_PUBLIC_KEY=
+SYSTEMS_LICENSE_PUBLIC_KEY=
+SYSTEMS_EVENT_BATCH_SIZE=25
+SYSTEMS_EVENT_FLUSH_INTERVAL_MS=5000
+SYSTEMS_ENTITLEMENT_CACHE_TTL_SECONDS=900
+SYSTEMS_OFFLINE_GRACE_SECONDS=604800
+```
+
+### Environment-variable rules
+
+- Never commit `.env` files.
+- Secrets must be injected by SYSTEMS.
+- Public frontend variables must be explicitly prefixed according to the framework convention.
+- The app must fail clearly when required secrets are missing.
+- The app must never log secret values.
+- The app must tolerate rotated integration keys.
+
+---
+
+## 7. Runtime requirements
+
+A managed SYSTEMS. app must:
+
+- Listen on `0.0.0.0`.
+- Use the port provided by `PORT`.
+- Start without interactive prompts.
+- Log to stdout/stderr.
+- Exit non-zero on unrecoverable startup failure.
+- Handle `SIGTERM` gracefully.
+- Not write important state only to the container filesystem.
+- Not assume persistent disk unless SYSTEMS. explicitly provides a volume.
+- Not require root privileges.
+- Not require host Docker socket access.
+- Not run background cron jobs without declaring them.
+
+Graceful shutdown target:
+
+```text
+SIGTERM received
+→ stop accepting new requests
+→ finish in-flight requests
+→ flush analytics/logs
+→ close database connections
+→ exit within 10–30 seconds
+```
+
+---
+
+## 8. Health, readiness and liveness
+
+Every web app must expose health endpoints.
+
+### `/api/health`
+
+Used to check whether the process is alive.
+
+Expected response:
+
+```json
+{
+  "status": "ok",
+  "app": "plot",
+  "version": "1.4.2",
+  "environment": "production",
+  "timestamp": "2026-06-20T12:00:00.000Z"
+}
+```
+
+Rules:
+
+- Must be fast.
+- Must not require authentication.
+- Must not expose secrets.
+- Must not dump internal infrastructure.
+- Should return `200` only when the process can serve basic traffic.
+
+### `/api/ready`
+
+Used to check whether the app is ready for production traffic.
+
+Expected response:
+
+```json
+{
+  "status": "ready",
+  "checks": {
+    "database": "ok",
+    "cache": "ok",
+    "systemsApi": "ok"
+  },
+  "timestamp": "2026-06-20T12:00:00.000Z"
+}
+```
+
+Rules:
+
+- May check database, migrations and required dependencies.
+- Should return `503` when the app cannot serve real traffic.
+- Must remain bounded by timeout.
+- Must not perform destructive or expensive checks.
+
+### `/api/version`
+
+Recommended for release traceability.
+
+```json
+{
+  "app": "plot",
+  "version": "1.4.2",
+  "commit": "a1b2c3d",
+  "buildId": "build_123",
+  "builtAt": "2026-06-20T11:55:00.000Z"
+}
+```
+
+---
+
+## 9. Active health reporting to SYSTEMS.
+
+Managed apps may be checked by SYSTEMS. through HTTP. External apps must actively report heartbeats.
+
+Endpoint:
+
+```http
+POST /api/ingest/heartbeat
+Authorization: Bearer <SYSTEMS_INTEGRATION_KEY>
+Content-Type: application/json
+Idempotency-Key: hb_<uuid>
+```
+
+Payload:
+
+```json
+{
+  "schema": "systems.heartbeat.v1",
+  "systemId": "sys_plot_web",
+  "environment": "production",
+  "status": "ok",
+  "version": "1.4.2",
+  "commit": "a1b2c3d",
+  "region": "self-hosted",
+  "uptimeSeconds": 86400,
+  "metrics": {
+    "responseTimeMs": 72,
+    "memoryMb": 186,
+    "queueDepth": 0
+  },
+  "checks": {
+    "database": "ok",
+    "cache": "ok",
+    "externalApi": "degraded"
+  },
+  "timestamp": "2026-06-20T12:00:00.000Z"
+}
+```
+
+Heartbeat rules:
+
+- Send every 30–120 seconds for external systems.
+- Send less often for low-priority systems.
+- Use idempotency keys.
+- Include only safe operational data.
+- Never include customer personal data.
+- Never include secrets.
+- Use backoff when SYSTEMS. is unavailable.
+- Do not block the product if heartbeat reporting fails.
+
+---
+
+## 10. Release reporting
+
+Apps should report releases so SYSTEMS. can connect product behaviour to versions.
+
+Endpoint:
+
+```http
+POST /api/ingest/releases
+Authorization: Bearer <SYSTEMS_INTEGRATION_KEY>
+Content-Type: application/json
+Idempotency-Key: rel_<version>_<commit>
+```
+
+Payload:
+
+```json
+{
+  "schema": "systems.release.v1",
+  "systemId": "sys_plot_web",
+  "environment": "production",
+  "version": "1.4.2",
+  "commit": "a1b2c3d",
+  "source": "github",
+  "branch": "main",
+  "deployedAt": "2026-06-20T12:00:00.000Z",
+  "changeSummary": "Improved expense splitting and onboarding",
+  "migration": {
+    "included": true,
+    "status": "completed"
+  }
+}
+```
+
+Release reporting should happen after deployment is complete, not merely after a build starts.
+
+---
+
+## 11. Error reporting
+
+Apps should report structured errors, not raw log dumps.
+
+Endpoint:
+
+```http
+POST /api/ingest/errors
+Authorization: Bearer <SYSTEMS_INTEGRATION_KEY>
+Content-Type: application/json
+Idempotency-Key: err_<uuid>
+```
+
+Payload:
+
+```json
+{
+  "schema": "systems.error.v1",
+  "systemId": "sys_plot_web",
+  "environment": "production",
+  "severity": "error",
+  "type": "UnhandledException",
+  "message": "Checkout entitlement sync failed",
+  "fingerprint": "checkout-entitlement-sync",
+  "version": "1.4.2",
+  "requestId": "req_123",
+  "userImpact": "checkout_delayed",
+  "timestamp": "2026-06-20T12:00:00.000Z"
+}
+```
+
+Rules:
+
+- Do not send stack traces by default to public dashboards.
+- Do not include access tokens, API keys, passwords, card data or raw cookies.
+- Scrub emails and personal identifiers unless strictly necessary.
+- Use fingerprints for grouping.
+- Send high-severity errors immediately.
+- Batch low-severity errors.
+
+---
+
+## 12. Product analytics
+
+SYSTEMS. must be able to show how each product performs commercially and operationally.
+
+Apps should send analytics events through the SYSTEMS. event API or SDK.
+
+Endpoint:
+
+```http
+POST /api/ingest/events
+Authorization: Bearer <SYSTEMS_INTEGRATION_KEY>
+Content-Type: application/json
+Idempotency-Key: evt_<uuid>
+```
+
+Payload:
+
+```json
+{
+  "schema": "systems.event.v1",
+  "productId": "prod_plot",
+  "systemId": "sys_plot_web",
+  "environment": "production",
+  "event": "signup_completed",
+  "anonymousId": "anon_7f6a",
+  "productUserId": "user_123",
+  "timestamp": "2026-06-20T12:00:00.000Z",
+  "properties": {
+    "plan": "starter",
+    "source": "portfolio"
+  },
+  "context": {
+    "locale": "en",
+    "page": "/signup",
+    "referrer": "acronym.sk",
+    "appVersion": "1.4.2"
+  }
+}
+```
+
+### Required standard events
+
+For web products:
+
+```text
+app_opened
+page_viewed
+signup_started
+signup_completed
+login_completed
+demo_started
+checkout_started
+checkout_completed
+entitlement_checked
+entitlement_denied
+subscription_required
+subscription_recovered
+```
+
+For licensed desktop/download apps:
+
+```text
+download_started
+download_completed
+license_redemption_started
+license_redemption_completed
+license_activation_created
+license_validation_succeeded
+license_validation_failed
+license_grace_started
+license_suspended
+license_device_limit_reached
+```
+
+For APIs:
+
+```text
+api_key_created
+api_request_accepted
+api_request_rejected
+usage_limit_warning
+usage_limit_exceeded
+```
+
+### Analytics rules
+
+- Events must be privacy-conscious.
+- Do not send raw personal profiles.
+- Use anonymous IDs before account creation.
+- Use product-user IDs after login where needed.
+- Keep event names stable.
+- Keep high-cardinality values out of top-level fields.
+- Batch events.
+- Retry with backoff.
+- Drop non-critical analytics before harming app performance.
+- Respect cookie/consent rules for public marketing analytics.
+
+---
+
+## 13. Customer, account and product-user model
+
+Apps must understand the difference between customer, account, user and entitlement.
+
+```text
+Customer
+→ billing relationship, usually from Stripe
+
+Acronym Account
+→ identity/login controlled or recognised by Acronym/SYSTEMS.
+
+Product User
+→ app-local user profile
+
+Entitlement
+→ right to access a product or feature
+
+Licence
+→ redeemable or activated right for downloadable/desktop/API products
+
+Activation
+→ device, installation, account or API credential using the licence
+```
+
+Apps should not assume that the paying customer and the product user are the same person.
+
+Examples:
+
+- A company buys five seats.
+- One person buys a licence for another user.
+- An administrator has billing access but no product usage.
+- A customer owns several products.
+- A subscription grants hosted access but no downloadable licence.
+
+---
+
+## 14. Entitlement checks for hosted apps
+
+Hosted paid apps should check access through SYSTEMS. entitlements.
+
+Apps check the **effective entitlement** only. They do not need to understand whether access came from a subscription, one-time purchase, manual grant, trial, promotion, compensation or support override. SYSTEMS. resolves those sources internally through entitlement grants and revocations.
+
+Endpoint:
+
+```http
+POST /api/entitlements/check
+Authorization: Bearer <SYSTEMS_INTEGRATION_KEY>
+Content-Type: application/json
+```
+
+Request:
+
+```json
+{
+  "schema": "systems.entitlement.check.v1",
+  "productId": "prod_plot",
+  "accountId": "acct_123",
+  "productUserId": "user_456",
+  "requestedAccess": "app.full",
+  "environment": "production"
+}
+```
+
+Response:
+
+```json
+{
+  "allowed": true,
+  "entitlementId": "ent_789",
+  "state": "active",
+  "plan": "pro",
+  "source": "subscription",
+  "validUntil": "2026-07-20T00:00:00.000Z",
+  "graceUntil": null,
+  "features": {
+    "projects.max": 20,
+    "exports.enabled": true
+  },
+  "signature": "signed-response"
+}
+```
+
+App behaviour:
+
+- Allow access when `allowed=true`.
+- Deny or downgrade access when `allowed=false`.
+- Cache positive checks briefly.
+- Cache signed entitlement state for outage tolerance.
+- Never trust a client-side entitlement claim alone.
+- Do entitlement checks on the server for protected resources.
+- Re-check after billing/subscription events when notified.
+
+---
+
+## 15. Product-key and licence flow
+
+Product keys are mainly for downloadable, desktop, CLI or API products. Hosted web apps should prefer account-based entitlements.
+
+### Purchase-to-key flow
+
+```text
+Customer selects offer on acronym.sk
+→ Stripe Checkout
+→ Stripe webhook confirms payment/subscription
+→ SYSTEMS. creates order
+→ SYSTEMS. creates entitlement
+→ SYSTEMS. creates licence or redemption token
+→ Customer receives secure redemption email/link
+→ Customer redeems to an Acronym account or product user
+→ App activates licence
+→ SYSTEMS. tracks activation
+```
+
+### Product-key format
+
+Use high-entropy opaque keys. Do not encode personal or billing data in the key.
+
+Recommended display format:
+
+```text
+ACR-PLT-8K7D-2Q9M-X4ZP-H6VA
+```
+
+Rules:
+
+- Key must be random and high entropy.
+- Key must be stored hashed or encrypted in SYSTEMS.
+- Key must not contain email, price, plan or expiry.
+- Key must be revocable.
+- Key must support replacement.
+- Key must support device/seat limits.
+- Key must have audit history.
+
+### Redemption endpoint
+
+```http
+POST /api/licensing/redeem
+Content-Type: application/json
+```
+
+Request:
+
+```json
+{
+  "schema": "systems.license.redeem.v1",
+  "productKey": "ACR-PLT-8K7D-2Q9M-X4ZP-H6VA",
+  "accountId": "acct_123",
+  "productId": "prod_plot"
+}
+```
+
+Response:
+
+```json
+{
+  "redeemed": true,
+  "licenceId": "lic_123",
+  "entitlementId": "ent_789",
+  "plan": "pro",
+  "state": "active",
+  "activationRequired": true
+}
+```
+
+Product keys should preferably be redeemed through a secure SYSTEMS./Acronym page rather than typed into random app UI, unless the app is a desktop/CLI product.
+
+---
+
+## 16. Licence activation flow
+
+Used when a licence is bound to a device, installation, API credential or product account.
+
+Endpoint:
+
+```http
+POST /api/licensing/activate
+Authorization: Bearer <SYSTEMS_INTEGRATION_KEY>
+Content-Type: application/json
+```
+
+Request:
+
+```json
+{
+  "schema": "systems.license.activate.v1",
+  "licenceId": "lic_123",
+  "productId": "prod_plot",
+  "activationType": "device",
+  "device": {
+    "fingerprint": "hashed-device-fingerprint",
+    "name": "Zuzana MacBook Pro",
+    "platform": "macos"
+  },
+  "appVersion": "1.4.2"
+}
+```
+
+Response:
+
+```json
+{
+  "activated": true,
+  "activationId": "act_456",
+  "lease": {
+    "state": "active",
+    "validUntil": "2026-07-20T00:00:00.000Z",
+    "offlineUntil": "2026-07-27T00:00:00.000Z",
+    "features": {
+      "exports.enabled": true
+    },
+    "signature": "signed-licence-lease"
+  }
+}
+```
+
+Activation rules:
+
+- Device identifiers must be hashed.
+- Users must be able to deactivate old devices if the offer allows it.
+- Device reset limits should prevent abuse.
+- Activations must be auditable.
+- Activations must not expose other customers’ devices.
+- An app must handle “device limit reached” gracefully.
+
+---
+
+## 17. Licence validation
+
+Apps with licences must periodically validate or refresh a signed licence lease.
+
+Endpoint:
+
+```http
+POST /api/licensing/validate
+Authorization: Bearer <SYSTEMS_INTEGRATION_KEY>
+Content-Type: application/json
+```
+
+Request:
+
+```json
+{
+  "schema": "systems.license.validate.v1",
+  "licenceId": "lic_123",
+  "activationId": "act_456",
+  "productId": "prod_plot",
+  "appVersion": "1.4.2"
+}
+```
+
+Response:
+
+```json
+{
+  "valid": true,
+  "state": "active",
+  "subscription": {
+    "state": "active",
+    "currentPeriodEnd": "2026-07-20T00:00:00.000Z"
+  },
+  "lease": {
+    "validUntil": "2026-07-20T00:00:00.000Z",
+    "offlineUntil": "2026-07-27T00:00:00.000Z",
+    "signature": "signed-licence-lease"
+  }
+}
+```
+
+### Licence deactivation
+
+Endpoint:
+
+```http
+POST /api/licensing/deactivate
+Authorization: Bearer <SYSTEMS_INTEGRATION_KEY>
+Content-Type: application/json
+```
+
+Used when a customer removes an old device, resets an installation, or an administrator revokes an activation. Apps must treat deactivation as auditable and idempotent.
+
+Validation rules:
+
+- Validate on startup where reasonable.
+- Refresh lease periodically.
+- Continue during short SYSTEMS. outages using signed cached lease.
+- Do not block critical local user data export during payment failures.
+- Respect subscription grace periods.
+- Do not instantly lock users out after one failed payment.
+
+---
+
+## 18. Subscription states and required app behaviour
+
+Apps must recognise these subscription-driven entitlement states.
+
+```text
+active
+trialing
+past_due
+grace
+suspended
+cancel_at_period_end
+cancelled
+expired
+refunded
+chargeback
+manual_revoked
+```
+
+Recommended behaviour:
+
+| State | App behaviour |
+|---|---|
+| `active` | Full paid access |
+| `trialing` | Trial access with trial UI if needed |
+| `past_due` | Continue access if within paid-through or grace window |
+| `grace` | Continue limited or full access depending on offer |
+| `suspended` | Block paid features, allow billing recovery |
+| `cancel_at_period_end` | Continue access until period end |
+| `cancelled` | Remove access after paid-through date |
+| `expired` | Remove paid access |
+| `refunded` | Revoke purchased entitlement |
+| `chargeback` | Revoke and flag |
+| `manual_revoked` | Revoke according to admin action |
+
+App UX must show clear recovery paths:
+
+```text
+Your subscription needs attention.
+Update billing → opens Stripe Customer Portal.
+```
+
+The app must not collect card details.
+
+---
+
+## 19. Offline and outage behaviour
+
+SYSTEMS. must not become a hard real-time single point of failure for paid customers.
+
+Apps should use signed leases.
+
+```text
+Online validation succeeds
+→ app stores signed entitlement/licence lease
+→ SYSTEMS. temporarily unavailable
+→ app continues until offlineUntil
+→ app retries with exponential backoff
+→ app reconciles when SYSTEMS. returns
+```
+
+Rules:
+
+- Hosted web apps may use short cache windows.
+- Desktop apps should use longer offline windows.
+- Subscription apps should use bounded grace.
+- One-time perpetual apps should not require constant online checks.
+- Expired, refunded or revoked licences should be denied when known.
+- Apps should preserve local user data access/export even when paid features are suspended.
+
+---
+
+## 20. Webhook-style entitlement updates to apps
+
+For hosted apps, SYSTEMS. can notify apps when entitlements change.
+
+Endpoint implemented by app:
+
+```http
+POST /systems/webhooks/entitlement-updated
+X-Systems-Signature: <signature>
+Content-Type: application/json
+```
+
+Payload:
+
+```json
+{
+  "schema": "systems.webhook.entitlement_updated.v1",
+  "productId": "prod_plot",
+  "accountId": "acct_123",
+  "productUserId": "user_456",
+  "entitlementId": "ent_789",
+  "state": "suspended",
+  "reason": "subscription_past_due_grace_expired",
+  "occurredAt": "2026-06-20T12:00:00.000Z"
+}
+```
+
+Webhook rules:
+
+- Verify SYSTEMS. signature.
+- Use idempotency keys.
+- Process asynchronously.
+- Re-check entitlement from SYSTEMS. if event is critical.
+- Never trust unsigned webhook payloads.
+- Return 2xx only after durable acceptance.
+
+---
+
+## 21. Authentication integration
+
+There are three acceptable authentication modes.
+
+### Mode A — App-local users with SYSTEMS. entitlements
+
+The app owns login and users. SYSTEMS. knows mapped product-user IDs and entitlements.
+
+Best for existing products.
+
+### Mode B — Acronym account login
+
+The product uses Acronym/SYSTEMS. identity directly or through OIDC-like login.
+
+Best for new hosted paid products.
+
+### Mode C — Licence-only access
+
+The app validates product keys/licences without full account login.
+
+Best for desktop utilities, CLI tools and small downloadable apps.
+
+Apps must never use SYSTEMS. administrator sessions as customer login.
+
+---
+
+## 22. User registration reporting
+
+When a product creates or identifies a user, it should report the event.
+
+Endpoint:
+
+```http
+POST /api/ingest/events
+Authorization: Bearer <SYSTEMS_INTEGRATION_KEY>
+```
+
+Payload:
+
+```json
+{
+  "schema": "systems.event.v1",
+  "event": "product_user_registered",
+  "productId": "prod_plot",
+  "productUserId": "user_456",
+  "timestamp": "2026-06-20T12:00:00.000Z",
+  "properties": {
+    "signupMethod": "email",
+    "locale": "sk"
+  }
+}
+```
+
+Privacy rules:
+
+- Prefer stable internal IDs over raw emails.
+- Send email only when required for support/fulfilment and permitted.
+- Do not send passwords, tokens or full profile data.
+- Respect account deletion and data minimisation.
+
+---
+
+## 23. API products
+
+For API products, SYSTEMS. should track API keys as activations or credentials.
+
+Required behaviours:
+
+- API key creation connected to entitlement.
+- Usage reporting.
+- Rate-limit reporting.
+- Denial reason reporting.
+- Subscription state enforcement.
+- Key revocation.
+- Key rotation.
+
+Example usage event:
+
+```json
+{
+  "schema": "systems.event.v1",
+  "event": "api_request_accepted",
+  "productId": "prod_image_api",
+  "productUserId": "user_123",
+  "timestamp": "2026-06-20T12:00:00.000Z",
+  "properties": {
+    "endpoint": "remove_metadata",
+    "plan": "pro",
+    "units": 1
+  }
+}
+```
+
+---
+
+## 24. Worker/background apps
+
+Workers must be declared as workers in `systems.app.json`.
+
+Worker-specific requirements:
+
+- No public web route unless explicitly needed.
+- Health or heartbeat reporting.
+- Queue-depth reporting.
+- Job success/failure reporting.
+- Graceful shutdown.
+- Idempotent job handling.
+- No unbounded retries.
+- Dead-letter strategy.
+- Resource limits.
+
+Worker heartbeat example:
+
+```json
+{
+  "schema": "systems.heartbeat.v1",
+  "systemId": "sys_plot_worker",
+  "environment": "production",
+  "status": "ok",
+  "metrics": {
+    "queueDepth": 14,
+    "jobsPerMinute": 82,
+    "oldestJobAgeSeconds": 28
+  },
+  "timestamp": "2026-06-20T12:00:00.000Z"
+}
+```
+
+---
+
+## 25. Static/public portfolio apps
+
+Static apps and public portfolio renderers must be cache-friendly.
+
+Required:
+
+- Pre-rendered pages where possible.
+- Immutable hashed assets.
+- No database query for cached public page render.
+- Safe fallback when SYSTEMS. API is unavailable.
+- Local or edge cache of published catalog snapshot.
+- Language-aware routes.
+- SEO metadata per locale.
+- No admin APIs exposed publicly.
+
+Recommended routes:
+
+```text
+/
+ /sk
+ /en
+ /products/{slug}
+ /sk/products/{slug}
+ /en/products/{slug}
+ /pricing
+ /legal/terms
+ /legal/privacy
+ /legal/cookies
+```
+
+---
+
+## 26. Language support
+
+Public apps should be language-aware.
+
+Minimum required for Acronym-facing products:
+
+- Slovak and English content support.
+- Stable locale URLs.
+- Language switch mapping equivalent pages.
+- Localised SEO title/description.
+- Localised legal text where applicable.
+- Localised pricing display.
+- Fallback when translation is incomplete.
+
+Apps should send locale context in analytics:
+
+```json
+{
+  "context": {
+    "locale": "sk",
+    "page": "/sk/products/plot"
+  }
+}
+```
+
+---
+
+## 27. Security requirements
+
+Apps accepted by SYSTEMS. V4 must follow these rules.
+
+Forbidden by default:
+
+- Running as root.
+- Privileged containers.
+- Mounting Docker socket.
+- Hardcoded secrets.
+- Logging secrets.
+- Public debug endpoints.
+- Public admin panels without authentication.
+- Unverified webhooks.
+- Trusting client-side subscription status.
+- Storing card details.
+- Sending raw passwords/tokens to SYSTEMS.
+- Cross-product database access.
+
+Required:
+
+- Input validation.
+- Rate limiting on auth and licence endpoints.
+- CSRF protection for cookie-based apps.
+- Secure cookies.
+- HTTPS-only production URLs.
+- Dependency vulnerability scanning.
+- Secret rotation readiness.
+- Audit logging for licence/access changes.
+- Clear data deletion/export behaviour.
+- Error messages that do not leak internals.
+
+---
+
+## 28. Logging requirements
+
+Logs must be structured enough for SYSTEMS. to inspect.
+
+Recommended JSON log:
+
+```json
+{
+  "level": "info",
+  "message": "Checkout started",
+  "timestamp": "2026-06-20T12:00:00.000Z",
+  "requestId": "req_123",
+  "productId": "prod_plot",
+  "systemId": "sys_plot_web",
+  "environment": "production"
+}
+```
+
+Rules:
+
+- Log to stdout/stderr.
+- Include request ID where possible.
+- Do not log secrets.
+- Do not log raw product keys.
+- Do not log full payment data.
+- Do not log full personal profiles.
+- Use error fingerprints for repeat failures.
+- Keep logs useful but bounded.
+
+---
+
+## 29. Database and migrations
+
+Apps with databases must define their migration strategy.
+
+Required:
+
+- Migrations are versioned.
+- Migrations can be run non-interactively.
+- Migration failure fails deployment.
+- Backups are taken before risky production migrations where possible.
+- Rollback impact is documented.
+- App can report migration status in readiness check.
+
+Recommended manifest addition:
+
+```json
+{
+  "database": {
+    "required": true,
+    "engine": "postgres",
+    "migrationCommand": "npm run db:migrate:deploy",
+    "backupBeforeMigration": true
+  }
+}
+```
+
+Apps must not assume direct access to the SYSTEMS. platform database. Product databases are separate from SYSTEMS. control-plane data.
+
+---
+
+## 30. Build and deployment contract
+
+SYSTEMS. should be able to run:
+
+```text
+detect
+→ validate manifest
+→ build
+→ run smoke test
+→ deploy preview
+→ promote to production
+→ verify health
+```
+
+Apps should provide a smoke test script:
+
+```bash
+scripts/systems-smoke-test.sh
+```
+
+Expected checks:
+
+- App boots.
+- Health endpoint returns 200.
+- Version endpoint returns expected version.
+- Required routes respond.
+- Entitlement failure path is safe.
+- Analytics failure does not break app.
+- Graceful shutdown works.
+
+---
+
+## 31. Resource and performance requirements
+
+Apps must not be able to kill the host.
+
+Required:
+
+- Memory limit compatibility.
+- CPU limit compatibility.
+- Bounded startup work.
+- Bounded request body sizes.
+- Bounded uploads.
+- Bounded background jobs.
+- Configurable concurrency.
+- Database connection pooling.
+- Cache where appropriate.
+- Avoid expensive health checks.
+- Avoid unbounded analytics queues.
+
+Apps should expose safe resource hints:
+
+```json
+{
+  "resources": {
+    "memoryMb": 512,
+    "cpuShares": 1,
+    "maxUploadMb": 25,
+    "requiresPersistentVolume": false,
+    "backgroundConcurrency": 2
+  }
+}
+```
+
+Performance rules:
+
+- Public pages should be cacheable.
+- Admin/customer pages should not be publicly cached.
+- Checkout and entitlement responses should use conservative no-cache headers.
+- Static assets should use hashed filenames and long cache TTL.
+- Analytics should batch and drop under pressure.
+- Health checks should not hit slow third-party APIs.
+
+---
+
+## 32. Caching rules
+
+Recommended HTTP caching:
+
+| Surface | Cache policy |
+|---|---|
+| Public static assets | Long immutable cache |
+| Public portfolio pages | Cache with stale-while-revalidate |
+| Product marketing pages | Cacheable unless personalised |
+| App authenticated pages | Private/no-store |
+| Checkout/session routes | No-store |
+| Entitlement checks | Server-side short cache only |
+| Licence leases | Signed time-limited cache |
+| Admin APIs | No-store |
+| Health endpoints | No-store or very short cache |
+
+Apps must never cache personalised paid content publicly.
+
+---
+
+## 33. Legal and compliance readiness
+
+Apps that sell digital products in the EU/SK context must support the legal surfaces controlled by Acronym/SYSTEMS.
+
+App requirements:
+
+- Display or link terms where relevant.
+- Display or link privacy policy where relevant.
+- Respect cookie/consent state for tracking.
+- Support data export/deletion where user data is stored.
+- Avoid collecting unnecessary personal data.
+- Do not collect card data directly.
+- Support subscription cancellation/recovery UX through Stripe portal.
+- Clearly show paid feature restrictions.
+- Preserve user data export where reasonable after suspension.
+
+SYSTEMS. owns the final checkout compliance flow. Apps must not create parallel non-compliant purchase flows.
+
+---
+
+## 34. External app integration checklist
+
+External apps hosted outside SYSTEMS. must provide:
+
+- Stable public or private URL.
+- Heartbeat endpoint/reporting.
+- Release reporting.
+- Error reporting.
+- Analytics events.
+- Entitlement/licence checks if paid.
+- Scoped API key.
+- Rate limiting.
+- Backoff/retry logic.
+- Signed webhook verification.
+- No direct access to SYSTEMS. database.
+- No admin JWT embedded in app.
+- Clear owner and runbook.
+
+External apps are observed and commercialised by SYSTEMS.; they are not remotely controlled by SYSTEMS. in V4.
+
+---
+
+## 35. Required app states and user-facing screens
+
+Paid apps must handle these user states cleanly.
+
+Required screens/states:
+
+- Not logged in.
+- No entitlement.
+- Trial active.
+- Subscription active.
+- Payment failed.
+- Grace period.
+- Subscription suspended.
+- Licence expired.
+- Device limit reached.
+- Product key already redeemed.
+- Product key invalid.
+- Product key revoked.
+- SYSTEMS. temporarily unavailable.
+- Maintenance mode.
+- Read-only/data export mode.
+
+Never show raw internal errors to customers.
+
+---
+
+## 36. Product-key email and delivery
+
+SYSTEMS. should send the buyer a secure fulfilment email after verified payment. Apps should not send independent licence emails unless delegated by SYSTEMS.
+
+Recommended email flow:
+
+```text
+Payment confirmed
+→ SYSTEMS. creates entitlement/licence
+→ SYSTEMS. sends fulfilment email
+→ Customer opens secure redemption link
+→ Customer redeems or activates product
+```
+
+Email must include:
+
+- Product name.
+- Offer purchased.
+- Redemption link or instructions.
+- Billing portal link for subscriptions.
+- Support/contact link.
+- Expiry/trial information if applicable.
+
+Email should not expose permanent raw secret material unless necessary. Prefer secure redemption links.
+
+---
+
+## 37. SDK recommendation
+
+SYSTEMS. should provide official SDKs so every app does not reinvent the integration.
+
+Recommended first SDKs:
+
+```text
+@systems/node
+@systems/browser
+systems-python
+systems-cli
+```
+
+### Node server example
+
+```ts
+import { SystemsClient } from "@systems/node";
+
+const systems = new SystemsClient({
+  apiBaseUrl: process.env.SYSTEMS_API_BASE_URL!,
+  integrationKey: process.env.SYSTEMS_INTEGRATION_KEY!,
+  productId: process.env.SYSTEMS_PRODUCT_ID!,
+  systemId: process.env.SYSTEMS_APP_ID!,
+});
+
+export async function requireEntitlement(accountId: string) {
+  const result = await systems.entitlements.check({
+    accountId,
+    requestedAccess: "app.full",
+  });
+
+  if (!result.allowed) {
+    throw new Error("ENTITLEMENT_REQUIRED");
+  }
+
+  return result;
+}
+
+export async function trackSignup(productUserId: string) {
+  await systems.events.track({
+    event: "signup_completed",
+    productUserId,
+    properties: { source: "app" },
+  });
+}
+```
+
+### Browser SDK rule
+
+The browser SDK may send anonymous analytics events, but it must never contain secret integration keys.
+
+Browser events should be proxied or use a public write-only token with strict scope and rate limits.
+
+---
+
+## 38. API versioning
+
+All app integrations must include a schema/version.
+
+Examples:
+
+```text
+systems.event.v1
+systems.heartbeat.v1
+systems.license.validate.v1
+systems.entitlement.check.v1
+```
+
+Rules:
+
+- SYSTEMS. must accept old versions during a migration window.
+- Apps must not silently change event meaning.
+- Breaking changes require a new version.
+- SDKs should pin protocol versions.
+- Deprecated versions should appear in SYSTEMS. warnings.
+
+---
+
+## 39. Acceptance test checklist
+
+Before SYSTEMS. accepts an app as V4-ready, it should pass this checklist.
+
+### Build
+
+- Manifest exists.
+- Dockerfile or framework detection works.
+- Build succeeds.
+- Build does not require secrets that should only exist at runtime.
+- Image size is reasonable.
+- No privileged mode required.
+
+### Runtime
+
+- App listens on `PORT`.
+- Health endpoint works.
+- Readiness endpoint works.
+- Logs are readable.
+- Graceful shutdown works.
+- Required env vars are validated.
+- App survives restart.
+
+### Security
+
+- No committed secrets.
+- No public debug/admin route.
+- No raw product-key logging.
+- No card storage.
+- Webhooks are signed.
+- Entitlement checks are server-side.
+- App does not use SYSTEMS. admin credentials.
+
+### Commerce
+
+- Paid access is blocked without entitlement.
+- Active entitlement grants access.
+- Cancelled/expired entitlement removes access.
+- Past-due/grace state behaves correctly.
+- Billing recovery link works.
+- Product-key redemption works if applicable.
+- Device limit works if applicable.
+
+### Analytics
+
+- Required events are emitted.
+- Events are batched.
+- Analytics failure does not break the app.
+- Locale/page context is included where applicable.
+- Personal data is minimised.
+
+### Operations
+
+- Release reporting works.
+- Heartbeat works for external apps.
+- Error reporting is scrubbed.
+- Resource hints exist.
+- Smoke test passes.
+- Runbook exists.
+
+---
+
+## 40. App runbook requirements
+
+Every important product should include `docs/RUNBOOK.md`.
+
+Runbook must answer:
+
+```text
+What does this app do?
+What are its critical routes?
+What dependencies does it need?
+How do you deploy it?
+How do you roll it back?
+How do you verify it is healthy?
+What are common failure modes?
+How do you recover from failed payment/entitlement sync?
+How do you disable paid access safely?
+How do you export customer/user data?
+Who owns the product?
+```
+
+---
+
+## 41. Common rejection reasons
+
+SYSTEMS. should reject or quarantine apps that:
+
+- Cannot run without manual steps.
+- Require root/privileged Docker without approval.
+- Have no health endpoint.
+- Leak secrets in logs.
+- Store card data.
+- Hardcode production URLs/secrets.
+- Use hidden paths as security.
+- Require direct access to SYSTEMS. database.
+- Break when analytics fails.
+- Break when SYSTEMS. entitlement API is temporarily unavailable.
+- Cannot handle subscription cancellation.
+- Cannot revoke product keys.
+- Have no runbook for paid products.
+- Consume unbounded resources.
+- Cannot be cleanly stopped.
+
+---
+
+## 42. Minimal examples by app type
+
+### Static product page
+
+Must have:
+
+```text
+systems.app.json
+build output
+health/static availability
+cacheable assets
+localized SEO if public
+```
+
+No product-key or entitlement integration needed unless selling protected content.
+
+### Hosted SaaS/web app
+
+Must have:
+
+```text
+health + readiness
+server-side entitlement checks
+subscription states
+analytics events
+user registration reporting
+billing recovery UX
+safe outage cache
+```
+
+### Desktop/downloadable app
+
+Must have:
+
+```text
+product-key redemption
+licence activation
+signed licence lease
+offline grace
+device limit handling
+revocation handling
+activation analytics
+```
+
+### API product
+
+Must have:
+
+```text
+API key/credential issuance
+entitlement check
+usage reporting
+rate-limit reporting
+subscription enforcement
+key revocation
+```
+
+### Worker
+
+Must have:
+
+```text
+heartbeat
+queue metrics
+job reporting
+graceful shutdown
+bounded retries
+dead-letter handling
+```
+
+---
+
+## 43. Recommended development flow for app developers
+
+```text
+1. Build the app normally.
+2. Add systems.app.json.
+3. Add health, readiness and version endpoints.
+4. Move all config to env vars.
+5. Add structured logs.
+6. Add entitlement checks if paid.
+7. Add product-key/licence flow if downloadable/API/desktop.
+8. Add analytics events.
+9. Add release/error/heartbeat reporting.
+10. Add graceful shutdown.
+11. Add smoke tests.
+12. Add runbook.
+13. Deploy to SYSTEMS. preview.
+14. Verify acceptance checklist.
+15. Promote to production.
+```
+
+---
+
+## 44. Final principle
+
+A V4-ready app should not merely run in Docker.
+
+It should be understandable, observable, sellable, recoverable and safe.
+
+SYSTEMS. must be able to answer:
+
+```text
+What is this app?
+How do we build it?
+Is it healthy?
+Who can access it?
+Who paid for it?
+What licence or subscription do they have?
+What version is running?
+What changed recently?
+Is it converting?
+Is it hurting the server?
+Can it recover safely?
+```
+
+Only apps that can answer those questions should be treated as fully accepted SYSTEMS. V4 products.
