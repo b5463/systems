@@ -1,6 +1,6 @@
 'use strict';
 
-const { db } = require('../db');
+const { statsRepo } = require('../repo');
 const { getContainerStats } = require('../services/docker');
 const { loadOr404 } = require('../util/project');
 const { getSetting } = require('../util/settings');
@@ -19,7 +19,7 @@ async function statsRoutes(fastify, options) {
   }, async (request, reply) => {
     const { slug } = request.params;
 
-    const project = loadOr404(reply, slug);
+    const project = await loadOr404(reply, slug);
     if (!project) return;
 
     if (!project.container_id) {
@@ -44,25 +44,19 @@ async function statsRoutes(fastify, options) {
       // Fire-and-forget: persist a snapshot for historical charts.
       // Never block (or fail) the live-stats response on the write.
       try {
-        db.prepare(`
-          INSERT INTO stats_history
-            (project_id, cpu_percent, memory_mb, memory_limit_mb, rx_bytes, tx_bytes)
-          VALUES (?, ?, ?, ?, ?, ?)
-        `).run(
-          project.id,
-          safeStats.cpu_percent,
-          stats.memory_mb ?? 0,
-          stats.memory_limit_mb ?? 0,
-          stats.rx_bytes ?? 0,
-          stats.tx_bytes ?? 0
-        );
+        await statsRepo.insertStats({
+          project_id: project.id,
+          cpu_percent: safeStats.cpu_percent,
+          memory_mb: stats.memory_mb ?? 0,
+          memory_limit_mb: stats.memory_limit_mb ?? 0,
+          rx_bytes: stats.rx_bytes ?? 0,
+          tx_bytes: stats.tx_bytes ?? 0,
+        });
         // Occasionally trim old history so the table doesn't grow without bound
         // (this endpoint is polled for every running system on an interval).
         if (Math.random() < 0.02) {
-          const hours = getSetting('statsRetentionHours');
-          db.prepare(
-            `DELETE FROM stats_history WHERE project_id = ? AND julianday(recorded_at) < julianday('now', ?)`
-          ).run(project.id, `-${hours} hours`);
+          const hours = await getSetting('statsRetentionHours');
+          await statsRepo.pruneOlderThan(project.id, hours);
         }
       } catch (writeErr) {
         request.log.warn({ err: writeErr }, '[stats] Failed to persist stats history');
@@ -84,10 +78,10 @@ async function statsRoutes(fastify, options) {
   }, async (request, reply) => {
     const { slug } = request.params;
 
-    const project = loadOr404(reply, slug);
+    const project = await loadOr404(reply, slug);
     if (!project) return;
 
-    const retentionHours = getSetting('statsRetentionHours');
+    const retentionHours = await getSetting('statsRetentionHours');
     let hours = Number(request.query.hours);
     if (!Number.isFinite(hours) || hours <= 0) hours = 1;
     hours = Math.min(hours, retentionHours);
@@ -96,19 +90,7 @@ async function statsRoutes(fastify, options) {
     // ten-second buckets; wider windows are averaged into proportionally larger
     // buckets instead of shipping every stored poll to the browser.
     const bucketSeconds = Math.max(10, Math.ceil((hours * 3600) / 360));
-    const rawPoints = db.prepare(`
-      SELECT
-        AVG(cpu_percent) AS cpu_percent,
-        AVG(memory_mb) AS memory_mb,
-        AVG(rx_bytes) AS rx_bytes,
-        AVG(tx_bytes) AS tx_bytes,
-        MAX(recorded_at) AS recorded_at
-      FROM stats_history
-      WHERE project_id = ?
-        AND recorded_at >= strftime('%Y-%m-%dT%H:%M:%SZ', 'now', ?)
-      GROUP BY CAST(CAST(strftime('%s', recorded_at) AS INTEGER) / ? AS INTEGER)
-      ORDER BY recorded_at ASC
-    `).all(project.id, `-${hours} hours`, bucketSeconds);
+    const rawPoints = await statsRepo.getHistory(project.id, hours, bucketSeconds);
 
     const points = rawPoints.map((point) => ({
       ...point,

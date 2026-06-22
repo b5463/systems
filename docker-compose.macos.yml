@@ -1,6 +1,22 @@
 name: systems-macos
 
 services:
+  systems-postgres:
+    image: postgres:16-alpine
+    container_name: systems-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: systems
+      POSTGRES_USER: systems
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - "${SYSTEMS_MAC_DATA_DIR}/pgdata:/var/lib/postgresql/data"
+    networks: [systems]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U systems"]
+      interval: 5s
+      retries: 5
+
   acronym-nginx:
     image: nginx:1.27-alpine
     container_name: acronym-nginx
@@ -28,6 +44,7 @@ services:
       BACKUP_DIR: /app/data/backups
       DEPLOYMENTS_DIR: /app/data/releases
       UPLOADS_DIR: /app/data/uploads
+      DATABASE_URL: postgresql://systems:${POSTGRES_PASSWORD}@systems-postgres:5432/systems
       JWT_SECRET: ${JWT_SECRET}
       CSRF_SECRET: ${CSRF_SECRET:-}
       SESSION_IDLE_MINUTES: ${SESSION_IDLE_MINUTES:-720}
@@ -45,7 +62,13 @@ services:
       SYSTEMS_API_INTERNAL_UPSTREAM: acronym-api:3000
       SYSTEMS_APP_UPSTREAM_HOST: host.docker.internal
       RECONCILE_INTERVAL_SEC: ${RECONCILE_INTERVAL_SEC:-30}
-    depends_on: [acronym-nginx]
+      POSTGRES_HOST: systems-postgres
+      POSTGRES_PORT: "5432"
+    depends_on:
+      systems-postgres:
+        condition: service_healthy
+      acronym-nginx:
+        condition: service_started
     networks: [systems]
 
 networks:

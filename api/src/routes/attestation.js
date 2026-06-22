@@ -1,7 +1,7 @@
 'use strict';
 
 const crypto = require('crypto');
-const { db } = require('../db');
+const { projectRepo } = require('../repo');
 const attestation = require('../util/attestation');
 
 async function attestationRoutes(fastify) {
@@ -18,10 +18,7 @@ async function attestationRoutes(fastify) {
     if (!attestation.validNonce(nonce) || !attestation.validCredential(slug, credential)) {
       return reply.code(404).send({ error: 'Not found' });
     }
-    const project = db.prepare(
-      `SELECT slug, image_id, status, deploy_type, health_state, health_status, health_checked_at
-       FROM projects WHERE slug = ? AND status != 'deleted'`
-    ).get(slug);
+    const project = await projectRepo.findBySlugNotDeleted(slug);
     if (!project) return reply.code(404).send({ error: 'Not found' });
 
     const issuedAt = Date.now();

@@ -2,7 +2,7 @@
 
 const fsp = require('fs/promises');
 const path = require('path');
-const { db, auditLog } = require('../db');
+const { projectRepo, auditRepo } = require('../repo');
 const dockerService = require('../services/docker');
 const { projectContainerOptions } = require('../util/limits');
 const { extractZip, detectProjectType, generateDockerfile } = require('../services/zip');
@@ -24,15 +24,6 @@ const buildGate = new BuildGate();
 
 const { getSetting } = require('../util/settings');
 const RELEASE_RETENTION = () => getSetting('releaseRetention');
-
-// Serialize the port-allocation + INSERT critical section across concurrent
-// deploys (an in-process promise chain).
-let deployLock = Promise.resolve();
-function withDeployLock(fn) {
-  const run = deployLock.then(fn, fn);
-  deployLock = run.then(() => {}, () => {});
-  return run;
-}
 
 // Stream a multipart upload to a temp .zip, capturing string fields. Enforces
 // the transport cap. Shared by the deploy + redeploy endpoints.
@@ -64,14 +55,9 @@ async function readUploadToTmp(request) {
 
 // Trim deploy_history rows beyond the retention count (metadata only — the
 // rollback pointer lives on the project row and is never trimmed).
-function pruneReleases(projectId) {
+async function pruneReleases(projectId) {
   try {
-    db.prepare(`
-      DELETE FROM deploy_history
-      WHERE project_id = ? AND id NOT IN (
-        SELECT id FROM deploy_history WHERE project_id = ? ORDER BY deployed_at DESC, id DESC LIMIT ?
-      )
-    `).run(projectId, projectId, RELEASE_RETENTION());
+    await projectRepo.pruneDeployHistory(projectId, RELEASE_RETENTION());
   } catch (e) { /* best-effort */ }
 }
 
@@ -124,19 +110,17 @@ function recentLogExcerpt(slug) {
 // Record a deploy/redeploy failure with the failing stage, a clear log message,
 // a recovery hint, an audit entry, a notification, and a persisted last_error so
 // the dashboard can show *what* failed rather than a bare "error".
-function failBuild({ slug, stage, err, userId, ip, tag = 'deploy' }) {
+async function failBuild({ slug, stage, err, userId, ip, tag = 'deploy' }) {
   const info = STAGE_INFO[stage] || { label: stage || 'deploying', hint: '' };
   const reason = `Failed while ${info.label}: ${err.message}`;
   appendBuildLog(slug, `\n[${tag}] FAILED while ${info.label}: ${err.message}\n`);
   if (info.hint) appendBuildLog(slug, `[${tag}] Next step: ${info.hint}\n`);
   finishBuild(slug, 'error');
-  auditLog({ user_id: userId, action: `${tag}_fail`, target: slug, detail: `${stage}: ${err.message}`.slice(0, 300), ip });
+  await auditRepo.appendAudit({ user_id: userId, action: `${tag}_fail`, target: slug, detail: `${stage}: ${err.message}`.slice(0, 300), ip });
   notify.send({ kind: 'deploy_failed', slug, detail: reason }).catch(() => {});
   try {
-    db.prepare(`UPDATE projects SET github_deploy_status = 'failed', github_deploy_detail = ?, github_deploy_at = datetime('now') WHERE slug = ? AND github_deploy_status = 'building'`)
-      .run(reason.slice(0, 500), slug);
-    db.prepare(`UPDATE projects SET status = 'error', last_error = ?, last_error_stage = ?, last_error_hint = ?, last_error_excerpt = ?, updated_at = datetime('now') WHERE slug = ?`)
-      .run(reason.slice(0, 500), stage || null, info.hint || null, recentLogExcerpt(slug), slug);
+    await projectRepo.updateGithubDeployFailed(slug, reason.slice(0, 500));
+    await projectRepo.updateError(slug, { lastError: reason.slice(0, 500), lastErrorStage: stage || null, lastErrorHint: info.hint || null, lastErrorExcerpt: recentLogExcerpt(slug) });
   } catch (dbErr) {
     console.error(`[${tag}] Failed to update status to error:`, dbErr);
   }
@@ -226,7 +210,7 @@ function probeHealthSoon(slug) {
   (async () => {
     for (let i = 0; i < 4; i++) {
       await new Promise((r) => setTimeout(r, i === 0 ? 800 : 2000));
-      const fresh = db.prepare('SELECT slug, port, route_published, health_path FROM projects WHERE slug = ?').get(slug);
+      const fresh = await projectRepo.findBySlug(slug);
       if (!fresh) return;
       const target = health.targetFor(fresh);
       if (!target) return;
@@ -235,10 +219,8 @@ function probeHealthSoon(slug) {
         const routeAttestation = fresh.route_published && !health.isLocalMode()
           ? await health.checkAttestation(target, slug)
           : { state: 'not_applicable', checkedAt: new Date().toISOString() };
-        db.prepare('UPDATE projects SET health_state = ?, health_status = ?, health_response_ms = ?, health_checked_at = ?, attestation_state = ?, attestation_checked_at = ? WHERE slug = ?')
-          .run(hr.state, hr.httpStatus, hr.responseMs, hr.checkedAt, routeAttestation.state, routeAttestation.checkedAt, slug);
-        db.prepare(`UPDATE projects SET health_failures = CASE WHEN ? = 'healthy' THEN 0 ELSE health_failures + 1 END WHERE slug = ?`)
-          .run(hr.state, slug);
+        await projectRepo.updateHealth(slug, { healthState: hr.state, healthStatus: hr.httpStatus, healthResponseMs: hr.responseMs, healthCheckedAt: hr.checkedAt, attestationState: routeAttestation.state, attestationCheckedAt: routeAttestation.checkedAt });
+        await projectRepo.updateHealthFailures(slug, hr.state);
         if (hr.state === 'healthy') return;
       } catch { /* keep trying */ }
     }
@@ -276,23 +258,17 @@ async function runBuildPipeline(slug, zipPath, extractDir, port, userId, ip, env
     stage = 'container';
     const containerPort = (await dockerService.imageExposedPort(imageId)) || 3000;
     appendBuildLog(slug, `[deploy] Starting container — host ${port} → container ${containerPort}...\n`);
-    const runtimeProject = db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug);
+    const runtimeProject = await projectRepo.findBySlug(slug);
     const containerId = await dockerService.runContainer(
       slug, imageId, port, envVars, projectContainerOptions(runtimeProject, { containerPort })
     );
     appendBuildLog(slug, `[deploy] Container started: ${containerId}\n`);
 
     stage = 'route';
-    const project = db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug);
+    const project = await projectRepo.findBySlug(slug);
     const visibility = project?.visibility || 'public';
 
-    db.prepare(`
-      UPDATE projects
-      SET status = 'running', container_id = ?, image_id = ?, deploy_type = ?, last_error = NULL,
-          last_error_stage = NULL, last_error_hint = NULL, last_error_excerpt = NULL,
-          updated_at = datetime('now')
-      WHERE slug = ?
-    `).run(containerId, imageId, projectType, slug);
+    await projectRepo.updateAfterBuild(slug, { containerId, imageId, deployType: projectType });
 
     // Publish the route per visibility (private => no public route).
     appendBuildLog(slug, `[deploy] Publishing ${visibility} route via ${proxy.kind()}...\n`);
@@ -315,16 +291,16 @@ async function runBuildPipeline(slug, zipPath, extractDir, port, userId, ip, env
     } catch (e) {
       appendBuildLog(slug, `[deploy] WARNING: route publish failed: ${e.message}\n`);
     }
-    db.prepare(`UPDATE projects SET route_published = ? WHERE slug = ?`).run(published ? 1 : 0, slug);
-    if (project?.id) pruneReleases(project.id);
+    await projectRepo.updateRoutePublished(slug, published);
+    if (project?.id) await pruneReleases(project.id);
 
     appendBuildLog(slug, `[deploy] Deployment complete.\n`);
-    auditLog({ user_id: userId, action: 'deploy', target: slug, detail: `port:${port} ${visibility}`, ip });
+    await auditRepo.appendAudit({ user_id: userId, action: 'deploy', target: slug, detail: `port:${port} ${visibility}`, ip });
     notify.send({ kind: 'deploy', slug, detail: 'deployed' }).catch(() => {});
     finishBuild(slug, 'done');
     probeHealthSoon(slug);
   } catch (err) {
-    failBuild({ slug, stage, err, userId, ip, tag: 'deploy' });
+    await failBuild({ slug, stage, err, userId, ip, tag: 'deploy' });
   } finally {
     buildGate.release(slug);
     try {
@@ -337,7 +313,7 @@ async function runBuildPipeline(slug, zipPath, extractDir, port, userId, ip, env
 }
 
 async function runRedeployPipeline(slug, zipPath, extractDir, userId, ip) {
-  const project = db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug);
+  const project = await projectRepo.findBySlug(slug);
   const oldContainerId = project.container_id;
   const oldImageId = project.image_id;
   const port = project.port;
@@ -358,17 +334,10 @@ async function runRedeployPipeline(slug, zipPath, extractDir, userId, ip) {
     // Snapshot the current deploy so it can be rolled back to. We record this
     // BEFORE building the new image so the project always points at a known-good
     // previous image/container.
-    db.prepare(`
-      UPDATE projects
-      SET previous_container_id = ?, previous_image_id = ?
-      WHERE slug = ?
-    `).run(oldContainerId || null, oldImageId || null, slug);
+    await projectRepo.setPreviousSnap(slug, oldContainerId || null, oldImageId || null);
 
     try {
-      db.prepare(`
-        INSERT INTO deploy_history (project_id, image_id, container_id)
-        VALUES (?, ?, ?)
-      `).run(project.id, oldImageId || null, oldContainerId || null);
+      await projectRepo.createDeployHistory(project.id, oldImageId || null, oldContainerId || null);
     } catch (e) {
       console.error('[redeploy] Failed to record deploy history:', e);
     }
@@ -408,25 +377,19 @@ async function runRedeployPipeline(slug, zipPath, extractDir, userId, ip) {
     );
     appendBuildLog(slug, `[redeploy] Container started: ${newContainerId}\n`);
 
-    db.prepare(`
-      UPDATE projects
-      SET status = 'running', container_id = ?, image_id = ?, last_error = NULL,
-          last_error_stage = NULL, last_error_hint = NULL, last_error_excerpt = NULL,
-          updated_at = datetime('now')
-      WHERE slug = ?
-    `).run(newContainerId, newImageId, slug);
+    await projectRepo.updateAfterRedeploy(slug, { containerId: newContainerId, imageId: newImageId });
 
     // Keep the old image for rollback — do NOT remove it on redeploy.
     // (Previously: dockerService.removeImage(oldImageId, true).)
 
     appendBuildLog(slug, `[redeploy] Redeploy complete.\n`);
-    db.prepare(`UPDATE projects SET github_deploy_status = 'succeeded', github_deploy_detail = 'Deployment completed', github_deploy_at = datetime('now') WHERE slug = ? AND github_deploy_status = 'building'`).run(slug);
-    auditLog({ user_id: userId, action: 'redeploy', target: slug, ip });
+    await projectRepo.updateGithubDeploySucceeded(slug);
+    await auditRepo.appendAudit({ user_id: userId, action: 'redeploy', target: slug, ip });
     notify.send({ kind: 'redeploy', slug, detail: 'redeployed' }).catch(() => {});
     finishBuild(slug, 'done');
     probeHealthSoon(slug);
   } catch (err) {
-    failBuild({ slug, stage, err, userId, ip, tag: 'redeploy' });
+    await failBuild({ slug, stage, err, userId, ip, tag: 'redeploy' });
   } finally {
     buildGate.release(slug);
     try {
@@ -448,7 +411,7 @@ async function beginDeploy({ name, slug, visibility = 'public', zipPath, userId,
   if (!zipPath) return { ok: false, code: 400, error: 'Missing file upload' };
   if (!['public', 'private'].includes(visibility)) visibility = 'public';
 
-  const existing = db.prepare('SELECT id FROM projects WHERE slug = ? OR name = ?').get(slug, name);
+  const existing = await projectRepo.findBySlugOrName(slug, name);
   if (existing) return { ok: false, code: 409, error: 'A project with this name or slug already exists' };
   if (!buildGate.tryAcquire(slug)) {
     return { ok: false, code: 429, error: 'Build capacity is full. Wait for the active build to finish and try again.' };
@@ -456,28 +419,24 @@ async function beginDeploy({ name, slug, visibility = 'public', zipPath, userId,
 
   let handedOff = false;
   try {
-    // Serialize port allocation + INSERT so concurrent deploys cannot claim the
-    // same host port. Build concurrency is controlled separately by buildGate.
-    let port, project, conflict;
-    await withDeployLock(async () => {
-      if (db.prepare('SELECT id FROM projects WHERE slug = ? OR name = ?').get(slug, name)) { conflict = true; return; }
-      const dbPorts = db.prepare('SELECT port FROM projects WHERE port IS NOT NULL').all();
-      const usedPorts = new Set(dbPorts.map((r) => r.port));
-      port = await dockerService.findFreePort(4000, 5000, usedPorts);
-      db.prepare(`INSERT INTO projects (name, slug, port, status, visibility) VALUES (?, ?, ?, 'building', ?)`).run(name, slug, port, visibility);
-      project = db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug);
+    const result = await projectRepo.allocateAndCreate(
+      { name, slug, visibility },
+      dockerService.findFreePort
+    );
+    if (result.conflict) return { ok: false, code: 409, error: 'A project with this name or slug already exists' };
+    const port = result.port;
+    const project = result.project;
 
-      if (Object.keys(envVars).length > 0 && process.env.ENV_SECRET) {
-        try {
-          const { encryptEnvVars } = require('./env');
-          const encrypted = encryptEnvVars(envVars);
-          db.prepare('UPDATE projects SET env_vars = ? WHERE slug = ?').run(encrypted, slug);
-        } catch (e) {
-          console.error('[deploy] Failed to save env vars:', e);
-        }
+    // env vars
+    if (Object.keys(envVars).length > 0 && process.env.ENV_SECRET) {
+      try {
+        const { encryptEnvVars } = require('./env');
+        const encrypted = encryptEnvVars(envVars);
+        await projectRepo.updateEnvVars(slug, encrypted);
+      } catch (e) {
+        console.error('[deploy] Failed to save env vars:', e);
       }
-    });
-    if (conflict) return { ok: false, code: 409, error: 'A project with this name or slug already exists' };
+    }
 
     buildLogs.set(slug, []);
     buildStatus.set(slug, 'building');
@@ -502,7 +461,7 @@ async function beginDeploy({ name, slug, visibility = 'public', zipPath, userId,
 // Kick a redeploy of an existing system from an already-saved zip. Shared by
 // the multipart redeploy endpoint and the GitHub push handler.
 async function beginRedeploy({ slug, zipPath, userId, ip }) {
-  const project = db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug);
+  const project = await projectRepo.findBySlug(slug);
   if (!project) return { ok: false, code: 404, error: 'Project not found' };
   if (project.status === 'building') return { ok: false, code: 409, error: 'Build already in progress' };
   if (!zipPath) return { ok: false, code: 400, error: 'Missing file upload' };
@@ -512,7 +471,7 @@ async function beginRedeploy({ slug, zipPath, userId, ip }) {
 
   let handedOff = false;
   try {
-    db.prepare(`UPDATE projects SET status = 'building', updated_at = datetime('now') WHERE slug = ?`).run(slug);
+    await projectRepo.updateStatus(slug, 'building');
     buildLogs.set(slug, []);
     buildStatus.set(slug, 'building');
 
@@ -525,7 +484,7 @@ async function beginRedeploy({ slug, zipPath, userId, ip }) {
     handedOff = true;
     return { ok: true, slug };
   } catch (err) {
-    db.prepare("UPDATE projects SET status = ?, updated_at = datetime('now') WHERE slug = ?").run(project.status, slug);
+    await projectRepo.updateStatus(slug, project.status);
     throw err;
   } finally {
     if (!handedOff) buildGate.release(slug);
@@ -551,7 +510,7 @@ async function deployRoutes(fastify, options) {
     const { slug } = request.body;
     const visibility = request.body.visibility || 'public';
     const err = slugError(slug);
-    const taken = !err && !!db.prepare('SELECT 1 FROM projects WHERE slug = ? AND status != ?').get(slug, 'deleted');
+    const taken = !err && await projectRepo.slugTaken(slug);
 
     const plan = {
       slug,
@@ -630,7 +589,7 @@ async function deployRoutes(fastify, options) {
     },
   }, async (request, reply) => {
     const { slug } = request.params;
-    const project = db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug);
+    const project = await projectRepo.findBySlug(slug);
     if (!project) return reply.code(404).send({ error: 'Project not found' });
     if (project.status === 'building') return reply.code(409).send({ error: 'Build already in progress' });
 

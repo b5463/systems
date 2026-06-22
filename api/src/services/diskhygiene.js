@@ -2,7 +2,7 @@
 
 const fsp = require('fs/promises');
 const path = require('path');
-const { db } = require('../db');
+const { projectRepo } = require('../repo');
 const { createDocker } = require('./docker');
 const { DATA_DIR } = require('../util/paths');
 
@@ -14,10 +14,8 @@ function deploymentsDir() {
 
 // All image IDs currently referenced by any project (current + rollback).
 // Includes soft-deleted rows because they still hold images until purged.
-function referencedImageIds() {
-  const rows = db
-    .prepare('SELECT image_id, previous_image_id FROM projects')
-    .all();
+async function referencedImageIds() {
+  const rows = await projectRepo.getAllImageIds();
   const ids = new Set();
   for (const r of rows) {
     if (r.image_id) ids.add(r.image_id);
@@ -103,7 +101,7 @@ async function previewCleanup() {
 
   try {
     const images = await managedImages();
-    const refIds = referencedImageIds();
+    const refIds = await referencedImageIds();
     const prunable = images.filter((img) => !idMatches(img.Id, refIds));
     result.images.count = prunable.length;
     result.images.sizeMb = Math.round(
@@ -114,9 +112,8 @@ async function previewCleanup() {
   try {
     const dir = deploymentsDir();
     const entries = await fsp.readdir(dir, { withFileTypes: true });
-    const knownSlugs = new Set(
-      db.prepare('SELECT slug FROM projects').all().map((r) => r.slug)
-    );
+    const slugs = await projectRepo.getAllSlugs();
+    const knownSlugs = new Set(slugs);
     result.releases.count = entries.filter(
       (e) => e.isDirectory() && !knownSlugs.has(e.name)
     ).length;
@@ -134,7 +131,7 @@ async function runCleanup() {
 
   try {
     const images = await managedImages();
-    const refIds = referencedImageIds();
+    const refIds = await referencedImageIds();
     const prunable = images.filter((img) => !idMatches(img.Id, refIds));
     imagesSizeMb = Math.round(
       prunable.reduce((sum, img) => sum + (img.Size || 0), 0) / (1024 * 1024)
@@ -156,9 +153,8 @@ async function runCleanup() {
   try {
     const dir = deploymentsDir();
     const entries = await fsp.readdir(dir, { withFileTypes: true });
-    const knownSlugs = new Set(
-      db.prepare('SELECT slug FROM projects').all().map((r) => r.slug)
-    );
+    const slugs = await projectRepo.getAllSlugs();
+    const knownSlugs = new Set(slugs);
     for (const e of entries.filter(
       (x) => x.isDirectory() && !knownSlugs.has(x.name)
     )) {

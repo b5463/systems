@@ -1,7 +1,7 @@
 'use strict';
 
 const crypto = require('crypto');
-const { db, auditLog } = require('../db');
+const { projectRepo, auditRepo } = require('../repo');
 const dockerService = require('../services/docker');
 const { projectContainerOptions } = require('../util/limits');
 const { loadOr404 } = require('../util/project');
@@ -44,7 +44,7 @@ async function envRoutes(fastify, options) {
     preHandler: [fastify.authenticate],
   }, async (request, reply) => {
     const { slug } = request.params;
-    const project = loadOr404(reply, slug);
+    const project = await loadOr404(reply, slug);
     if (!project) return;
 
     if (!project.env_vars) return { keys: [] };
@@ -82,7 +82,7 @@ async function envRoutes(fastify, options) {
     const vars = request.body.vars || {};
     const remove = request.body.remove || [];
 
-    const project = loadOr404(reply, slug);
+    const project = await loadOr404(reply, slug);
     if (!project) return;
     if (project.status === 'building') return reply.code(409).send({ error: 'Cannot update env while building' });
 
@@ -125,7 +125,7 @@ async function envRoutes(fastify, options) {
 
     // Store encrypted vars, and mark building during the recreate so
     // reconciliation (which skips 'building') doesn't race the swap window.
-    db.prepare(`UPDATE projects SET env_vars = ?, status = 'building', updated_at = datetime('now') WHERE slug = ?`).run(encrypted, slug);
+    await projectRepo.updateEnvAndBuilding(slug, encrypted);
 
     // Recreate container with new env vars (stop → remove → recreate → start)
     try {
@@ -138,12 +138,10 @@ async function envRoutes(fastify, options) {
         slug, project.image_id, project.port, merged, projectContainerOptions(project)
       );
 
-      db.prepare(`
-        UPDATE projects SET status = 'running', container_id = ?, updated_at = datetime('now') WHERE slug = ?
-      `).run(newContainerId, slug);
+      await projectRepo.updateContainerRunning(slug, newContainerId);
 
       const changed = [...Object.keys(vars), ...remove.map((k) => `-${k}`)];
-      auditLog({
+      await auditRepo.appendAudit({
         user_id: request.user.id,
         action: 'env_update',
         target: slug,
@@ -156,7 +154,7 @@ async function envRoutes(fastify, options) {
       request.log.error({ err }, '[env] Failed to recreate container with new env vars');
       // The old container was already removed; null the id so reconcile/lifecycle
       // don't act on a removed container. Operator redeploys to recover.
-      db.prepare(`UPDATE projects SET status = 'error', container_id = NULL, updated_at = datetime('now') WHERE slug = ?`).run(slug);
+      await projectRepo.updateContainerError(slug);
       return reply.code(500).send({ error: `Failed to restart container: ${err.message}` });
     }
   });

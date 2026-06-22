@@ -3,15 +3,18 @@
 const fs = require('fs');
 const fsp = require('fs/promises');
 const path = require('path');
-const { db, auditLog } = require('../db');
+const { execFile } = require('child_process');
+const { promisify } = require('util');
+const { auditRepo } = require('../repo');
 const notify = require('./notify');
 const { backupsToPrune, backupStamp } = require('../util/backup');
 const { getSetting } = require('../util/settings');
 
-// Node-native backups. Uses better-sqlite3's online backup API, which is safe
-// to run against a live WAL-mode database (no need to stop the API). Copies the
-// platform DB and, when present, the Caddy routes directory into a timestamped
-// folder under BACKUP_DIR, writes a manifest, and prunes old backups.
+const execFileAsync = promisify(execFile);
+
+// Node-native backups. Uses pg_dump to create a consistent database backup.
+// Copies the platform DB and, when present, the Caddy routes directory into a
+// timestamped folder under BACKUP_DIR, writes a manifest, and prunes old backups.
 //
 // A manual backup is always available to admins; the scheduler that runs this
 // on an interval is gated behind ENABLE_BACKUP_SCHEDULER (off by default).
@@ -34,8 +37,12 @@ async function runBackup() {
   try {
     await fsp.mkdir(dest, { recursive: true });
 
-    // Online DB backup (consistent snapshot, safe under WAL).
-    await db.backup(path.join(dest, 'platform.db'));
+    // Database backup via pg_dump (consistent snapshot).
+    await execFileAsync('pg_dump', [
+      '--format=custom',
+      '--file=' + path.join(dest, 'platform.pgdump'),
+      process.env.DATABASE_URL,
+    ]);
 
     // Caddy routes, if configured and present (best-effort).
     let caddyCopied = false;
@@ -70,10 +77,10 @@ async function runBackup() {
       }
     } catch { /* best-effort */ }
 
-    auditLog({ action: 'backup_succeeded', detail: `${stamp}${caddyCopied ? ' +caddy' : ''}` });
+    await auditRepo.appendAudit({ action: 'backup_succeeded', detail: `${stamp}${caddyCopied ? ' +caddy' : ''}` });
     return { ok: true, path: dest, pruned };
   } catch (e) {
-    auditLog({ action: 'backup_failed', detail: e.message });
+    await auditRepo.appendAudit({ action: 'backup_failed', detail: e.message });
     notify.send({ kind: 'backup_failed', detail: e.message }).catch(() => {});
     // Clean up a half-written backup folder.
     try { await fsp.rm(dest, { recursive: true, force: true }); } catch {}

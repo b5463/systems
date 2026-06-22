@@ -1,6 +1,6 @@
 'use strict';
 
-const { db } = require('../db');
+const { adminRepo } = require('../repo');
 
 const DEFINITIONS = Object.freeze({
   releaseRetention: { type: 'integer', min: 1, max: 50, default: 3, env: 'RELEASE_RETENTION_DEFAULT', label: 'Release retention' },
@@ -34,59 +34,53 @@ function envValue(key, env = process.env) {
   try { return coerce(def, raw); } catch { return def.default; }
 }
 
-function storedRow(key) {
-  return db.prepare('SELECT value, updated_at FROM platform_settings WHERE key = ?').get(key);
+async function storedRow(key) {
+  return adminRepo.getSetting(key);
 }
 
-function getSetting(key, env = process.env) {
+async function getSetting(key, env = process.env) {
   const def = DEFINITIONS[key];
   if (!def) throw new Error(`Unknown setting: ${key}`);
-  const row = storedRow(key);
+  const row = await storedRow(key);
   if (!row) return envValue(key, env);
   try { return coerce(def, JSON.parse(row.value)); } catch { return envValue(key, env); }
 }
 
-function listSettings(env = process.env) {
-  return Object.entries(DEFINITIONS).map(([key, def]) => {
-    const row = storedRow(key);
-    return {
+async function listSettings(env = process.env) {
+  const results = [];
+  for (const [key, def] of Object.entries(DEFINITIONS)) {
+    const row = await storedRow(key);
+    results.push({
       key,
       label: def.label,
       type: def.type,
       min: def.min,
       max: def.max,
       values: def.values,
-      value: getSetting(key, env),
+      value: await getSetting(key, env),
       source: row ? 'database' : (def.env && env[def.env] != null ? 'environment' : 'default'),
       updatedAt: row ? row.updated_at : null,
-    };
-  });
+    });
+  }
+  return results;
 }
 
-const upsert = db.prepare(`
-  INSERT INTO platform_settings (key, value, updated_by, updated_at)
-  VALUES (?, ?, ?, datetime('now'))
-  ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_by = excluded.updated_by, updated_at = datetime('now')
-`);
-const remove = db.prepare('DELETE FROM platform_settings WHERE key = ?');
-
-function updateSettings(changes, userId) {
+async function updateSettings(changes, userId) {
   const updated = {};
-  const tx = db.transaction(() => {
-    for (const [key, raw] of Object.entries(changes || {})) {
-      const def = DEFINITIONS[key];
-      if (!def) throw new Error(`Unknown setting: ${key}`);
-      if (raw === null) {
-        remove.run(key);
-        updated[key] = envValue(key);
-      } else {
-        const value = coerce(def, raw);
-        upsert.run(key, JSON.stringify(value), userId || null);
-        updated[key] = value;
-      }
+  const batch = {};
+  for (const [key, raw] of Object.entries(changes || {})) {
+    const def = DEFINITIONS[key];
+    if (!def) throw new Error(`Unknown setting: ${key}`);
+    if (raw === null) {
+      batch[key] = null;
+      updated[key] = envValue(key);
+    } else {
+      const value = coerce(def, raw);
+      batch[key] = value;
+      updated[key] = value;
     }
-  });
-  tx();
+  }
+  await adminRepo.updateSettingsBatch(batch, userId);
   return updated;
 }
 

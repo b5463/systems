@@ -210,7 +210,7 @@ function fmtDateTime(value) {
 const disk = computed(() => {
   const d = info.value?.disk
   if (!d || d.status !== 'measured') return { tone: 'idle', label: 'Not measured yet', sub: 'data volume' }
-  const tone = d.usedPct >= 90 ? 'error' : d.usedPct >= 75 ? 'warn' : 'ok'
+  const tone = d.usedPct >= 98 ? 'error' : d.usedPct >= 95 ? 'warn' : 'ok'
   return { tone, label: `${d.usedPct}% used`, sub: `${d.freeGb} GB free of ${d.totalGb} GB` }
 })
 
@@ -264,9 +264,9 @@ const criticals = computed(() => {
   const alerts = []
   const d = info.value.disk
   const b = info.value.backup
-  if (d?.status === 'measured' && d.usedPct >= 90) {
+  if (d?.status === 'measured' && d.usedPct >= 98) {
     alerts.push({ level: 'error', message: `Disk is ${d.usedPct}% full — only ${d.freeGb} GB free. Free space before deploying.`, next: 'Review cleanup candidates below, then run cleanup if the list is safe.', command: 'docker system df' })
-  } else if (d?.status === 'measured' && d.usedPct >= 75) {
+  } else if (d?.status === 'measured' && d.usedPct >= 95) {
     alerts.push({ level: 'warn', message: `Disk is ${d.usedPct}% full (${d.freeGb} GB free). Consider running disk cleanup.`, next: 'Check orphaned images and release directories before the next large deploy.', command: 'docker system df' })
   }
   if (b?.status === 'none') {

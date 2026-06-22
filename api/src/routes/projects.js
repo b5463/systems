@@ -3,7 +3,7 @@
 const bcrypt = require('bcrypt');
 const fsp = require('fs/promises');
 const path = require('path');
-const { db, auditLog } = require('../db');
+const { projectRepo, auditRepo } = require('../repo');
 const dockerService = require('../services/docker');
 const proxy = require('../services/proxy');
 const health = require('../services/health');
@@ -16,7 +16,7 @@ async function projectsRoutes(fastify, options) {
   fastify.get('/api/projects', {
     preHandler: [fastify.authenticate],
   }, async () => {
-    const projects = db.prepare('SELECT * FROM projects ORDER BY created_at DESC').all().map(pub);
+    const projects = (await projectRepo.listAll()).map(pub);
     return { projects };
   });
 
@@ -24,7 +24,7 @@ async function projectsRoutes(fastify, options) {
     preHandler: [fastify.authenticate],
   }, async (request, reply) => {
     const { slug } = request.params;
-    const project = loadOr404(reply, slug);
+    const project = await loadOr404(reply, slug);
     if (!project) return;
     return { project: pub(project) };
   });
@@ -33,7 +33,7 @@ async function projectsRoutes(fastify, options) {
     preHandler: [fastify.authenticate],
   }, async (request, reply) => {
     const { slug } = request.params;
-    const project = loadOr404(reply, slug);
+    const project = await loadOr404(reply, slug);
     if (!project) return;
     if (!project.container_id) return reply.code(400).send({ error: 'Project has no container' });
     if (project.status === 'running') return reply.code(400).send({ error: 'Already running' });
@@ -42,10 +42,10 @@ async function projectsRoutes(fastify, options) {
     try {
       await dockerService.startContainer(project.container_id);
 
-      db.prepare(`UPDATE projects SET status = 'running', updated_at = datetime('now') WHERE slug = ?`).run(slug);
-      auditLog({ user_id: request.user.id, action: 'start', target: slug, ip: request.ip });
+      await projectRepo.updateStatus(slug, 'running');
+      await auditRepo.appendAudit({ user_id: request.user.id, action: 'start', target: slug, ip: request.ip });
 
-      return { project: pub(db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug)) };
+      return { project: pub(await projectRepo.findBySlug(slug)) };
     } catch (err) {
       request.log.error({ err }, '[projects] Failed to start container');
       return reply.code(500).send({ error: `Failed to start: ${err.message}` });
@@ -56,7 +56,7 @@ async function projectsRoutes(fastify, options) {
     preHandler: [fastify.authenticate],
   }, async (request, reply) => {
     const { slug } = request.params;
-    const project = loadOr404(reply, slug);
+    const project = await loadOr404(reply, slug);
     if (!project) return;
     if (!project.container_id) return reply.code(400).send({ error: 'Project has no container' });
     if (project.status === 'stopped') return reply.code(400).send({ error: 'Already stopped' });
@@ -64,10 +64,10 @@ async function projectsRoutes(fastify, options) {
 
     try {
       await dockerService.stopContainer(project.container_id);
-      db.prepare(`UPDATE projects SET status = 'stopped', updated_at = datetime('now') WHERE slug = ?`).run(slug);
-      auditLog({ user_id: request.user.id, action: 'stop', target: slug, ip: request.ip });
+      await projectRepo.updateStatus(slug, 'stopped');
+      await auditRepo.appendAudit({ user_id: request.user.id, action: 'stop', target: slug, ip: request.ip });
 
-      return { project: pub(db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug)) };
+      return { project: pub(await projectRepo.findBySlug(slug)) };
     } catch (err) {
       request.log.error({ err }, '[projects] Failed to stop container');
       return reply.code(500).send({ error: `Failed to stop: ${err.message}` });
@@ -78,17 +78,17 @@ async function projectsRoutes(fastify, options) {
     preHandler: [fastify.authenticate],
   }, async (request, reply) => {
     const { slug } = request.params;
-    const project = loadOr404(reply, slug);
+    const project = await loadOr404(reply, slug);
     if (!project) return;
     if (!project.container_id) return reply.code(400).send({ error: 'Project has no container' });
     if (project.status === 'building') return reply.code(400).send({ error: 'Currently building' });
 
     try {
       await dockerService.restartContainer(project.container_id);
-      db.prepare(`UPDATE projects SET status = 'running', updated_at = datetime('now') WHERE slug = ?`).run(slug);
-      auditLog({ user_id: request.user.id, action: 'restart', target: slug, ip: request.ip });
+      await projectRepo.updateStatus(slug, 'running');
+      await auditRepo.appendAudit({ user_id: request.user.id, action: 'restart', target: slug, ip: request.ip });
 
-      return { project: pub(db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug)) };
+      return { project: pub(await projectRepo.findBySlug(slug)) };
     } catch (err) {
       request.log.error({ err }, '[projects] Failed to restart container');
       return reply.code(500).send({ error: `Failed to restart: ${err.message}` });
@@ -102,7 +102,7 @@ async function projectsRoutes(fastify, options) {
     preHandler: [fastify.authenticate],
   }, async (request, reply) => {
     const { slug } = request.params;
-    const project = loadOr404(reply, slug);
+    const project = await loadOr404(reply, slug);
     if (!project) return;
 
     const errors = [];
@@ -112,8 +112,8 @@ async function projectsRoutes(fastify, options) {
     }
     try { await proxy.removeRoute(slug); } catch (err) { errors.push(`Remove route: ${err.message}`); }
 
-    db.prepare(`UPDATE projects SET status = 'deleted', container_id = NULL, route_published = 0, updated_at = datetime('now') WHERE slug = ?`).run(slug);
-    auditLog({ user_id: request.user.id, action: 'delete', target: slug, ip: request.ip });
+    await projectRepo.softDelete(slug);
+    await auditRepo.appendAudit({ user_id: request.user.id, action: 'delete', target: slug, ip: request.ip });
     return { message: 'System deleted (history kept). Purge to remove permanently.', warnings: errors.length ? errors : undefined };
   });
 
@@ -127,7 +127,7 @@ async function projectsRoutes(fastify, options) {
     if (!confirmMatches(request.body.confirm, slug)) {
       return reply.code(400).send({ error: 'Confirmation does not match the system slug.' });
     }
-    const project = loadOr404(reply, slug);
+    const project = await loadOr404(reply, slug);
     if (!project) return;
 
     const errors = [];
@@ -145,8 +145,8 @@ async function projectsRoutes(fastify, options) {
       await fsp.rm(path.join(dir, slug), { recursive: true, force: true });
     } catch (err) { errors.push(`Remove releases: ${err.message}`); }
 
-    db.prepare('DELETE FROM projects WHERE slug = ?').run(slug); // cascades deploy_history/stats_history
-    auditLog({ user_id: request.user.id, action: 'purge', target: slug, ip: request.ip });
+    await projectRepo.hardDelete(slug);
+    await auditRepo.appendAudit({ user_id: request.user.id, action: 'purge', target: slug, ip: request.ip });
     return { message: 'System purged.', warnings: errors.length ? errors : undefined };
   });
 
@@ -166,7 +166,7 @@ async function projectsRoutes(fastify, options) {
   }, async (request, reply) => {
     const { slug } = request.params;
     const { visibility, username, password } = request.body;
-    const project = loadOr404(reply, slug);
+    const project = await loadOr404(reply, slug);
     if (!project) return;
     if (project.status === 'deleted') return reply.code(409).send({ error: 'System is deleted.' });
 
@@ -196,11 +196,10 @@ async function projectsRoutes(fastify, options) {
 
     // A private system has no public route, so it can't remain the apex/primary.
     const keepPrimary = visibility === 'private' ? 0 : project.is_primary;
-    db.prepare(`UPDATE projects SET visibility = ?, basic_user = ?, basic_hash = ?, route_published = ?, is_primary = ?, updated_at = datetime('now') WHERE slug = ?`)
-      .run(visibility, basicUser, basicHash, published ? 1 : 0, keepPrimary, slug);
-    auditLog({ user_id: request.user.id, action: 'visibility_change', target: slug, detail: visibility, ip: request.ip });
+    await projectRepo.updateVisibility(slug, { visibility, basicUser, basicHash, routePublished: published ? 1 : 0, isPrimary: keepPrimary });
+    await auditRepo.appendAudit({ user_id: request.user.id, action: 'visibility_change', target: slug, detail: visibility, ip: request.ip });
 
-    return { project: pub(db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug)), warnings: errors.length ? errors : undefined };
+    return { project: pub(await projectRepo.findBySlug(slug)), warnings: errors.length ? errors : undefined };
   });
 
   // Retry publishing the public route (e.g. after the reverse proxy comes up).
@@ -210,7 +209,7 @@ async function projectsRoutes(fastify, options) {
     preHandler: [fastify.authenticate],
   }, async (request, reply) => {
     const { slug } = request.params;
-    const project = loadOr404(reply, slug);
+    const project = await loadOr404(reply, slug);
     if (!project) return;
     if (project.status === 'deleted') return reply.code(409).send({ error: 'System is deleted.' });
     if (project.visibility === 'private') return reply.code(400).send({ error: 'Private systems have no public route to publish.' });
@@ -225,8 +224,8 @@ async function projectsRoutes(fastify, options) {
     } catch (err) {
       return reply.code(502).send({ error: `Route publish failed: ${err.message}` });
     }
-    db.prepare(`UPDATE projects SET route_published = ?, updated_at = datetime('now') WHERE slug = ?`).run(published ? 1 : 0, slug);
-    auditLog({ user_id: request.user.id, action: 'route_publish', target: slug, detail: published ? 'published' : (reason || 'not_published'), ip: request.ip });
+    await projectRepo.updateRoutePublished(slug, published);
+    await auditRepo.appendAudit({ user_id: request.user.id, action: 'route_publish', target: slug, detail: published ? 'published' : (reason || 'not_published'), ip: request.ip });
 
     if (!published) {
       const msg = (reason === 'nginx_not_found' || reason === 'caddy_not_found')
@@ -236,7 +235,7 @@ async function projectsRoutes(fastify, options) {
           : 'The route could not be published.';
       return reply.code(409).send({ error: msg, reason });
     }
-    return { project: pub(db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug)) };
+    return { project: pub(await projectRepo.findBySlug(slug)) };
   });
 
   // Persist per-system container overrides. Docker log/resource settings are
@@ -260,7 +259,7 @@ async function projectsRoutes(fastify, options) {
     },
   }, async (request, reply) => {
     const { slug } = request.params;
-    const project = loadOr404(reply, slug);
+    const project = await loadOr404(reply, slug);
     if (!project) return;
     if (project.status === 'deleted') return reply.code(409).send({ error: 'System is deleted.' });
 
@@ -280,19 +279,9 @@ async function projectsRoutes(fastify, options) {
       logMaxFile: pick('logMaxFile', project.limit_log_max_file),
     };
 
-    db.prepare(`
-      UPDATE projects SET
-        limit_memory_mb = ?, limit_cpu = ?, limit_pids = ?,
-        limit_restart_policy = ?, limit_log_max_size = ?, limit_log_max_file = ?,
-        health_path = ?, updated_at = datetime('now')
-      WHERE slug = ?
-    `).run(
-      values.memoryMb, values.cpuLimit, values.pidsLimit,
-      values.restartPolicy, values.logMaxSize, values.logMaxFile,
-      healthPath, slug
-    );
+    await projectRepo.updateLimits(slug, { ...values, healthPath });
 
-    auditLog({
+    await auditRepo.appendAudit({
       user_id: request.user.id,
       action: 'limits_update',
       target: slug,
@@ -300,7 +289,7 @@ async function projectsRoutes(fastify, options) {
       ip: request.ip,
     });
     return {
-      project: pub(db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug)),
+      project: pub(await projectRepo.findBySlug(slug)),
       appliesOn: 'next-container-recreation',
     };
   });
@@ -310,12 +299,8 @@ async function projectsRoutes(fastify, options) {
     preHandler: [fastify.authenticate],
   }, async (request, reply) => {
     const { slug } = request.params;
-    const project = loadOr404(reply, slug);
+    const project = await loadOr404(reply, slug);
     if (!project) return;
-    // Probe the published public URL when there is one; otherwise probe the
-    // container's host port (so a running private/unpublished/local system
-    // reports real health instead of a false "unreachable" against a domain
-    // that doesn't resolve here).
     const target = health.targetFor(project);
     if (!target) {
       return reply.code(400).send({ error: 'Nothing to check — the system is not running and has no published route.' });
@@ -324,11 +309,9 @@ async function projectsRoutes(fastify, options) {
     const routeAttestation = project.route_published && !health.isLocalMode()
       ? await health.checkAttestation(target, slug)
       : { state: 'not_applicable', checkedAt: new Date().toISOString() };
-    db.prepare(`UPDATE projects SET health_state = ?, health_status = ?, health_response_ms = ?, health_checked_at = ?, attestation_state = ?, attestation_checked_at = ? WHERE slug = ?`)
-      .run(result.state, result.httpStatus, result.responseMs, result.checkedAt, routeAttestation.state, routeAttestation.checkedAt, slug);
-    db.prepare(`UPDATE projects SET health_failures = CASE WHEN ? = 'healthy' THEN 0 ELSE health_failures + 1 END WHERE slug = ?`)
-      .run(result.state, slug);
-    auditLog({ user_id: request.user.id, action: result.state === 'healthy' ? 'health_ok' : 'health_fail', target: slug, detail: `${result.state} ${result.httpStatus ?? ''}`.trim(), ip: request.ip });
+    await projectRepo.updateHealth(slug, { healthState: result.state, healthStatus: result.httpStatus, healthResponseMs: result.responseMs, healthCheckedAt: result.checkedAt, attestationState: routeAttestation.state, attestationCheckedAt: routeAttestation.checkedAt });
+    await projectRepo.updateHealthFailures(slug, result.state);
+    await auditRepo.appendAudit({ user_id: request.user.id, action: result.state === 'healthy' ? 'health_ok' : 'health_fail', target: slug, detail: `${result.state} ${result.httpStatus ?? ''}`.trim(), ip: request.ip });
     return { health: result, routeAttestation };
   });
 
@@ -337,7 +320,7 @@ async function projectsRoutes(fastify, options) {
     preHandler: [fastify.authenticate],
   }, async (request, reply) => {
     const { slug } = request.params;
-    const project = loadOr404(reply, slug);
+    const project = await loadOr404(reply, slug);
     if (!project) return;
     if (project.status === 'building') return reply.code(409).send({ error: 'Currently building' });
     if (!project.previous_image_id) {
@@ -361,7 +344,7 @@ async function projectsRoutes(fastify, options) {
 
     // Mark building during the swap so reconciliation (which skips 'building')
     // can't see the transient no-container window and flip the row to 'error'.
-    db.prepare(`UPDATE projects SET status = 'building', updated_at = datetime('now') WHERE slug = ?`).run(slug);
+    await projectRepo.updateStatus(slug, 'building');
 
     try {
       // Stop + remove the current container.
@@ -377,28 +360,24 @@ async function projectsRoutes(fastify, options) {
 
       // Swap current <-> previous so a subsequent rollback returns to the
       // version we just rolled away from.
-      db.prepare(`
-        UPDATE projects
-        SET status = 'running',
-            container_id = ?, image_id = ?,
-            previous_container_id = ?, previous_image_id = ?,
-            updated_at = datetime('now')
-        WHERE slug = ?
-      `).run(newContainerId, targetImageId, currentContainerId || null, currentImageId || null, slug);
+      await projectRepo.updateRollback(slug, {
+        containerId: newContainerId,
+        imageId: targetImageId,
+        previousContainerId: currentContainerId || null,
+        previousImageId: currentImageId || null,
+      });
 
-      auditLog({ user_id: request.user.id, action: 'rollback', target: slug, ip: request.ip });
+      await auditRepo.appendAudit({ user_id: request.user.id, action: 'rollback', target: slug, ip: request.ip });
 
-      return { project: pub(db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug)) };
+      return { project: pub(await projectRepo.findBySlug(slug)) };
     } catch (err) {
       request.log.error({ err }, '[projects] Rollback failed');
-      db.prepare(`UPDATE projects SET status = 'error', updated_at = datetime('now') WHERE slug = ?`).run(slug);
+      await projectRepo.updateStatus(slug, 'error');
       return reply.code(500).send({ error: `Rollback failed: ${err.message}` });
     }
   });
 
   // Provision a dedicated Postgres database + least-privilege role for a system
-  // and stash the DATABASE_URL into its (encrypted) env, picked up on next
-  // deploy. OFF unless ENABLE_DB_PROVISIONING and a Postgres admin URL are set.
   fastify.post('/api/projects/:slug/provision-db', {
     preHandler: [fastify.authenticate],
   }, async (request, reply) => {
@@ -406,7 +385,7 @@ async function projectsRoutes(fastify, options) {
     if (!features().dbProvisioning) return reply.code(404).send({ error: 'Database provisioning is not enabled.' });
 
     const { slug } = request.params;
-    const project = loadOr404(reply, slug);
+    const project = await loadOr404(reply, slug);
     if (!project) return;
 
     const runner = require('../services/dbprovision-runner');
@@ -419,15 +398,14 @@ async function projectsRoutes(fastify, options) {
       let vars = {};
       if (project.env_vars) { try { vars = env.decryptEnvVars(project.env_vars); } catch {} }
       vars.DATABASE_URL = result.url;
-      db.prepare(`UPDATE projects SET env_vars = ?, updated_at = datetime('now') WHERE slug = ?`).run(env.encryptEnvVars(vars), slug);
+      await projectRepo.updateEnvVars(slug, env.encryptEnvVars(vars));
     } catch { /* env storage best-effort (e.g. ENV_SECRET unset) */ }
 
-    auditLog({ user_id: request.user.id, action: 'db_provisioned', target: slug, detail: result.database, ip: request.ip });
+    await auditRepo.appendAudit({ user_id: request.user.id, action: 'db_provisioned', target: slug, detail: result.database, ip: request.ip });
     return { ok: true, database: result.database, user: result.user, databaseUrl: result.masked };
   });
 
-  // Map a system to a GitHub repo + branch for deploy-on-push. Setting the repo
-  // does nothing until ENABLE_GITHUB_DEPLOYS is on and a webhook is configured.
+  // Map a system to a GitHub repo + branch for deploy-on-push.
   fastify.patch('/api/projects/:slug/repo', {
     preHandler: [fastify.authenticate],
     schema: {
@@ -441,7 +419,7 @@ async function projectsRoutes(fastify, options) {
     },
   }, async (request, reply) => {
     const { slug } = request.params;
-    const project = loadOr404(reply, slug);
+    const project = await loadOr404(reply, slug);
     if (!project) return;
 
     let repo = request.body.repo;
@@ -454,23 +432,19 @@ async function projectsRoutes(fastify, options) {
     }
     const branch = (request.body.branch && String(request.body.branch).trim()) || project.deploy_branch || 'main';
 
-    db.prepare(`UPDATE projects SET repo = ?, deploy_branch = ?, updated_at = datetime('now') WHERE slug = ?`)
-      .run(repo, branch, slug);
-    auditLog({ user_id: request.user.id, action: 'repo_set', target: slug, detail: repo ? `${repo}@${branch}` : 'cleared', ip: request.ip });
-    return { project: pub(db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug)) };
+    await projectRepo.updateRepo(slug, repo, branch);
+    await auditRepo.appendAudit({ user_id: request.user.id, action: 'repo_set', target: slug, detail: repo ? `${repo}@${branch}` : 'cleared', ip: request.ip });
+    return { project: pub(await projectRepo.findBySlug(slug)) };
   });
 
-  // Designate (or clear) the PRIMARY system — the one also served at the bare
-  // base/apex domain (e.g. acronym.sk), while the dashboard stays on
-  // systems.acronym.sk. Only one system can be primary; a private system can't
-  // be (it has no public route to serve at the root).
+  // Designate (or clear) the PRIMARY system
   fastify.patch('/api/projects/:slug/primary', {
     preHandler: [fastify.authenticate],
     schema: { body: { type: 'object', required: ['primary'], properties: { primary: { type: 'boolean' } } } },
   }, async (request, reply) => {
     const { slug } = request.params;
     const { primary } = request.body;
-    const project = loadOr404(reply, slug);
+    const project = await loadOr404(reply, slug);
     if (!project) return;
     if (project.status === 'deleted') return reply.code(409).send({ error: 'System is deleted.' });
     if (primary && project.visibility === 'private') {
@@ -485,21 +459,20 @@ async function projectsRoutes(fastify, options) {
     };
 
     if (primary) {
-      // Clear any existing primary and drop its apex route first.
-      const current = db.prepare(`SELECT * FROM projects WHERE is_primary = 1 AND slug != ?`).get(slug);
+      const current = await projectRepo.findCurrentPrimary(slug);
       if (current) {
-        db.prepare(`UPDATE projects SET is_primary = 0, updated_at = datetime('now') WHERE id = ?`).run(current.id);
+        await projectRepo.clearPrimary(current.id);
         await republish(current, false);
       }
-      db.prepare(`UPDATE projects SET is_primary = 1, updated_at = datetime('now') WHERE slug = ?`).run(slug);
+      await projectRepo.setPrimary(slug);
       await republish({ ...project, is_primary: 1 }, true);
     } else {
-      db.prepare(`UPDATE projects SET is_primary = 0, updated_at = datetime('now') WHERE slug = ?`).run(slug);
+      await projectRepo.clearPrimaryBySlug(slug);
       await republish(project, false);
     }
 
-    auditLog({ user_id: request.user.id, action: 'primary_set', target: slug, detail: primary ? 'apex (root domain)' : 'cleared', ip: request.ip });
-    return { project: pub(db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug)), warnings: errors.length ? errors : undefined };
+    await auditRepo.appendAudit({ user_id: request.user.id, action: 'primary_set', target: slug, detail: primary ? 'apex (root domain)' : 'cleared', ip: request.ip });
+    return { project: pub(await projectRepo.findBySlug(slug)), warnings: errors.length ? errors : undefined };
   });
 
   // Last 10 deploy-history rows for a project.
@@ -507,16 +480,10 @@ async function projectsRoutes(fastify, options) {
     preHandler: [fastify.authenticate],
   }, async (request, reply) => {
     const { slug } = request.params;
-    const project = db.prepare('SELECT id FROM projects WHERE slug = ?').get(slug);
+    const project = await projectRepo.getProjectId(slug);
     if (!project) return reply.code(404).send({ error: 'Project not found' });
 
-    const history = db.prepare(`
-      SELECT id, image_id, container_id, deployed_at
-      FROM deploy_history
-      WHERE project_id = ?
-      ORDER BY deployed_at DESC, id DESC
-      LIMIT 10
-    `).all(project.id);
+    const history = await projectRepo.getDeployHistory(project.id);
 
     return { history };
   });

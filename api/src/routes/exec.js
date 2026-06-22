@@ -1,6 +1,6 @@
 'use strict';
 
-const { db, auditLog } = require('../db');
+const { projectRepo, auditRepo } = require('../repo');
 const dockerService = require('../services/docker');
 const { features } = require('../util/flags');
 
@@ -23,7 +23,7 @@ async function execRoutes(fastify, options) {
       return;
     }
 
-    const project = db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug);
+    const project = await projectRepo.findBySlug(slug);
 
     if (!project || !project.container_id) {
       socket.send(JSON.stringify({ type: 'error', message: 'Project not found or has no container' }));
@@ -67,7 +67,7 @@ async function execRoutes(fastify, options) {
       return;
     }
 
-    auditLog({
+    await auditRepo.appendAudit({
       user_id: request.user.id,
       action: 'exec_open',
       target: slug,

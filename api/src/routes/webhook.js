@@ -1,7 +1,7 @@
 'use strict';
 
 const fsp = require('fs/promises');
-const { db, auditLog } = require('../db');
+const { projectRepo, auditRepo } = require('../repo');
 const { features } = require('../util/flags');
 const { tmpZip } = require('../util/tmp');
 const { verifySignature, branchAllowed } = require('../util/webhook');
@@ -58,36 +58,32 @@ async function webhookRoutes(fastify, options) {
     const ref = payload.ref;
     if (!repo || !ref) return reply.code(400).send({ error: 'Malformed push payload.' });
 
-    const project = db.prepare(`SELECT * FROM projects WHERE repo = ? AND status != 'deleted'`).get(repo);
+    const project = await projectRepo.findByRepo(repo);
     if (!project) return { ok: true, ignored: 'no system mapped to repo' };
 
     if (!branchAllowed(ref, project.deploy_branch || 'main')) {
       return { ok: true, ignored: `branch ${ref}` };
     }
 
-    auditLog({ action: 'github_push', target: project.slug, detail: `${repo} ${ref}` });
-    db.prepare(`UPDATE projects SET github_deploy_status = 'downloading', github_deploy_detail = ?, github_deploy_at = datetime('now') WHERE slug = ?`)
-      .run(`${repo} ${ref}`.slice(0, 300), project.slug);
+    await auditRepo.appendAudit({ action: 'github_push', target: project.slug, detail: `${repo} ${ref}` });
+    await projectRepo.updateGithubDeployStatus(project.slug, 'downloading', `${repo} ${ref}`.slice(0, 300));
 
     // Download the commit zipball and redeploy (best-effort, async).
     const zipPath = tmpZip();
     try {
       await downloadZipball(repo, ref.replace('refs/heads/', ''), zipPath);
     } catch (e) {
-      auditLog({ action: 'redeploy_fail', target: project.slug, detail: e.message });
-      db.prepare(`UPDATE projects SET github_deploy_status = 'failed', github_deploy_detail = ?, github_deploy_at = datetime('now') WHERE slug = ?`)
-        .run(e.message.slice(0, 500), project.slug);
+      await auditRepo.appendAudit({ action: 'redeploy_fail', target: project.slug, detail: e.message });
+      await projectRepo.updateGithubDeployStatus(project.slug, 'failed', e.message.slice(0, 500));
       notify.send({ kind: 'deploy_failed', slug: project.slug, detail: e.message }).catch(() => {});
       return reply.code(502).send({ error: e.message });
     }
 
-    db.prepare(`UPDATE projects SET github_deploy_status = 'building', github_deploy_detail = ?, github_deploy_at = datetime('now') WHERE slug = ?`)
-      .run(`Push accepted from ${repo}`.slice(0, 300), project.slug);
+    await projectRepo.updateGithubDeployStatus(project.slug, 'building', `Push accepted from ${repo}`.slice(0, 300));
     const result = await deploy.beginRedeploy({ slug: project.slug, zipPath, userId: null, ip: request.ip });
     if (!result.ok) {
       await fsp.rm(zipPath, { force: true }).catch(() => {});
-      db.prepare(`UPDATE projects SET github_deploy_status = 'failed', github_deploy_detail = ?, github_deploy_at = datetime('now') WHERE slug = ?`)
-        .run(result.error.slice(0, 500), project.slug);
+      await projectRepo.updateGithubDeployStatus(project.slug, 'failed', result.error.slice(0, 500));
       return reply.code(result.code).send({ error: result.error });
     }
     return reply.code(202).send({ ok: true, redeploying: project.slug });

@@ -13,7 +13,7 @@ const { getSetting } = require('../util/settings');
 async function send(event) {
   if (!shouldSend()) return { sent: false, reason: 'disabled' };
   const url = process.env.NOTIFY_WEBHOOK_URL;
-  const payload = buildPayload(event, { ...process.env, NOTIFY_FORMAT: getSetting('notificationFormat') });
+  const payload = buildPayload(event, { ...process.env, NOTIFY_FORMAT: await getSetting('notificationFormat') });
   try {
     await retry(async () => {
       const controller = new AbortController();

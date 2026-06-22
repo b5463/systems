@@ -3,7 +3,7 @@
 const fs = require('fs');
 const fsp = require('fs/promises');
 const path = require('path');
-const { db, auditLog } = require('../db');
+const { projectRepo, auditRepo } = require('../repo');
 const dockerService = require('./docker');
 const notify = require('./notify');
 const health = require('./health');
@@ -70,21 +70,7 @@ async function buildInfoSnapshot(dockerOk) {
   } catch { /* not_measured */ }
 
   try {
-    info.systems = db.prepare(`
-      SELECT p.slug, p.health_failures,
-        s.cpu_percent,
-        CASE WHEN s.memory_limit_mb > 0 THEN (s.memory_mb / s.memory_limit_mb) * 100 ELSE NULL END AS memory_percent
-      FROM projects p
-      LEFT JOIN stats_history s ON s.id = (
-        SELECT id FROM stats_history WHERE project_id = p.id ORDER BY recorded_at DESC, id DESC LIMIT 1
-      )
-      WHERE p.status = 'running'
-    `).all().map((row) => ({
-      slug: row.slug,
-      healthFailures: row.health_failures || 0,
-      cpuPercent: row.cpu_percent,
-      memoryPercent: row.memory_percent,
-    }));
+    info.systems = await projectRepo.getSystemsSnapshot();
   } catch { info.systems = []; }
 
   return info;
@@ -116,9 +102,7 @@ async function reconcileOnce() {
         for (const n of c.Names || []) byName.set(n.replace(/^\//, ''), c);
       }
 
-      const projects = db
-        .prepare(`SELECT id, slug, status, container_id FROM projects WHERE status NOT IN ('deleted')`)
-        .all();
+      const projects = await projectRepo.listNonDeleted();
 
       for (const p of projects) {
         let container = null;
@@ -130,8 +114,8 @@ async function reconcileOnce() {
 
         const next = reconcileStatus(p, container);
         if (next && next !== p.status) {
-          db.prepare(`UPDATE projects SET status = ?, updated_at = datetime('now') WHERE id = ?`).run(next, p.id);
-          auditLog({ action: 'reconcile', target: p.slug, detail: `${p.status} → ${next}` });
+          await projectRepo.updateStatus(p.slug, next);
+          await auditRepo.appendAudit({ action: 'reconcile', target: p.slug, detail: `${p.status} → ${next}` });
           changes.push({ slug: p.slug, from: p.status, to: next });
           if (next === 'error') {
             notify.send({ kind: 'system_error', slug: p.slug, detail: `status drifted ${p.status} → error` }).catch(() => {});
@@ -143,23 +127,20 @@ async function reconcileOnce() {
       // each running system's host port so old public-probe failures self-correct
       // on boot and during the normal reconciliation cycle.
       if (health.isLocalMode()) {
-        const runningProjects = db.prepare(
-          `SELECT slug, port, route_published, health_state, health_path
-           FROM projects WHERE status = 'running' AND port IS NOT NULL`
-        ).all();
+        const runningProjects = await projectRepo.findRunningWithPort();
         await Promise.all(runningProjects.map(async (project) => {
           const target = health.targetFor(project);
           if (!target) return;
           const observed = await health.checkSystem(target, project.health_path || '/');
-          db.prepare(
-            `UPDATE projects
-             SET health_state = ?, health_status = ?, health_response_ms = ?, health_checked_at = ?
-             WHERE slug = ?`
-          ).run(observed.state, observed.httpStatus, observed.responseMs, observed.checkedAt, project.slug);
-          db.prepare(`UPDATE projects SET health_failures = CASE WHEN ? = 'healthy' THEN 0 ELSE health_failures + 1 END WHERE slug = ?`)
-            .run(observed.state, project.slug);
+          await projectRepo.updateHealth(project.slug, {
+            healthState: observed.state,
+            healthStatus: observed.httpStatus,
+            healthResponseMs: observed.responseMs,
+            healthCheckedAt: observed.checkedAt,
+          });
+          await projectRepo.updateHealthFailures(project.slug, observed.state);
           if (observed.state !== project.health_state) {
-            auditLog({
+            await auditRepo.appendAudit({
               action: observed.state === 'healthy' ? 'health_ok' : 'health_fail',
               target: project.slug,
               detail: `${observed.state} ${observed.httpStatus ?? ''}`.trim(),
@@ -172,13 +153,10 @@ async function reconcileOnce() {
       // timeout can't finish (the in-process build died with a restart), and
       // reconcileStatus deliberately skips 'building' — so handle it explicitly.
       const stuckMs = (Number(process.env.BUILD_TIMEOUT_SECONDS) || 600) * 1000 * 3;
-      const stuck = db.prepare(
-        `SELECT slug, status FROM projects WHERE status = 'building'
-         AND (julianday('now') - julianday(updated_at)) * 86400000 > ?`
-      ).all(stuckMs);
+      const stuck = await projectRepo.findBuildingOlderThan(stuckMs);
       for (const s of stuck) {
-        db.prepare(`UPDATE projects SET status = 'error', updated_at = datetime('now') WHERE slug = ?`).run(s.slug);
-        auditLog({ action: 'build_stuck', target: s.slug, detail: 'recovered to error after timeout' });
+        await projectRepo.updateStatus(s.slug, 'error');
+        await auditRepo.appendAudit({ action: 'build_stuck', target: s.slug, detail: 'recovered to error after timeout' });
         changes.push({ slug: s.slug, from: 'building', to: 'error' });
         notify.send({ kind: 'system_error', slug: s.slug, detail: 'build stuck → error' }).catch(() => {});
       }

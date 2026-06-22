@@ -2,7 +2,7 @@
 
 const bcrypt = require('bcrypt');
 const { v4: uuidv4 } = require('uuid');
-const { db, auditLog } = require('../db');
+const { userRepo, auditRepo } = require('../repo');
 const totp = require('../util/totp');
 const lockout = require('../util/lockout');
 const { setSessionCookie, clearSessionCookie, csrfToken } = require('../util/session');
@@ -36,19 +36,18 @@ function signToken(fastify, user, jti) {
 }
 
 // Record a new session row and return a token bound to it.
-function createSession(fastify, user, request, reply) {
+async function createSession(fastify, user, request, reply) {
   const jti = uuidv4();
   const ua = ((request.headers && request.headers['user-agent']) || '').slice(0, 300);
-  db.prepare('INSERT INTO sessions (user_id, jti, user_agent, ip) VALUES (?, ?, ?, ?)')
-    .run(user.id, jti, ua || null, request.ip || null);
+  await userRepo.createSession(user.id, jti, ua || null, request.ip || null);
   setSessionCookie(reply, signToken(fastify, user, jti));
   return csrfToken(jti);
 }
 
 // Sign-out-everywhere: drop all of this user's sessions, then open a fresh one
 // for the current request so the acting admin stays signed in.
-function rotateSoleSession(fastify, user, request, reply) {
-  db.prepare('DELETE FROM sessions WHERE user_id = ?').run(user.id);
+async function rotateSoleSession(fastify, user, request, reply) {
+  await userRepo.deleteUserSessions(user.id);
   return createSession(fastify, user, request, reply);
 }
 
@@ -84,7 +83,7 @@ async function authRoutes(fastify, options) {
     const { locked, retryAfterMs } = lockout.check(loginAttempts.get(ip), Date.now());
     if (locked) {
       const retryAfter = Math.ceil(retryAfterMs / 1000);
-      auditLog({ action: 'login_locked', target: username, detail: `retry in ${retryAfter}s`, ip });
+      await auditRepo.appendAudit({ action: 'login_locked', target: username, detail: `retry in ${retryAfter}s`, ip });
       return reply
         .code(429)
         .header('Retry-After', String(retryAfter))
@@ -92,23 +91,21 @@ async function authRoutes(fastify, options) {
     }
     const fail = () => loginAttempts.set(ip, lockout.onFailure(loginAttempts.get(ip), Date.now()));
 
-    const user = db
-      .prepare('SELECT id, username, password_hash, token_version, totp_enabled, totp_secret FROM users WHERE username = ?')
-      .get(username);
+    const user = await userRepo.findByUsername(username);
 
     if (!user) {
       // Compare against a dummy hash so an unknown username takes the same time
       // as a known one (no timing oracle for user enumeration).
       await bcrypt.compare(password, DUMMY_HASH);
       fail();
-      auditLog({ action: 'login_fail', target: username, detail: 'user not found', ip });
+      await auditRepo.appendAudit({ action: 'login_fail', target: username, detail: 'user not found', ip });
       return reply.code(401).send({ error: 'Invalid credentials' });
     }
 
     const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) {
       fail();
-      auditLog({ user_id: user.id, action: 'login_fail', target: username, detail: 'wrong password', ip });
+      await auditRepo.appendAudit({ user_id: user.id, action: 'login_fail', target: username, detail: 'wrong password', ip });
       return reply.code(401).send({ error: 'Invalid credentials' });
     }
 
@@ -120,15 +117,15 @@ async function authRoutes(fastify, options) {
       }
       if (!totp.verify(code, user.totp_secret)) {
         fail();
-        auditLog({ user_id: user.id, action: 'login_fail', target: username, detail: '2fa code invalid', ip });
+        await auditRepo.appendAudit({ user_id: user.id, action: 'login_fail', target: username, detail: '2fa code invalid', ip });
         return reply.code(401).send({ error: 'Invalid two-factor code.', twoFactorRequired: true });
       }
     }
 
     // Success — clear any failure streak for this IP.
     loginAttempts.delete(ip);
-    const csrf = createSession(fastify, user, request, reply);
-    auditLog({ user_id: user.id, action: 'login', target: username, ip });
+    const csrf = await createSession(fastify, user, request, reply);
+    await auditRepo.appendAudit({ user_id: user.id, action: 'login', target: username, ip });
     return { csrfToken: csrf };
   });
 
@@ -136,8 +133,8 @@ async function authRoutes(fastify, options) {
     preHandler: [fastify.authenticate],
   }, async (request) => {
     const { id, username } = request.user;
-    const row = db.prepare('SELECT totp_enabled FROM users WHERE id = ?').get(id);
-    const session = db.prepare('SELECT created_at FROM sessions WHERE jti = ?').get(request.user.jti);
+    const row = await userRepo.findById(id);
+    const session = await userRepo.findSessionByJti(request.user.jti);
     return {
       id, username, twoFactorEnabled: !!(row && row.totp_enabled),
       sessionCreatedAt: session && session.created_at, csrfToken: csrfToken(request.user.jti),
@@ -147,9 +144,9 @@ async function authRoutes(fastify, options) {
   fastify.post('/api/auth/logout', {
     preHandler: [fastify.authenticate],
   }, async (request, reply) => {
-    if (request.user.jti) db.prepare('DELETE FROM sessions WHERE jti = ?').run(request.user.jti);
+    if (request.user.jti) await userRepo.deleteSessionByJti(request.user.jti);
     clearSessionCookie(reply);
-    auditLog({ user_id: request.user.id, action: 'logout', ip: request.ip });
+    await auditRepo.appendAudit({ user_id: request.user.id, action: 'logout', ip: request.ip });
     return { message: 'Logged out successfully' };
   });
 
@@ -157,9 +154,7 @@ async function authRoutes(fastify, options) {
   fastify.get('/api/auth/sessions', {
     preHandler: [fastify.authenticate],
   }, async (request) => {
-    const rows = db.prepare(
-      'SELECT id, jti, user_agent, ip, created_at, last_seen_at FROM sessions WHERE user_id = ? ORDER BY last_seen_at DESC'
-    ).all(request.user.id);
+    const rows = await userRepo.listUserSessions(request.user.id);
     return {
       sessions: rows.map((r) => ({
         id: r.id,
@@ -177,10 +172,10 @@ async function authRoutes(fastify, options) {
     preHandler: [fastify.authenticate],
   }, async (request, reply) => {
     const id = Number(request.params.id);
-    const row = db.prepare('SELECT id, jti FROM sessions WHERE id = ? AND user_id = ?').get(id, request.user.id);
+    const row = await userRepo.findSessionById(id, request.user.id);
     if (!row) return reply.code(404).send({ error: 'Session not found.' });
-    db.prepare('DELETE FROM sessions WHERE id = ?').run(id);
-    auditLog({ user_id: request.user.id, action: 'session_revoked', ip: request.ip });
+    await userRepo.deleteSessionById(id);
+    await auditRepo.appendAudit({ user_id: request.user.id, action: 'session_revoked', ip: request.ip });
     return { message: 'Session revoked.', current: row.jti === request.user.jti };
   });
 
@@ -207,9 +202,7 @@ async function authRoutes(fastify, options) {
       return reply.code(400).send({ error: 'New password must be at least 15 characters.' });
     }
 
-    const user = db
-      .prepare('SELECT id, username, password_hash, token_version FROM users WHERE id = ?')
-      .get(request.user.id);
+    const user = await userRepo.findById(request.user.id);
     if (!user) return reply.code(401).send({ error: 'Unauthorized' });
 
     const valid = await bcrypt.compare(currentPassword, user.password_hash);
@@ -218,13 +211,13 @@ async function authRoutes(fastify, options) {
     }
 
     const password_hash = await bcrypt.hash(newPassword, 12);
-    db.prepare(`UPDATE users SET password_hash = ?, token_version = token_version + 1 WHERE id = ?`).run(password_hash, user.id);
+    await userRepo.updatePassword(user.id, password_hash);
 
-    auditLog({ user_id: user.id, action: 'password_change', target: user.username, ip: request.ip });
+    await auditRepo.appendAudit({ user_id: user.id, action: 'password_change', target: user.username, ip: request.ip });
     // Re-issue a fresh token so the current session stays signed in; other
     // sessions are dropped (sign-out-everywhere).
-    const updated = db.prepare('SELECT id, username, token_version FROM users WHERE id = ?').get(user.id);
-    return { message: 'Password updated.', csrfToken: rotateSoleSession(fastify, updated, request, reply) };
+    const updated = await userRepo.findById(user.id);
+    return { message: 'Password updated.', csrfToken: await rotateSoleSession(fastify, updated, request, reply) };
   });
 
   // Sign out everywhere: bump token_version, drop other sessions, hand back a
@@ -232,10 +225,10 @@ async function authRoutes(fastify, options) {
   fastify.post('/api/auth/revoke-sessions', {
     preHandler: [fastify.authenticate],
   }, async (request, reply) => {
-    db.prepare(`UPDATE users SET token_version = token_version + 1 WHERE id = ?`).run(request.user.id);
-    auditLog({ user_id: request.user.id, action: 'sessions_revoked', ip: request.ip });
-    const updated = db.prepare('SELECT id, username, token_version FROM users WHERE id = ?').get(request.user.id);
-    return { message: 'Other sessions signed out.', csrfToken: rotateSoleSession(fastify, updated, request, reply) };
+    await userRepo.bumpTokenVersion(request.user.id);
+    await auditRepo.appendAudit({ user_id: request.user.id, action: 'sessions_revoked', ip: request.ip });
+    const updated = await userRepo.findById(request.user.id);
+    return { message: 'Other sessions signed out.', csrfToken: await rotateSoleSession(fastify, updated, request, reply) };
   });
 
   // Refresh token: re-sign for the SAME session (stable jti). Rotating the jti
@@ -244,10 +237,10 @@ async function authRoutes(fastify, options) {
   fastify.post('/api/auth/refresh', {
     preHandler: [fastify.authenticate],
   }, async (request, reply) => {
-    const user = db.prepare('SELECT id, username, token_version FROM users WHERE id = ?').get(request.user.id);
+    const user = await userRepo.findById(request.user.id);
     const jti = request.user.jti;
     if (jti) {
-      db.prepare(`UPDATE sessions SET last_seen_at = datetime('now') WHERE jti = ?`).run(jti);
+      await userRepo.touchSession(jti);
       setSessionCookie(reply, signToken(fastify, user, jti));
       return { csrfToken: csrfToken(jti) };
     }
@@ -261,10 +254,10 @@ async function authRoutes(fastify, options) {
   fastify.post('/api/auth/2fa/setup', {
     preHandler: [fastify.authenticate],
   }, async (request, reply) => {
-    const user = db.prepare('SELECT id, username, totp_enabled FROM users WHERE id = ?').get(request.user.id);
+    const user = await userRepo.findById(request.user.id);
     if (user.totp_enabled) return reply.code(409).send({ error: 'Two-factor is already enabled.' });
     const secret = totp.generateSecret();
-    db.prepare('UPDATE users SET totp_secret = ?, totp_enabled = 0 WHERE id = ?').run(secret, user.id);
+    await userRepo.setupTotp(user.id, secret);
     return { secret, otpauth: totp.otpauthURL(secret, { label: user.username }) };
   });
 
@@ -273,7 +266,7 @@ async function authRoutes(fastify, options) {
     preHandler: [fastify.authenticate],
     schema: { body: { type: 'object', required: ['code'], properties: { code: { type: 'string', maxLength: 16 } } } },
   }, async (request, reply) => {
-    const user = db.prepare('SELECT id, username, totp_secret, totp_enabled FROM users WHERE id = ?').get(request.user.id);
+    const user = await userRepo.findById(request.user.id);
     if (user.totp_enabled) return reply.code(409).send({ error: 'Two-factor is already enabled.' });
     if (!user.totp_secret) return reply.code(400).send({ error: 'Start setup first.' });
     if (!totp.verify(request.body.code, user.totp_secret)) {
@@ -281,10 +274,10 @@ async function authRoutes(fastify, options) {
     }
     // Bump token_version (revokes other sessions) and re-issue this session's
     // token so the admin who just enabled 2FA isn't logged out.
-    db.prepare('UPDATE users SET totp_enabled = 1, token_version = token_version + 1 WHERE id = ?').run(user.id);
-    auditLog({ user_id: user.id, action: '2fa_enabled', target: user.username, ip: request.ip });
-    const updated = db.prepare('SELECT id, username, token_version FROM users WHERE id = ?').get(user.id);
-    return { message: 'Two-factor enabled.', csrfToken: rotateSoleSession(fastify, updated, request, reply) };
+    await userRepo.enableTotp(user.id);
+    await auditRepo.appendAudit({ user_id: user.id, action: '2fa_enabled', target: user.username, ip: request.ip });
+    const updated = await userRepo.findById(user.id);
+    return { message: 'Two-factor enabled.', csrfToken: await rotateSoleSession(fastify, updated, request, reply) };
   });
 
   // Disable 2FA (requires current password + a valid code).
@@ -297,17 +290,17 @@ async function authRoutes(fastify, options) {
       },
     },
   }, async (request, reply) => {
-    const user = db.prepare('SELECT id, username, password_hash, totp_secret, totp_enabled FROM users WHERE id = ?').get(request.user.id);
+    const user = await userRepo.findById(request.user.id);
     if (!user.totp_enabled) return reply.code(400).send({ error: 'Two-factor is not enabled.' });
     const okPass = await bcrypt.compare(request.body.password || '', user.password_hash);
     if (!okPass) return reply.code(401).send({ error: 'Password is incorrect.' });
     if (!totp.verify(request.body.code, user.totp_secret)) {
       return reply.code(400).send({ error: 'Code did not verify.' });
     }
-    db.prepare('UPDATE users SET totp_enabled = 0, totp_secret = NULL, token_version = token_version + 1 WHERE id = ?').run(user.id);
-    auditLog({ user_id: user.id, action: '2fa_disabled', target: user.username, ip: request.ip });
-    const updated = db.prepare('SELECT id, username, token_version FROM users WHERE id = ?').get(user.id);
-    return { message: 'Two-factor disabled.', csrfToken: rotateSoleSession(fastify, updated, request, reply) };
+    await userRepo.disableTotp(user.id);
+    await auditRepo.appendAudit({ user_id: user.id, action: '2fa_disabled', target: user.username, ip: request.ip });
+    const updated = await userRepo.findById(user.id);
+    return { message: 'Two-factor disabled.', csrfToken: await rotateSoleSession(fastify, updated, request, reply) };
   });
 }
 

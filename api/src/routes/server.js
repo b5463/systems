@@ -44,8 +44,8 @@ async function serverRoutes(fastify, options) {
     preHandler: [fastify.authenticate],
   }, async () => {
     const featureFlags = features();
-    const backupRetention = getSetting('backupRetention');
-    const backupIntervalHours = getSetting('backupIntervalHours');
+    const backupRetention = await getSetting('backupRetention');
+    const backupIntervalHours = await getSetting('backupIntervalHours');
     const info = {
       platform: {
         name: 'SYSTEMS.',
@@ -58,7 +58,7 @@ async function serverRoutes(fastify, options) {
         wildcardDomain: process.env.WILDCARD_DOMAIN || null,
         dataDir: dataDir(),
         uploadMaxMb: Number(process.env.UPLOAD_MAX_MB) || 100,
-        releaseRetention: getSetting('releaseRetention'),
+        releaseRetention: await getSetting('releaseRetention'),
         firewall: 'host_validation',   // verify with check-firewall-windows.ps1
         hardening: 'host_validation',  // verify with verify-hardening-windows.ps1
       },
@@ -203,9 +203,9 @@ async function serverRoutes(fastify, options) {
     config: { rateLimit: { max: 3, timeWindow: '1 minute' } },
   }, async (request, reply) => {
     const diskhygiene = require('../services/diskhygiene');
-    const { auditLog } = require('../db');
+    const { auditRepo } = require('../repo');
     const result = await diskhygiene.runCleanup();
-    auditLog({ user_id: request.user.id, action: 'disk_cleanup', ip: request.ip,
+    await auditRepo.appendAudit({ user_id: request.user.id, action: 'disk_cleanup', ip: request.ip,
       detail: `images:${result.imagesPruned} releases:${result.releasesPruned} ~${result.imagesSizeMb}MB` });
     return result;
   });
@@ -217,9 +217,9 @@ async function serverRoutes(fastify, options) {
     config: { rateLimit: { max: 3, timeWindow: '1 minute' } },
   }, async (request, reply) => {
     const diskhygiene = require('../services/diskhygiene');
-    const { auditLog } = require('../db');
+    const { auditRepo } = require('../repo');
     const result = await diskhygiene.pruneSystem();
-    auditLog({ user_id: request.user.id, action: 'disk_cleanup', ip: request.ip,
+    await auditRepo.appendAudit({ user_id: request.user.id, action: 'disk_cleanup', ip: request.ip,
       detail: `prune ~${result.reclaimedMb}MB` });
     return result;
   });

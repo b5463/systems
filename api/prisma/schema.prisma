@@ -1,0 +1,168 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           Int       @id @default(autoincrement())
+  username     String    @unique
+  passwordHash String    @map("password_hash")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  tokenVersion Int       @default(0) @map("token_version")
+  totpSecret   String?   @map("totp_secret")
+  totpEnabled  Boolean   @default(false) @map("totp_enabled")
+
+  sessions     Session[]
+  ipBans       IpBan[]   @relation("BanCreator")
+  settings     PlatformSetting[] @relation("SettingUpdater")
+
+  @@map("users")
+}
+
+model Project {
+  id                    Int       @id @default(autoincrement())
+  name                  String    @unique
+  slug                  String    @unique
+  containerId           String?   @map("container_id")
+  imageId               String?   @map("image_id")
+  port                  Int?
+  status                String    @default("building")
+  envVars               String?   @map("env_vars")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  previousImageId       String?   @map("previous_image_id")
+  previousContainerId   String?   @map("previous_container_id")
+
+  visibility            String    @default("public")
+  deployType            String?   @map("deploy_type")
+  basicUser             String?   @map("basic_user")
+  basicHash             String?   @map("basic_hash")
+
+  healthState           String?   @map("health_state")
+  healthStatus          Int?      @map("health_status")
+  healthResponseMs      Int?      @map("health_response_ms")
+  healthCheckedAt       String?   @map("health_checked_at")
+  healthFailures        Int       @default(0) @map("health_failures")
+  healthPath            String    @default("/") @map("health_path")
+
+  routePublished        Boolean   @default(false) @map("route_published")
+  attestationState      String?   @map("attestation_state")
+  attestationCheckedAt  String?   @map("attestation_checked_at")
+
+  lastError             String?   @map("last_error")
+  lastErrorStage        String?   @map("last_error_stage")
+  lastErrorHint         String?   @map("last_error_hint")
+  lastErrorExcerpt      String?   @map("last_error_excerpt")
+
+  repo                  String?
+  deployBranch          String    @default("main") @map("deploy_branch")
+  isPrimary             Boolean   @default(false) @map("is_primary")
+
+  limitMemoryMb         Int?      @map("limit_memory_mb")
+  limitCpu              Float?    @map("limit_cpu")
+  limitPids             Int?      @map("limit_pids")
+  limitRestartPolicy    String?   @map("limit_restart_policy")
+  limitLogMaxSize       String?   @map("limit_log_max_size")
+  limitLogMaxFile       Int?      @map("limit_log_max_file")
+
+  githubDeployStatus    String?   @map("github_deploy_status")
+  githubDeployDetail    String?   @map("github_deploy_detail")
+  githubDeployAt        String?   @map("github_deploy_at")
+
+  deployHistory         DeployHistory[]
+  statsHistory          StatsHistory[]
+
+  @@index([repo])
+  @@index([isPrimary])
+  @@map("projects")
+}
+
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  userId    Int?     @map("user_id")
+  action    String
+  target    String?
+  detail    String?
+  ip        String?
+  createdAt DateTime @default(now()) @map("created_at")
+  prevHash  String?  @map("prev_hash")
+  hash      String?
+
+  @@index([createdAt])
+  @@map("audit_log")
+}
+
+model Session {
+  id         Int      @id @default(autoincrement())
+  userId     Int      @map("user_id")
+  jti        String   @unique
+  userAgent  String?  @map("user_agent")
+  ip         String?
+  createdAt  DateTime @default(now()) @map("created_at")
+  lastSeenAt DateTime @default(now()) @map("last_seen_at")
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+model IpBan {
+  id        Int      @id @default(autoincrement())
+  ip        String   @unique
+  reason    String?
+  expiresAt String?  @map("expires_at")
+  createdBy Int?     @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  creator   User?    @relation("BanCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+
+  @@index([ip])
+  @@map("ip_bans")
+}
+
+model PlatformSetting {
+  key       String   @id
+  value     String
+  updatedBy Int?     @map("updated_by")
+  updatedAt DateTime @default(now()) @map("updated_at")
+
+  updater   User?    @relation("SettingUpdater", fields: [updatedBy], references: [id], onDelete: SetNull)
+
+  @@map("platform_settings")
+}
+
+model DeployHistory {
+  id          Int      @id @default(autoincrement())
+  projectId   Int      @map("project_id")
+  imageId     String?  @map("image_id")
+  containerId String?  @map("container_id")
+  deployedAt  DateTime @default(now()) @map("deployed_at")
+  metadata    String?
+
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@map("deploy_history")
+}
+
+model StatsHistory {
+  id            Int      @id @default(autoincrement())
+  projectId     Int      @map("project_id")
+  cpuPercent    Float?   @map("cpu_percent")
+  memoryMb      Float?   @map("memory_mb")
+  memoryLimitMb Float?   @map("memory_limit_mb")
+  rxBytes       BigInt?  @map("rx_bytes")
+  txBytes       BigInt?  @map("tx_bytes")
+  recordedAt    DateTime @default(now()) @map("recorded_at")
+
+  project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, recordedAt])
+  @@map("stats_history")
+}

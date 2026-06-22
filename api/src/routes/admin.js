@@ -1,7 +1,7 @@
 'use strict';
 
 const bcrypt = require('bcrypt');
-const { db, auditLog } = require('../db');
+const { userRepo, adminRepo, auditRepo } = require('../repo');
 const ipmatch = require('../util/ipmatch');
 const settings = require('../util/settings');
 
@@ -10,9 +10,7 @@ async function adminRoutes(fastify, options) {
   fastify.get('/api/admin/users', {
     preHandler: [fastify.authenticate],
   }, async () => {
-    const users = db
-      .prepare('SELECT id, username, created_at FROM users ORDER BY created_at ASC')
-      .all();
+    const users = await userRepo.listUsers();
     return { users };
   });
 
@@ -40,26 +38,22 @@ async function adminRoutes(fastify, options) {
     }
 
     // Hard cap: SYSTEMS. is a two-admin platform. No public signup, ever.
-    const adminCount = db.prepare('SELECT COUNT(*) AS c FROM users').get().c;
+    const adminCount = await userRepo.countUsers();
     if (adminCount >= 2) {
       return reply.code(409).send({ error: 'SYSTEMS. allows a maximum of two admins.' });
     }
 
-    const existing = db.prepare('SELECT id FROM users WHERE username = ?').get(username);
+    const existing = await userRepo.findByUsername(username);
     if (existing) {
       return reply.code(409).send({ error: 'A user with this username already exists.' });
     }
 
     const password_hash = await bcrypt.hash(password, 12);
-    const info = db
-      .prepare('INSERT INTO users (username, password_hash) VALUES (?, ?)')
-      .run(username, password_hash);
+    const info = await userRepo.createUser(username, password_hash);
 
-    auditLog({ user_id: request.user.id, action: 'user_create', target: username, ip: request.ip });
+    await auditRepo.appendAudit({ user_id: request.user.id, action: 'user_create', target: username, ip: request.ip });
 
-    const user = db
-      .prepare('SELECT id, username, created_at FROM users WHERE id = ?')
-      .get(info.lastInsertRowid);
+    const user = await userRepo.findById(info.lastInsertRowid);
     return reply.code(201).send({ user });
   });
 
@@ -74,11 +68,11 @@ async function adminRoutes(fastify, options) {
       return reply.code(400).send({ error: 'You cannot delete your own account.' });
     }
 
-    const user = db.prepare('SELECT id, username FROM users WHERE id = ?').get(id);
+    const user = await userRepo.findById(id);
     if (!user) return reply.code(404).send({ error: 'User not found.' });
 
-    db.prepare('DELETE FROM users WHERE id = ?').run(id);
-    auditLog({ user_id: request.user.id, action: 'user_delete', target: user.username, ip: request.ip });
+    await userRepo.deleteUser(id);
+    await auditRepo.appendAudit({ user_id: request.user.id, action: 'user_delete', target: user.username, ip: request.ip });
 
     return { message: 'User deleted.' };
   });
@@ -104,14 +98,14 @@ async function adminRoutes(fastify, options) {
       return reply.code(400).send({ error: 'New password must be at least 15 characters.' });
     }
 
-    const user = db.prepare('SELECT id, username FROM users WHERE id = ?').get(id);
+    const user = await userRepo.findById(id);
     if (!user) return reply.code(404).send({ error: 'User not found.' });
 
     const password_hash = await bcrypt.hash(newPassword, 12);
     // Bump token_version so the reset signs out the target user's sessions.
-    db.prepare('UPDATE users SET password_hash = ?, token_version = token_version + 1 WHERE id = ?').run(password_hash, id);
+    await userRepo.updatePassword(id, password_hash);
 
-    auditLog({ user_id: request.user.id, action: 'password_reset', target: user.username, ip: request.ip });
+    await auditRepo.appendAudit({ user_id: request.user.id, action: 'password_reset', target: user.username, ip: request.ip });
     return { message: 'Password reset.' };
   });
 
@@ -120,9 +114,7 @@ async function adminRoutes(fastify, options) {
   fastify.get('/api/admin/ip-bans', {
     preHandler: [fastify.authenticate],
   }, async () => ({
-    bans: db.prepare(
-      'SELECT id, ip, reason, expires_at, created_at FROM ip_bans ORDER BY created_at DESC'
-    ).all(),
+    bans: await adminRepo.listBans(),
   }));
 
   fastify.post('/api/admin/ip-bans', {
@@ -152,13 +144,12 @@ async function adminRoutes(fastify, options) {
       return reply.code(400).send({ error: 'Ban expiry must be a future timestamp.' });
     }
     try {
-      const info = db.prepare(
-        'INSERT INTO ip_bans (ip, reason, expires_at, created_by) VALUES (?, ?, ?, ?)'
-      ).run(ip, reason, expiresAt, request.user.id);
-      auditLog({ user_id: request.user.id, action: 'ip_ban_create', target: ip, detail: reason, ip: request.ip });
-      return reply.code(201).send({ ban: db.prepare('SELECT id, ip, reason, expires_at, created_at FROM ip_bans WHERE id = ?').get(info.lastInsertRowid) });
+      const info = await adminRepo.createBan({ ip, reason, expiresAt, createdBy: request.user.id });
+      await auditRepo.appendAudit({ user_id: request.user.id, action: 'ip_ban_create', target: ip, detail: reason, ip: request.ip });
+      const ban = await adminRepo.findBanById(info.lastInsertRowid);
+      return reply.code(201).send({ ban });
     } catch (err) {
-      if (err.code === 'SQLITE_CONSTRAINT_UNIQUE') return reply.code(409).send({ error: 'That address is already banned.' });
+      if (err.code === 'P2002') return reply.code(409).send({ error: 'That address is already banned.' });
       throw err;
     }
   });
@@ -168,10 +159,10 @@ async function adminRoutes(fastify, options) {
   }, async (request, reply) => {
     const id = Number(request.params.id);
     if (!Number.isInteger(id)) return reply.code(400).send({ error: 'Invalid ban id.' });
-    const ban = db.prepare('SELECT id, ip FROM ip_bans WHERE id = ?').get(id);
+    const ban = await adminRepo.findBanById(id);
     if (!ban) return reply.code(404).send({ error: 'IP ban not found.' });
-    db.prepare('DELETE FROM ip_bans WHERE id = ?').run(id);
-    auditLog({ user_id: request.user.id, action: 'ip_ban_delete', target: ban.ip, ip: request.ip });
+    await adminRepo.deleteBan(id);
+    await auditRepo.appendAudit({ user_id: request.user.id, action: 'ip_ban_delete', target: ban.ip, ip: request.ip });
     return { message: 'IP ban removed.' };
   });
 
@@ -179,7 +170,7 @@ async function adminRoutes(fastify, options) {
   // remain environment-owned and are deliberately absent from this allowlist.
   fastify.get('/api/admin/settings', {
     preHandler: [fastify.authenticate],
-  }, async () => ({ settings: settings.listSettings() }));
+  }, async () => ({ settings: await settings.listSettings() }));
 
   fastify.patch('/api/admin/settings', {
     preHandler: [fastify.authenticate],
@@ -195,15 +186,15 @@ async function adminRoutes(fastify, options) {
     },
   }, async (request, reply) => {
     try {
-      const changed = settings.updateSettings(request.body.settings, request.user.id);
-      auditLog({
+      const changed = await settings.updateSettings(request.body.settings, request.user.id);
+      await auditRepo.appendAudit({
         user_id: request.user.id,
         action: 'settings_update',
         target: 'platform',
         detail: Object.keys(changed).sort().join(', '),
         ip: request.ip,
       });
-      return { settings: settings.listSettings(), changed };
+      return { settings: await settings.listSettings(), changed };
     } catch (err) {
       return reply.code(400).send({ error: err.message });
     }

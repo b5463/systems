@@ -1,6 +1,6 @@
 'use strict';
 
-const { db } = require('../db');
+const { projectRepo } = require('../repo');
 const { streamContainerLogs, getContainerLogs } = require('../services/docker');
 const { loadOr404 } = require('../util/project');
 
@@ -22,7 +22,7 @@ async function logsRoutes(fastify, options) {
     const socket = connection.socket || connection;
     const { slug } = request.params;
 
-    const project = db.prepare('SELECT * FROM projects WHERE slug = ?').get(slug);
+    const project = await projectRepo.findBySlug(slug);
     if (!project) {
       socket.send(JSON.stringify({ type: 'error', message: 'Project not found' }));
       socket.close();
@@ -104,7 +104,7 @@ async function logsRoutes(fastify, options) {
   }, async (request, reply) => {
     const { slug } = request.params;
 
-    const project = loadOr404(reply, slug);
+    const project = await loadOr404(reply, slug);
     if (!project) return;
     if (!project.container_id) return reply.code(400).send({ error: 'Project has no container' });
 

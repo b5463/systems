@@ -152,7 +152,7 @@ const firstDeploy = computed(() => systemsCount.value === 0)
 const hostReadiness = computed(() => {
   const info = serverInfo.value
   const dockerReady = info?.docker?.status === 'connected'
-  const diskReady = info?.disk?.status !== 'measured' || Number(info.disk.usedPct) < 90
+  const diskReady = info?.disk?.status !== 'measured' || Number(info.disk.usedPct) < 98
   const diskToFreeGb = info?.disk?.status === 'measured' && Number(info.disk.totalGb) > 0
     ? Math.max(0, (Number(info.disk.totalGb) * 0.1) - Number(info.disk.freeGb || 0))
     : null
@@ -182,11 +182,11 @@ const hostReadiness = computed(() => {
       ok: diskReady,
       required: true,
       detail: info?.disk?.status === 'measured'
-        ? String(info.disk.freeGb) + ' GB free · ' + String(info.disk.usedPct) + '% used · deployment limit is below 90%'
+        ? String(info.disk.freeGb) + ' GB free · ' + String(info.disk.usedPct) + '% used · deployment limit is below 98%'
         : 'Disk usage could not be measured from the API.',
       action: diskReady ? null : (diskToFreeGb != null
         ? 'Free at least ' + Math.max(0.1, diskToFreeGb).toFixed(1) + ' GB from the SYSTEMS. data volume, then refresh this page.'
-        : 'Reduce data-volume usage below 90%, then refresh this page.'),
+        : 'Reduce data-volume usage below 98%, then refresh this page.'),
     },  ]
 })
 const hostBlocks = computed(() =>

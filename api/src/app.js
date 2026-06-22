@@ -84,7 +84,7 @@ async function buildApp(opts = {}) {
   // Decorate authenticate on the ROOT instance so every (encapsulated) route
   // plugin can use it as a preHandler. Enforces JWT validity AND token_version
   // (a stale token after a password change / revoke / deleted user is rejected).
-  const { db } = require('./db');
+  const { adminRepo, userRepo } = require('./repo');
   const ipmatch = require('./util/ipmatch');
   // Enforce the persistent denylist before auth and route work. Supports both
   // exact IPs (fast indexed lookup) and CIDR ranges (scanned — the denylist is
@@ -95,14 +95,10 @@ async function buildApp(opts = {}) {
   fastify.addHook('onRequest', async (request, reply) => {
     try {
       const ip = request.ip;
-      const exact = db.prepare(
-        `SELECT id FROM ip_bans WHERE ip = ? AND (expires_at IS NULL OR expires_at > datetime('now'))`
-      ).get(ip);
+      const exact = await adminRepo.findActiveBanByIp(ip);
       let banned = !!exact;
       if (!banned) {
-        const cidrRows = db.prepare(
-          `SELECT ip FROM ip_bans WHERE ip LIKE '%/%' AND (expires_at IS NULL OR expires_at > datetime('now'))`
-        ).all();
+        const cidrRows = await adminRepo.findActiveCidrBans();
         banned = cidrRows.length > 0 && ipmatch.matchesAny(ip, cidrRows.map((r) => r.ip));
       }
       if (banned) return reply.code(403).send({ error: 'Access denied.' });
@@ -117,7 +113,7 @@ async function buildApp(opts = {}) {
     } catch (err) {
       return reply.code(401).send({ error: 'Unauthorized', message: err.message });
     }
-    const u = db.prepare('SELECT token_version FROM users WHERE id = ?').get(request.user.id);
+    const u = await userRepo.findById(request.user.id);
     if (!u || (request.user.tv ?? 0) !== (u.token_version || 0)) {
       return reply.code(401).send({ error: 'Session expired. Please sign in again.' });
     }
@@ -125,17 +121,17 @@ async function buildApp(opts = {}) {
     // bearer JWTs without a jti are intentionally invalid after this migration.
     if (!request.user.jti) return reply.code(401).send({ error: 'Session expired. Please sign in again.' });
     {
-      const s = db.prepare('SELECT id, created_at, last_seen_at FROM sessions WHERE jti = ?').get(request.user.jti);
+      const s = await userRepo.findSessionByJti(request.user.jti);
       if (!s) return reply.code(401).send({ error: 'This session was signed out.' });
       const utc = (value) => Date.parse(value.endsWith('Z') ? value : `${value}Z`);
       const idleMs = (Number(process.env.SESSION_IDLE_MINUTES) || 720) * 60_000;
       const absoluteMs = (Number(process.env.SESSION_ABSOLUTE_HOURS) || 168) * 60 * 60_000;
       if (Date.now() - utc(s.last_seen_at) > idleMs || Date.now() - utc(s.created_at) > absoluteMs) {
-        db.prepare('DELETE FROM sessions WHERE id = ?').run(s.id);
+        await userRepo.deleteSessionById(s.id);
         clearSessionCookie(reply);
         return reply.code(401).send({ error: 'Session expired. Please sign in again.' });
       }
-      db.prepare(`UPDATE sessions SET last_seen_at = datetime('now') WHERE id = ?`).run(s.id);
+      await userRepo.touchSession(request.user.jti);
     }
 
     // Reject cross-origin browser requests, including WebSocket handshakes.
