@@ -12,7 +12,11 @@
     "test:e2e": "node --test test/deploy.e2e.test.js",
     "test:coverage": "node --test --experimental-test-coverage --test-coverage-exclude=\"src/routes/**\" --test-coverage-exclude=\"src/services/**\" --test-coverage-exclude=\"src/db/**\" --test-coverage-exclude=\"src/index.js\" --test-coverage-exclude=\"src/app.js\" --test-coverage-lines=70 --test-coverage-functions=65 --test-coverage-branches=55",
     "lint": "eslint src test scripts",
-    "migrate:postgres": "node scripts/migrate-sqlite-to-postgres.js"
+    "migrate:postgres": "node scripts/migrate-sqlite-to-postgres.js",
+    "prisma:generate": "dotenv -e ../.env -- prisma generate --schema=prisma/schema.prisma",
+    "prisma:migrate": "dotenv -e ../.env -- prisma migrate dev --schema=prisma/schema.prisma",
+    "prisma:deploy": "dotenv -e ../.env -- prisma migrate deploy --schema=prisma/schema.prisma",
+    "prisma:studio": "dotenv -e ../.env -- prisma studio --schema=prisma/schema.prisma"
   },
   "engines": {
     "node": ">=20"
@@ -33,6 +37,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "dotenv-cli": "^11.0.0",
     "eslint": "^10.5.0",
     "globals": "^17.6.0",
     "prisma": "^6.19.3"
