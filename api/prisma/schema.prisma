@@ -30,6 +30,9 @@ model Project {
   containerId           String?   @map("container_id")
   imageId               String?   @map("image_id")
   port                  Int?
+  portBlue              Int?      @map("port_blue")
+  portGreen             Int?      @map("port_green")
+  activeSlot            String    @default("blue") @map("active_slot")
   status                String    @default("building")
   envVars               String?   @map("env_vars")
   createdAt             DateTime  @default(now()) @map("created_at")

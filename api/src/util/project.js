@@ -24,6 +24,10 @@ function pub(p) {
     delete p.limit_log_max_size;
     delete p.limit_log_max_file;
     delete p.health_path;
+    p.activeSlot = p.active_slot || 'blue';
+    delete p.active_slot;
+    delete p.port_blue;
+    delete p.port_green;
   }
   return p;
 }

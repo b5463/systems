@@ -47,6 +47,9 @@ function toSnake(row) {
     github_deploy_status: row.githubDeployStatus,
     github_deploy_detail: row.githubDeployDetail,
     github_deploy_at: row.githubDeployAt,
+    port_blue: row.portBlue,
+    port_green: row.portGreen,
+    active_slot: row.activeSlot,
   };
 }
 
@@ -88,10 +91,20 @@ async function listNonDeleted() {
 
 async function getAllPorts() {
   const rows = await prisma.project.findMany({
-    where: { port: { not: null } },
-    select: { port: true },
+    where: { OR: [{ port: { not: null } }, { portBlue: { not: null } }, { portGreen: { not: null } }] },
+    select: { port: true, portBlue: true, portGreen: true },
   });
   return rows;
+}
+
+function collectUsedPorts(rows) {
+  const used = new Set();
+  for (const r of rows) {
+    if (r.port != null) used.add(r.port);
+    if (r.portBlue != null) used.add(r.portBlue);
+    if (r.portGreen != null) used.add(r.portGreen);
+  }
+  return used;
 }
 
 async function allocateAndCreate({ name, slug, visibility }, findFreePortFn) {
@@ -102,16 +115,40 @@ async function allocateAndCreate({ name, slug, visibility }, findFreePortFn) {
     });
     if (existing) return { conflict: true };
     const dbPorts = await tx.project.findMany({
-      where: { port: { not: null } },
-      select: { port: true },
+      where: { OR: [{ port: { not: null } }, { portBlue: { not: null } }, { portGreen: { not: null } }] },
+      select: { port: true, portBlue: true, portGreen: true },
     });
-    const usedPorts = new Set(dbPorts.map((r) => r.port));
-    const port = await findFreePortFn(4000, 5000, usedPorts);
+    const usedPorts = collectUsedPorts(dbPorts);
+    const portBlue = await findFreePortFn(4000, 5000, usedPorts);
+    usedPorts.add(portBlue);
+    const portGreen = await findFreePortFn(4000, 5000, usedPorts);
     const row = await tx.project.create({
-      data: { name, slug, port, status: 'building', visibility },
+      data: { name, slug, port: portBlue, portBlue, portGreen, activeSlot: 'blue', status: 'building', visibility },
     });
-    return { conflict: false, project: toSnake(row), port };
+    return { conflict: false, project: toSnake(row), port: portBlue };
   });
+}
+
+function getInactivePort(project) {
+  return project.active_slot === 'blue' ? project.port_green : project.port_blue;
+}
+
+function getInactiveSlot(project) {
+  return project.active_slot === 'blue' ? 'green' : 'blue';
+}
+
+async function swapActiveSlot(slug) {
+  const project = await prisma.project.findUnique({
+    where: { slug },
+    select: { activeSlot: true, portBlue: true, portGreen: true },
+  });
+  const next = project.activeSlot === 'blue' ? 'green' : 'blue';
+  const nextPort = next === 'blue' ? project.portBlue : project.portGreen;
+  await prisma.project.update({
+    where: { slug },
+    data: { activeSlot: next, port: nextPort, updatedAt: new Date() },
+  });
+  return { slot: next, port: nextPort };
 }
 
 async function create({ name, slug, port, visibility }) {
@@ -426,6 +463,7 @@ module.exports = {
   findBySlug, findById, findBySlugOrName, findBySlugNotDeleted,
   listAll, listNonDeleted, getAllPorts,
   allocateAndCreate, create,
+  getInactivePort, getInactiveSlot, swapActiveSlot,
   updateStatus, updateAfterBuild, updateAfterRedeploy,
   updateHealth, updateHealthFailures, updateRoutePublished,
   updateEnvVars, updateEnvAndBuilding, updateContainerRunning, updateContainerError,

@@ -3,6 +3,8 @@
 const crypto = require('crypto');
 const { projectRepo, auditRepo } = require('../repo');
 const dockerService = require('../services/docker');
+const health = require('../services/health');
+const proxy = require('../services/proxy');
 const { projectContainerOptions } = require('../util/limits');
 const { loadOr404 } = require('../util/project');
 
@@ -127,16 +129,68 @@ async function envRoutes(fastify, options) {
     // reconciliation (which skips 'building') doesn't race the swap window.
     await projectRepo.updateEnvAndBuilding(slug, encrypted);
 
-    // Recreate container with new env vars (stop → remove → recreate → start)
-    try {
-      if (project.status === 'running') {
-        await dockerService.stopContainer(project.container_id);
-      }
-      await dockerService.removeContainer(project.container_id, true);
+    const inactiveSlot = projectRepo.getInactiveSlot(project);
+    const inactivePort = projectRepo.getInactivePort(project);
 
+    if (!inactivePort) {
+      // Legacy fallback: no blue/green ports, use old stop/remove/recreate behavior.
+      try {
+        if (project.status === 'running') {
+          await dockerService.stopContainer(project.container_id);
+        }
+        await dockerService.removeContainer(project.container_id, true);
+
+        const newContainerId = await dockerService.runContainer(
+          slug, project.image_id, project.port, merged, projectContainerOptions(project)
+        );
+
+        await projectRepo.updateContainerRunning(slug, newContainerId);
+
+        const changed = [...Object.keys(vars), ...remove.map((k) => `-${k}`)];
+        await auditRepo.appendAudit({
+          user_id: request.user.id,
+          action: 'env_update',
+          target: slug,
+          detail: `keys: ${changed.join(', ')}`,
+          ip: request.ip,
+        });
+
+        return { message: 'Env vars updated and container restarted', keys: Object.keys(merged) };
+      } catch (err) {
+        request.log.error({ err }, '[env] Failed to recreate container with new env vars');
+        await projectRepo.updateContainerError(slug);
+        return reply.code(500).send({ error: `Failed to restart container: ${err.message}` });
+      }
+    }
+
+    // Blue/green: start new container with updated env on the inactive slot.
+    try {
       const newContainerId = await dockerService.runContainer(
-        slug, project.image_id, project.port, merged, projectContainerOptions(project)
+        slug, project.image_id, inactivePort, merged,
+        { ...projectContainerOptions(project), slot: inactiveSlot }
       );
+
+      // Health-gate before switching traffic.
+      try {
+        await health.waitForHealthy(health.targetForPort(inactivePort), project.health_path || '/');
+      } catch (healthErr) {
+        try { await dockerService.stopContainer(newContainerId); } catch {}
+        try { await dockerService.removeContainer(newContainerId, true); } catch {}
+        await projectRepo.updateStatus(slug, project.status);
+        return reply.code(500).send({ error: `Env update health check failed: ${healthErr.message}` });
+      }
+
+      // Swap traffic to the new container.
+      await proxy.publishRoute({ slug, port: inactivePort, visibility: project.visibility, basicUser: project.basic_user, basicHash: project.basic_hash, apex: !!project.is_primary });
+      await projectRepo.swapActiveSlot(slug);
+
+      // Stop + remove the old container (no longer serving traffic).
+      if (project.container_id) {
+        if (project.status === 'running') {
+          try { await dockerService.stopContainer(project.container_id); } catch {}
+        }
+        try { await dockerService.removeContainer(project.container_id, true); } catch {}
+      }
 
       await projectRepo.updateContainerRunning(slug, newContainerId);
 
@@ -152,8 +206,6 @@ async function envRoutes(fastify, options) {
       return { message: 'Env vars updated and container restarted', keys: Object.keys(merged) };
     } catch (err) {
       request.log.error({ err }, '[env] Failed to recreate container with new env vars');
-      // The old container was already removed; null the id so reconcile/lifecycle
-      // don't act on a removed container. Operator redeploys to recover.
       await projectRepo.updateContainerError(slug);
       return reply.code(500).send({ error: `Failed to restart container: ${err.message}` });
     }

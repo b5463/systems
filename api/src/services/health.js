@@ -17,17 +17,26 @@ function isLocalMode(env = process.env) {
     domain === 'localhost' || domain === '127.0.0.1';
 }
 
+function appHost(env = process.env) {
+  return env.SYSTEMS_APP_UPSTREAM_HOST || '127.0.0.1';
+}
+
 function targetFor(project, env = process.env) {
   if (!project) return null;
   const localMode = isLocalMode(env);
-  if (localMode && project.port) return `http://127.0.0.1:${project.port}`;
+  const host = appHost(env);
+  if (localMode && project.port) return `http://${host}:${project.port}`;
   if (project.route_published) {
     const scheme = env.PUBLIC_SCHEME || 'https';
     const domain = env.BASE_DOMAIN || 'acronym.sk';
     return `${scheme}://${project.slug}.${domain}`;
   }
-  if (project.port) return `http://127.0.0.1:${project.port}`;
+  if (project.port) return `http://${host}:${project.port}`;
   return null;
+}
+
+function targetForPort(port, env = process.env) {
+  return `http://${appHost(env)}:${port}`;
 }
 
 async function request(url, timeoutMs = 6000) {
@@ -90,4 +99,15 @@ async function checkAttestation(baseUrl, slug, timeoutMs = 6000) {
   }
 }
 
-module.exports = { checkAttestation, checkSystem, isLocalMode, targetFor };
+async function waitForHealthy(baseUrl, healthPath = '/', { retries = 5, initialDelayMs = 1000, retryDelayMs = 2000 } = {}) {
+  for (let i = 0; i < retries; i++) {
+    await new Promise((r) => setTimeout(r, i === 0 ? initialDelayMs : retryDelayMs));
+    const hr = await checkSystem(baseUrl, healthPath);
+    if (hr.state === 'healthy') return hr;
+  }
+  const final = await checkSystem(baseUrl, healthPath);
+  if (final.state === 'healthy') return final;
+  throw new Error(`Health check failed after ${retries} retries: ${final.state} (HTTP ${final.httpStatus || 'N/A'})`);
+}
+
+module.exports = { checkAttestation, checkSystem, isLocalMode, targetFor, targetForPort, waitForHealthy };

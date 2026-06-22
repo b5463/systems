@@ -342,21 +342,40 @@ async function projectsRoutes(fastify, options) {
       }
     }
 
+    // Determine the inactive slot for blue/green zero-downtime rollback.
+    const inactiveSlot = projectRepo.getInactiveSlot(project);
+    const inactivePort = projectRepo.getInactivePort(project);
+
     // Mark building during the swap so reconciliation (which skips 'building')
-    // can't see the transient no-container window and flip the row to 'error'.
+    // can't see the transient state and flip the row to 'error'.
     await projectRepo.updateStatus(slug, 'building');
 
     try {
-      // Stop + remove the current container.
-      if (currentContainerId) {
-        try { await dockerService.stopContainer(currentContainerId); } catch (e) { /* already stopped */ }
-        try { await dockerService.removeContainer(currentContainerId, true); } catch (e) { /* gone */ }
+      // Start from previous image on INACTIVE port (old container still serving).
+      const newContainerId = await dockerService.runContainer(
+        slug, targetImageId, inactivePort, envVars,
+        { ...projectContainerOptions(project), slot: inactiveSlot }
+      );
+
+      // Health-gate the rollback container before switching traffic.
+      try {
+        await health.waitForHealthy(health.targetForPort(inactivePort), project.health_path || '/');
+      } catch (healthErr) {
+        try { await dockerService.stopContainer(newContainerId); } catch {}
+        try { await dockerService.removeContainer(newContainerId, true); } catch {}
+        await projectRepo.updateStatus(slug, 'error');
+        return reply.code(500).send({ error: `Rollback health check failed: ${healthErr.message}` });
       }
 
-      // Start a new container from the previous image, same port + env vars.
-      const newContainerId = await dockerService.runContainer(
-        slug, targetImageId, project.port, envVars, projectContainerOptions(project)
-      );
+      // Swap proxy to the new port — zero downtime.
+      await proxy.publishRoute({ slug, port: inactivePort, visibility: project.visibility, basicUser: project.basic_user, basicHash: project.basic_hash, apex: !!project.is_primary });
+      await projectRepo.swapActiveSlot(slug);
+
+      // Stop + remove the old container (no longer serving traffic).
+      if (currentContainerId) {
+        try { await dockerService.stopContainer(currentContainerId); } catch {}
+        try { await dockerService.removeContainer(currentContainerId, true); } catch {}
+      }
 
       // Swap current <-> previous so a subsequent rollback returns to the
       // version we just rolled away from.

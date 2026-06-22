@@ -110,7 +110,15 @@ async function reconcileOnce() {
           container = byId.get(p.container_id) || byId.get(String(p.container_id).slice(0, 12)) || null;
         }
         // Fall back to the deterministic container name (handles redeploy id drift).
-        if (!container) container = byName.get(`deploy_${p.slug}`) || null;
+        // Try slot-aware names first, then legacy name.
+        if (!container) {
+          const slot = p.active_slot || 'blue';
+          container = byName.get(`deploy_${p.slug}_${slot}`)
+            || byName.get(`deploy_${p.slug}_blue`)
+            || byName.get(`deploy_${p.slug}_green`)
+            || byName.get(`deploy_${p.slug}`)
+            || null;
+        }
 
         const next = reconcileStatus(p, container);
         if (next && next !== p.status) {

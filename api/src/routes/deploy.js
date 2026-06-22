@@ -94,6 +94,7 @@ const STAGE_INFO = {
   build: { label: 'building the image', hint: 'Check the build log above for the failing step (dependency install, compile, or Dockerfile error), fix it, and redeploy.' },
   container: { label: 'starting the container', hint: 'The image built but the container did not start — check the runtime logs for the crash reason, then redeploy.' },
   deploy: { label: 'deploying', hint: 'Check the log above and redeploy.' },
+  health_gate: { label: 'health-checking the new container', hint: 'The new container started but did not pass health checks. The previous version is still running. Check the application logs for startup errors, then redeploy.' },
 };
 
 function recentLogExcerpt(slug) {
@@ -260,7 +261,7 @@ async function runBuildPipeline(slug, zipPath, extractDir, port, userId, ip, env
     appendBuildLog(slug, `[deploy] Starting container — host ${port} → container ${containerPort}...\n`);
     const runtimeProject = await projectRepo.findBySlug(slug);
     const containerId = await dockerService.runContainer(
-      slug, imageId, port, envVars, projectContainerOptions(runtimeProject, { containerPort })
+      slug, imageId, port, envVars, { ...projectContainerOptions(runtimeProject, { containerPort }), slot: 'blue' }
     );
     appendBuildLog(slug, `[deploy] Container started: ${containerId}\n`);
 
@@ -316,7 +317,8 @@ async function runRedeployPipeline(slug, zipPath, extractDir, userId, ip) {
   const project = await projectRepo.findBySlug(slug);
   const oldContainerId = project.container_id;
   const oldImageId = project.image_id;
-  const port = project.port;
+  const inactiveSlot = projectRepo.getInactiveSlot(project);
+  const inactivePort = projectRepo.getInactivePort(project);
 
   let stage = 'extract';
   try {
@@ -331,9 +333,6 @@ async function runRedeployPipeline(slug, zipPath, extractDir, userId, ip) {
       await generateDockerfile(projectType, extractDir);
     }
 
-    // Snapshot the current deploy so it can be rolled back to. We record this
-    // BEFORE building the new image so the project always points at a known-good
-    // previous image/container.
     await projectRepo.setPreviousSnap(slug, oldContainerId || null, oldImageId || null);
 
     try {
@@ -350,16 +349,6 @@ async function runRedeployPipeline(slug, zipPath, extractDir, userId, ip) {
     appendBuildLog(slug, `[redeploy] Image built: ${newImageId}\n`);
 
     stage = 'container';
-    // Atomic swap: stop old → remove old → start new
-    appendBuildLog(slug, `[redeploy] Stopping old container...\n`);
-    if (oldContainerId) {
-      try { await dockerService.stopContainer(oldContainerId); } catch (e) { /* already stopped */ }
-      try { await dockerService.removeContainer(oldContainerId, true); } catch (e) { /* gone */ }
-    }
-
-    appendBuildLog(slug, `[redeploy] Starting new container on port ${port}...\n`);
-
-    // Carry over existing env vars
     let envVars = {};
     if (project.env_vars) {
       try {
@@ -371,18 +360,43 @@ async function runRedeployPipeline(slug, zipPath, extractDir, userId, ip) {
     }
 
     const containerPort = (await dockerService.imageExposedPort(newImageId)) || 3000;
-    appendBuildLog(slug, `[redeploy] Starting new container — host ${port} → container ${containerPort}...\n`);
+    appendBuildLog(slug, `[redeploy] Starting ${inactiveSlot} container — host ${inactivePort} → container ${containerPort}...\n`);
     const newContainerId = await dockerService.runContainer(
-      slug, newImageId, port, envVars, projectContainerOptions(project, { containerPort })
+      slug, newImageId, inactivePort, envVars,
+      { ...projectContainerOptions(project, { containerPort }), slot: inactiveSlot }
     );
     appendBuildLog(slug, `[redeploy] Container started: ${newContainerId}\n`);
 
+    stage = 'health_gate';
+    appendBuildLog(slug, `[redeploy] Health-gating new container on port ${inactivePort}...\n`);
+    try {
+      await health.waitForHealthy(health.targetForPort(inactivePort), project.health_path || '/');
+      appendBuildLog(slug, `[redeploy] Health check passed.\n`);
+    } catch (healthErr) {
+      appendBuildLog(slug, `[redeploy] Health check failed — rolling back to previous container.\n`);
+      try { await dockerService.stopContainer(newContainerId); } catch {}
+      try { await dockerService.removeContainer(newContainerId, true); } catch {}
+      throw healthErr;
+    }
+
+    stage = 'route';
+    appendBuildLog(slug, `[redeploy] Swapping traffic to ${inactiveSlot} (port ${inactivePort})...\n`);
+    try {
+      await proxy.publishRoute({ slug, port: inactivePort, visibility: project.visibility, basicUser: project.basic_user, basicHash: project.basic_hash, apex: !!project.is_primary });
+    } catch (e) {
+      appendBuildLog(slug, `[redeploy] WARNING: proxy route swap failed: ${e.message}\n`);
+    }
+    await projectRepo.swapActiveSlot(slug);
+
+    if (oldContainerId) {
+      appendBuildLog(slug, `[redeploy] Stopping old container...\n`);
+      try { await dockerService.stopContainer(oldContainerId); } catch {}
+      try { await dockerService.removeContainer(oldContainerId, true); } catch {}
+    }
+
     await projectRepo.updateAfterRedeploy(slug, { containerId: newContainerId, imageId: newImageId });
 
-    // Keep the old image for rollback — do NOT remove it on redeploy.
-    // (Previously: dockerService.removeImage(oldImageId, true).)
-
-    appendBuildLog(slug, `[redeploy] Redeploy complete.\n`);
+    appendBuildLog(slug, `[redeploy] Zero-downtime redeploy complete.\n`);
     await projectRepo.updateGithubDeploySucceeded(slug);
     await auditRepo.appendAudit({ user_id: userId, action: 'redeploy', target: slug, ip });
     notify.send({ kind: 'redeploy', slug, detail: 'redeployed' }).catch(() => {});

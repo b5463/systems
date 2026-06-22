@@ -144,7 +144,10 @@ async function buildImage(projectSlug, buildContextPath, onProgress) {
  * @returns {Promise<string>} Container ID
  */
 async function runContainer(projectSlug, imageId, port, envVars = {}, opts = {}) {
-  const containerName = `deploy_${projectSlug}`;
+  const slot = opts.slot;
+  const containerName = slot
+    ? `deploy_${projectSlug}_${slot}`
+    : `deploy_${projectSlug}`;
 
   const Env = Object.entries(envVars).map(([k, v]) => `${k}=${v}`);
 
