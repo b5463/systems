@@ -32,7 +32,6 @@ These paths are implemented but still require end-to-end validation on the real 
 - **Multi-node:** per-node Docker and Caddy, scheduler/placement, node health, and route distribution.
 - **Zero-downtime deploys:** blue/green or rolling cutover gated on health checks.
 - **Preview environments:** ephemeral branch and pull-request deployments.
-- **Roles and SSO:** owner/admin/viewer roles plus OIDC/SSO.
 - **Secrets management:** a dedicated per-system secrets store with rotation.
 - **Build pipeline:** cache, selectable runtimes, and a build queue or farm.
 - **Backups and disaster recovery at scale:** object storage, restore drills, and Postgres point-in-time recovery.
