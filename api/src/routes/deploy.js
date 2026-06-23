@@ -1,6 +1,8 @@
 'use strict';
 
 const fsp = require('fs/promises');
+const { createWriteStream } = require('fs');
+const { pipeline } = require('stream/promises');
 const path = require('path');
 const { projectRepo, auditRepo } = require('../repo');
 const dockerService = require('../services/docker');
@@ -36,15 +38,12 @@ async function readUploadToTmp(request) {
     if (part.type === 'field') {
       fields[part.fieldname] = part.value;
     } else if (part.type === 'file' && part.fieldname === 'file') {
+      // Stream straight to disk — never buffer the whole archive in memory.
+      // @fastify/multipart enforces the fileSize cap (registered in app.js) and
+      // sets part.file.truncated when it's exceeded.
       zipPath = tmpZip();
-      const chunks = [];
-      let total = 0;
-      for await (const chunk of part.file) {
-        total += chunk.length;
-        if (total > MAX_MULTIPART_BYTES) { await part.file.resume(); tooLarge = true; break; }
-        chunks.push(chunk);
-      }
-      if (!tooLarge) await fsp.writeFile(zipPath, Buffer.concat(chunks));
+      await pipeline(part.file, createWriteStream(zipPath));
+      if (part.file.truncated) tooLarge = true;
     } else if (part.file) {
       await part.file.resume();
     }
@@ -57,7 +56,7 @@ async function readUploadToTmp(request) {
 // rollback pointer lives on the project row and is never trimmed).
 async function pruneReleases(projectId) {
   try {
-    await projectRepo.pruneDeployHistory(projectId, RELEASE_RETENTION());
+    await projectRepo.pruneDeployHistory(projectId, await RELEASE_RETENTION());
   } catch (e) { /* best-effort */ }
 }
 

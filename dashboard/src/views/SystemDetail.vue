@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '../api/client'
 import StatusBadge from '../components/StatusBadge.vue'
@@ -394,6 +394,18 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   stopStats()
   document.removeEventListener('visibilitychange', onVisibility)
+})
+
+// vue-router reuses this component instance when navigating between systems
+// (/systems/a → /systems/b), so onMounted does NOT re-run. Re-load on slug
+// change or the page keeps showing the previous system's data. (LogConsole /
+// ExecTerminal already watch their own slug prop and reconnect.)
+watch(() => props.slug, async () => {
+  stopStats()
+  await loadSystem()
+  if (tab.value === 'Metrics') startStats()
+  if (tab.value === 'Deployments') loadDeployHistory()
+  fetchOverviewStat()
 })
 </script>
 

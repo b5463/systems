@@ -12,20 +12,29 @@ process.env.SYSTEMS_DATA_DIR = dir;
 process.env.JWT_SECRET = 'attestation-route-test-jwt-secret-long-enough';
 process.env.SYSTEMS_ATTESTATION_SECRET = 'attestation-route-test-secret-long-enough';
 
-const { db } = require('../src/db');
+const { prisma, hasDb, resetDb } = require('./_dbtest');
+
+if (!hasDb) {
+  test('attestation route (skipped: set DATABASE_URL to run)', { skip: true }, () => {});
+  return;
+}
+
 const { buildApp } = require('../src/app');
 const attestation = require('../src/util/attestation');
 
 test('internal attestation requires the proxy credential and returns a bound encrypted envelope', async (t) => {
-  db.prepare(`INSERT INTO projects (name, slug, status, image_id, deploy_type, health_state, health_status, health_checked_at)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(
-    'Attested system', 'attested', 'running', 'sha256:image-id', 'static',
-    'healthy', 200, new Date().toISOString(),
-  );
+  await resetDb();
+  await prisma.project.create({
+    data: {
+      name: 'Attested system', slug: 'attested', status: 'running',
+      imageId: 'sha256:image-id', deployType: 'static',
+      healthState: 'healthy', healthStatus: 200, healthCheckedAt: new Date().toISOString(),
+    },
+  });
   const app = await buildApp({ logger: false });
   t.after(async () => {
     await app.close();
-    db.close();
+    await prisma.$disconnect();
     fs.rmSync(dir, { recursive: true, force: true });
   });
 

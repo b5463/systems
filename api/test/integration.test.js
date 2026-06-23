@@ -2,7 +2,8 @@
 
 // Route-level integration tests. Each test file runs in its own process under
 // `node --test`, so we point DATA_DIR at a throwaway dir and exercise the real
-// Fastify app via inject() — no port, no Docker.
+// Fastify app via inject() — no port, no Docker. Data is seeded via Prisma
+// against a disposable Postgres database (see ./_dbtest).
 const os = require('os');
 const path = require('path');
 const fs = require('fs');
@@ -15,8 +16,14 @@ const { test, before, after } = require('node:test');
 const assert = require('node:assert');
 const bcrypt = require('bcrypt');
 
+const { prisma, hasDb, resetDb } = require('./_dbtest');
+
+if (!hasDb) {
+  test('integration (skipped: set DATABASE_URL to run)', { skip: true }, () => {});
+  return;
+}
+
 const { buildApp } = require('../src/app');
-const { db } = require('../src/db');
 const totp = require('../src/util/totp');
 
 let app;
@@ -24,15 +31,19 @@ let cookie;
 let csrf;
 
 before(async () => {
+  await resetDb();
   app = await buildApp();
   await app.ready();
-  db.prepare('INSERT INTO users (username, password_hash) VALUES (?, ?)').run('root', bcrypt.hashSync('correct-horse-battery', 12));
+  await prisma.user.create({ data: { username: 'root', passwordHash: bcrypt.hashSync('correct-horse-battery', 12) } });
   const res = await app.inject({ method: 'POST', url: '/api/auth/login', payload: { username: 'root', password: 'correct-horse-battery' } });
   cookie = res.headers['set-cookie'].split(';')[0];
   csrf = res.json().csrfToken;
 });
 
-after(async () => { if (app) await app.close(); });
+after(async () => {
+  if (app) await app.close();
+  await prisma.$disconnect();
+});
 
 const auth = () => ({ cookie, 'x-csrf-token': csrf });
 
@@ -164,13 +175,13 @@ test('notify-test reports disabled when notifications are off', async () => {
 });
 
 test('primary: set/clear apex on a public system; private rejected', async () => {
-  db.prepare(`INSERT INTO projects (name, slug, port, status, visibility) VALUES ('Folio','folio',4400,'running','public')`).run();
+  await prisma.project.create({ data: { name: 'Folio', slug: 'folio', port: 4400, status: 'running', visibility: 'public' } });
   const on = await app.inject({ method: 'PATCH', url: '/api/projects/folio/primary', headers: auth(), payload: { primary: true } });
   assert.equal(on.statusCode, 200);
   assert.equal(on.json().project.is_primary, 1);
 
   // a private system has no public route, so it can't be primary
-  db.prepare(`INSERT INTO projects (name, slug, port, status, visibility) VALUES ('Hidden','hidden',4401,'running','private')`).run();
+  await prisma.project.create({ data: { name: 'Hidden', slug: 'hidden', port: 4401, status: 'running', visibility: 'private' } });
   const bad = await app.inject({ method: 'PATCH', url: '/api/projects/hidden/primary', headers: auth(), payload: { primary: true } });
   assert.equal(bad.statusCode, 400);
 
@@ -181,13 +192,13 @@ test('primary: set/clear apex on a public system; private rejected', async () =>
 
 test('provision-db is 404 while flag is off', async () => {
   // Need a real system row first so we exercise the flag gate, not the 404.
-  db.prepare(`INSERT INTO projects (name, slug, port, status) VALUES ('Prov','prov',4321,'stopped')`).run();
+  await prisma.project.create({ data: { name: 'Prov', slug: 'prov', port: 4321, status: 'stopped' } });
   const res = await app.inject({ method: 'POST', url: '/api/projects/prov/provision-db', headers: auth() });
   assert.equal(res.statusCode, 404);
 });
 
 test('repo mapping: validates owner/name and clears on null', async () => {
-  db.prepare(`INSERT INTO projects (name, slug, port, status) VALUES ('Repo','repo',4330,'running')`).run();
+  await prisma.project.create({ data: { name: 'Repo', slug: 'repo', port: 4330, status: 'running' } });
   const bad = await app.inject({ method: 'PATCH', url: '/api/projects/repo/repo', headers: auth(), payload: { repo: 'not a repo' } });
   assert.equal(bad.statusCode, 400);
   const ok = await app.inject({ method: 'PATCH', url: '/api/projects/repo/repo', headers: auth(), payload: { repo: 'acme/site', branch: 'release' } });
@@ -199,15 +210,20 @@ test('repo mapping: validates owner/name and clears on null', async () => {
 });
 
 test('metrics history: supports seven-day windows with bounded downsampling', async () => {
-  const project = db.prepare(`INSERT INTO projects (name, slug, port, status) VALUES ('Metrics','metrics',4332,'running') RETURNING id`).get();
-  const insert = db.prepare(`
-    INSERT INTO stats_history (project_id, cpu_percent, memory_mb, memory_limit_mb, rx_bytes, tx_bytes, recorded_at)
-    VALUES (?, ?, ?, 512, 0, 0, datetime('now', ?))
-  `);
-  const seed = db.transaction(() => {
-    for (let i = 0; i < 400; i += 1) insert.run(project.id, i === 0 ? -10 : i % 100, 100 + i, `-${i} seconds`);
-  });
-  seed();
+  const project = await prisma.project.create({ data: { name: 'Metrics', slug: 'metrics', port: 4332, status: 'running' }, select: { id: true } });
+  const rows = [];
+  for (let i = 0; i < 400; i += 1) {
+    rows.push({
+      projectId: project.id,
+      cpuPercent: i === 0 ? -10 : i % 100,
+      memoryMb: 100 + i,
+      memoryLimitMb: 512,
+      rxBytes: BigInt(0),
+      txBytes: BigInt(0),
+      recordedAt: new Date(Date.now() - i * 1000),
+    });
+  }
+  await prisma.statsHistory.createMany({ data: rows });
 
   const response = await app.inject({
     method: 'GET', url: '/api/projects/metrics/stats/history?hours=168', headers: auth(),
@@ -220,7 +236,7 @@ test('metrics history: supports seven-day windows with bounded downsampling', as
   assert.ok(response.json().points.every((point) => point.cpu_percent >= 0));
 });
 test('limits: persists validated per-system overrides and exposes a stable shape', async () => {
-  db.prepare(`INSERT INTO projects (name, slug, port, status) VALUES ('Limited','limited',4331,'running')`).run();
+  await prisma.project.create({ data: { name: 'Limited', slug: 'limited', port: 4331, status: 'running' } });
   const saved = await app.inject({
     method: 'PATCH', url: '/api/projects/limited/limits', headers: auth(),
     payload: {
@@ -252,7 +268,7 @@ test('limits: persists validated per-system overrides and exposes a stable shape
   assert.equal(invalid.statusCode, 400);
 });
 test('visibility: rejects an unsafe basic-auth username (Caddy injection guard)', async () => {
-  db.prepare(`INSERT INTO projects (name, slug, port, status, visibility) VALUES ('Vis','vis',4322,'running','public')`).run();
+  await prisma.project.create({ data: { name: 'Vis', slug: 'vis', port: 4322, status: 'running', visibility: 'public' } });
   const res = await app.inject({
     method: 'PATCH', url: '/api/projects/vis/visibility', headers: auth(),
     payload: { visibility: 'password', username: 'bad user}', password: 'secretpw' },
@@ -261,7 +277,7 @@ test('visibility: rejects an unsafe basic-auth username (Caddy injection guard)'
 });
 
 test('env: rejects values with control characters', async () => {
-  db.prepare(`INSERT INTO projects (name, slug, port, status, container_id, image_id) VALUES ('Envx','envx',4323,'running','c1','i1')`).run();
+  await prisma.project.create({ data: { name: 'Envx', slug: 'envx', port: 4323, status: 'running', containerId: 'c1', imageId: 'i1' } });
   const res = await app.inject({
     method: 'PUT', url: '/api/projects/envx/env', headers: auth(),
     payload: { vars: { OK: 'fine', BAD: 'line\nbreak' } },
@@ -282,7 +298,7 @@ test('admin: safe runtime settings are validated, audited, and resettable', asyn
   const retention = saved.json().settings.find((item) => item.key === 'releaseRetention');
   assert.equal(retention.value, 7);
   assert.equal(retention.source, 'database');
-  assert.ok(db.prepare("SELECT id FROM audit_log WHERE action = 'settings_update' ORDER BY id DESC LIMIT 1").get());
+  assert.ok(await prisma.auditLog.findFirst({ where: { action: 'settings_update' }, orderBy: { id: 'desc' } }));
 
   const invalid = await app.inject({
     method: 'PATCH', url: '/api/admin/settings', headers: auth(),
@@ -319,7 +335,11 @@ test('2fa: setup -> enable -> login requires code', async () => {
 });
 
 test('sessions: changing password rotates the cookie and revokes the old session', async () => {
-  const login = await app.inject({ method: 'POST', url: '/api/auth/login', payload: { username: 'root', password: 'correct-horse-battery', code: totp.totp(db.prepare('SELECT totp_secret FROM users WHERE username = ?').get('root').totp_secret) } });
+  const secret = (await prisma.user.findUnique({ where: { username: 'root' } })).totpSecret;
+  // Use a next-step code: the prior 2FA test already consumed the current
+  // window's code, and the replay guard rejects reusing it within ~90s.
+  const code = totp.totp(secret, { time: Date.now() + 30_000 });
+  const login = await app.inject({ method: 'POST', url: '/api/auth/login', payload: { username: 'root', password: 'correct-horse-battery', code } });
   const oldCookie = login.headers['set-cookie'].split(';')[0];
   const oldCsrf = login.json().csrfToken;
 

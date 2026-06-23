@@ -136,7 +136,9 @@ async function reconcileOnce() {
       // on boot and during the normal reconciliation cycle.
       if (health.isLocalMode()) {
         const runningProjects = await projectRepo.findRunningWithPort();
-        await Promise.all(runningProjects.map(async (project) => {
+        // allSettled + per-item guard: one system's transient DB/probe failure
+        // must not abort the whole reconcile pass (incl. stuck-build recovery).
+        await Promise.allSettled(runningProjects.map(async (project) => {
           const target = health.targetFor(project);
           if (!target) return;
           const observed = await health.checkSystem(target, project.health_path || '/');
@@ -179,12 +181,14 @@ async function reconcileOnce() {
   // Fires a notification only when an alert is newly raised (transition-based),
   // not on every poll cycle.
   buildInfoSnapshot(dockerOk)
-    .then((snapshot) => {
+    .then(async (snapshot) => {
+      // getSetting is async — these must be awaited or evaluateAlerts receives
+      // Promises (→ NaN → silently ignored thresholds, always using defaults).
       const next = evaluateAlerts(snapshot, {
-        backupOverdueHours: getSetting('backupOverdueHours'),
-        memoryPercent: getSetting('alertMemoryPercent'),
-        cpuPercent: getSetting('alertCpuPercent'),
-        healthFailures: getSetting('alertHealthFailures'),
+        backupOverdueHours: await getSetting('backupOverdueHours'),
+        memoryPercent: await getSetting('alertMemoryPercent'),
+        cpuPercent: await getSetting('alertCpuPercent'),
+        healthFailures: await getSetting('alertHealthFailures'),
       });
       const { raised } = alertDelta(prevAlerts, next);
       prevAlerts = next;

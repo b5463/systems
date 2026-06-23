@@ -43,7 +43,11 @@ function sessionToken(request) {
 }
 
 function csrfToken(jti) {
-  const secret = process.env.CSRF_SECRET || process.env.JWT_SECRET;
+  // Mirror app.js's JWT-secret resolution: in production JWT_SECRET is required,
+  // in dev it falls back to a fixed default. Without this fallback, createHmac
+  // would be passed `undefined` and throw on the first login when no secret is
+  // set, 500ing the whole auth flow.
+  const secret = process.env.CSRF_SECRET || process.env.JWT_SECRET || 'insecure-default-secret-change-me';
   return crypto.createHmac('sha256', secret).update(`systems-csrf:${jti}`).digest('base64url');
 }
 

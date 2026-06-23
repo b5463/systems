@@ -57,6 +57,13 @@ function renderRoute({ slug, port = 3000, visibility = 'public', basicUser, basi
   const tag = `${visibility === 'password' ? 'password' : 'public'}${apex ? ', apex' : ''}`;
   const upstream = attestation.internalUpstream();
   const credential = attestation.routeCredential(slug);
+  // basicUser/basicHash are interpolated into the Caddyfile, so a username with
+  // whitespace, braces, or newlines could break out of the basic_auth block and
+  // inject arbitrary directives. Constrain both to safe charsets.
+  if (visibility === 'password' && basicUser && basicHash) {
+    if (!/^[A-Za-z0-9._@-]{1,64}$/.test(basicUser)) throw new Error('invalid basic_auth username');
+    if (!/^[A-Za-z0-9$./-]+$/.test(basicHash)) throw new Error('invalid basic_auth hash');
+  }
   const auth = visibility === 'password' && basicUser && basicHash
     ? `\t\tbasic_auth {\n\t\t\t${basicUser} ${basicHash}\n\t\t}\n`
     : '';

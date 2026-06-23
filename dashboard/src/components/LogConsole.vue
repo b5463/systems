@@ -34,6 +34,7 @@ let ws = null
 let resizeObserver = null
 let terminalReached = false   // a terminal state was reached â€” do not reconnect
 let reconnects = 0
+let reconnectTimer = null
 let idleTimer = null
 let lastOutputAt = 0
 let logBuffer = ''
@@ -169,6 +170,9 @@ function stopIdleWatch() {
 }
 
 function detach() {
+  // Cancel any pending reconnect so a stale timer can't spawn a second,
+  // untracked socket after a slug change or unmount.
+  if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null }
   if (ws) {
     ws.onmessage = null
     ws.onclose = null
@@ -224,7 +228,7 @@ function connect() {
         reconnects += 1
         status.value = 'reconnecting'
         writeLine(`\n[reconnectingâ€¦ attempt ${reconnects}]\n`)
-        setTimeout(() => { if (!terminalReached) connect() }, 1000 * reconnects)
+        reconnectTimer = setTimeout(() => { if (!terminalReached) connect() }, 1000 * reconnects)
       } else {
         status.value = 'ended'
         if (reconnects > 0) writeLine('\n[stream interrupted â€” could not reconnect]\n')

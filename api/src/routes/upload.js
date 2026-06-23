@@ -19,6 +19,9 @@ const UPLOADS_DIR = process.env.UPLOADS_DIR || path.join(TMP_DIR, 'uploads');
 try { fs.mkdirSync(UPLOADS_DIR, { recursive: true }); } catch { /* created lazily otherwise */ }
 const sessions = new Map(); // uploadId -> { ..., createdAt }
 const SESSION_TTL_MS = (Number(process.env.UPLOAD_SESSION_TTL_MIN) || 30) * 60 * 1000;
+// Cap concurrent upload sessions per user so a client can't spam /init and leak
+// .part files / memory faster than the 5-min sweeper reclaims them.
+const MAX_SESSIONS_PER_USER = Number(process.env.UPLOAD_MAX_SESSIONS_PER_USER) || 5;
 
 // Drop abandoned sessions + their .part files so a client that disappears after
 // /init can't leak memory or fill the disk.
@@ -63,6 +66,7 @@ async function uploadRoutes(fastify, options) {
 
   // Begin a session.
   fastify.post('/api/upload/init', {
+    config: { rateLimit: { max: 20, timeWindow: '1 minute' } },
     preHandler: [fastify.authenticate],
     schema: {
       body: {
@@ -84,6 +88,12 @@ async function uploadRoutes(fastify, options) {
 
     const sErr = slugError(slug);
     if (sErr) return reply.code(400).send({ error: sErr });
+
+    let mine = 0;
+    for (const s of sessions.values()) if (s.userId === request.user.id) mine += 1;
+    if (mine >= MAX_SESSIONS_PER_USER) {
+      return reply.code(429).send({ error: 'Too many concurrent uploads. Finish or cancel one first.' });
+    }
 
     const maxMb = features().v2UploadMaxMb;
     const vErr = validateChunk({ index: 0, total: totalChunks, chunkSize: 1, totalSize }, { maxMb });

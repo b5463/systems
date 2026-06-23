@@ -21,6 +21,21 @@ const _loginCleanup = setInterval(() => {
 }, 60 * 60_000);
 if (_loginCleanup.unref) _loginCleanup.unref();
 
+// TOTP replay guard: a code is valid for ~step*(2*window+1) ≈ 90s. Reject any
+// resubmission of an already-accepted code within that window so a captured
+// code can't be replayed (RFC 6238 §5.2).
+// ponytail: in-memory, single-process; move to a `users` column if the API ever
+// runs multi-instance.
+const totpUsed = new Map(); // userId -> { code, at }
+const TOTP_REPLAY_MS = 90_000;
+function totpReplayed(userId, code) {
+  const last = totpUsed.get(userId);
+  return !!last && last.code === code && Date.now() - last.at < TOTP_REPLAY_MS;
+}
+function rememberTotp(userId, code) {
+  totpUsed.set(userId, { code, at: Date.now() });
+}
+
 // A fixed bcrypt hash used only to spend equivalent time on unknown-user logins.
 const DUMMY_HASH = '$2b$12$LS.DksBFMLXDgraHFAgGFOqaqkWL1x15NcdADtOyxtIOWJHnW2pK6';
 
@@ -54,6 +69,11 @@ async function rotateSoleSession(fastify, user, request, reply) {
 async function authRoutes(fastify, options) {
   // `fastify.authenticate` is decorated on the root instance in app.js so all
   // route plugins share it.
+
+  // Per-IP limit for password/2FA-sensitive endpoints that do bcrypt or TOTP
+  // checks — the global 100/min is too loose to bound brute force on a stolen
+  // session (login has its own dedicated 10/min + lockout).
+  const sensitiveLimit = { rateLimit: { max: 10, timeWindow: '1 minute' } };
 
   // Rate-limit login aggressively: 10 attempts per minute per IP
   fastify.post('/api/auth/login', {
@@ -115,11 +135,12 @@ async function authRoutes(fastify, options) {
         // Password was correct — not a credential failure, so don't count it.
         return reply.code(401).send({ error: 'Two-factor code required.', twoFactorRequired: true });
       }
-      if (!totp.verify(code, user.totp_secret)) {
+      if (totpReplayed(user.id, code) || !totp.verify(code, user.totp_secret)) {
         fail();
         await auditRepo.appendAudit({ user_id: user.id, action: 'login_fail', target: username, detail: '2fa code invalid', ip });
         return reply.code(401).send({ error: 'Invalid two-factor code.', twoFactorRequired: true });
       }
+      rememberTotp(user.id, code);
     }
 
     // Success — clear any failure streak for this IP.
@@ -181,6 +202,7 @@ async function authRoutes(fastify, options) {
 
   // Change own password — also bumps token_version (signs out other sessions).
   fastify.post('/api/auth/change-password', {
+    config: sensitiveLimit,
     preHandler: [fastify.authenticate],
     schema: {
       body: {
@@ -252,6 +274,7 @@ async function authRoutes(fastify, options) {
   // Begin setup: generate a pending secret, return the otpauth URL + secret.
   // Not active until confirmed via /enable with a valid code.
   fastify.post('/api/auth/2fa/setup', {
+    config: sensitiveLimit,
     preHandler: [fastify.authenticate],
   }, async (request, reply) => {
     const user = await userRepo.findById(request.user.id);
@@ -263,6 +286,7 @@ async function authRoutes(fastify, options) {
 
   // Confirm + enable with a code from the authenticator app.
   fastify.post('/api/auth/2fa/enable', {
+    config: sensitiveLimit,
     preHandler: [fastify.authenticate],
     schema: { body: { type: 'object', required: ['code'], properties: { code: { type: 'string', maxLength: 16 } } } },
   }, async (request, reply) => {
@@ -282,6 +306,7 @@ async function authRoutes(fastify, options) {
 
   // Disable 2FA (requires current password + a valid code).
   fastify.post('/api/auth/2fa/disable', {
+    config: sensitiveLimit,
     preHandler: [fastify.authenticate],
     schema: {
       body: {
@@ -294,9 +319,10 @@ async function authRoutes(fastify, options) {
     if (!user.totp_enabled) return reply.code(400).send({ error: 'Two-factor is not enabled.' });
     const okPass = await bcrypt.compare(request.body.password || '', user.password_hash);
     if (!okPass) return reply.code(401).send({ error: 'Password is incorrect.' });
-    if (!totp.verify(request.body.code, user.totp_secret)) {
+    if (totpReplayed(user.id, request.body.code) || !totp.verify(request.body.code, user.totp_secret)) {
       return reply.code(400).send({ error: 'Code did not verify.' });
     }
+    rememberTotp(user.id, request.body.code);
     await userRepo.disableTotp(user.id);
     await auditRepo.appendAudit({ user_id: user.id, action: '2fa_disabled', target: user.username, ip: request.ip });
     const updated = await userRepo.findById(user.id);

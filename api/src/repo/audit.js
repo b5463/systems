@@ -81,7 +81,7 @@ async function query({ action, actions, target, username, from, to, limit = 100,
     ? String(actions).split(',').map((s) => s.trim()).filter(Boolean).slice(0, 50)
     : [];
 
-  let whereSql = '';
+  let whereSql;
   if (actionList.length) {
     where.push(`a.action IN (${actionList.map(() => `$${paramIdx++}`).join(', ')})`);
     params.push(...actionList);

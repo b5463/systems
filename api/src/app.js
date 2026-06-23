@@ -123,10 +123,21 @@ async function buildApp(opts = {}) {
     {
       const s = await userRepo.findSessionByJti(request.user.jti);
       if (!s) return reply.code(401).send({ error: 'This session was signed out.' });
-      const utc = (value) => Date.parse(value.endsWith('Z') ? value : `${value}Z`);
+      // Session timestamps are stored as 'YYYY-MM-DD HH:MM:SS' (space-separated,
+      // no zone). The bare space+Z form is not reliably parseable across engines,
+      // so normalize to ISO 'T' first. An unparseable value (NaN) is treated as
+      // expired (fail closed) rather than never-expiring (fail open).
+      const utc = (value) => {
+        if (value instanceof Date) return value.getTime();
+        const s = String(value).replace(' ', 'T');
+        return Date.parse(s.endsWith('Z') ? s : `${s}Z`);
+      };
       const idleMs = (Number(process.env.SESSION_IDLE_MINUTES) || 720) * 60_000;
       const absoluteMs = (Number(process.env.SESSION_ABSOLUTE_HOURS) || 168) * 60 * 60_000;
-      if (Date.now() - utc(s.last_seen_at) > idleMs || Date.now() - utc(s.created_at) > absoluteMs) {
+      const lastSeen = utc(s.last_seen_at);
+      const created = utc(s.created_at);
+      if (!Number.isFinite(lastSeen) || !Number.isFinite(created)
+        || Date.now() - lastSeen > idleMs || Date.now() - created > absoluteMs) {
         await userRepo.deleteSessionById(s.id);
         clearSessionCookie(reply);
         return reply.code(401).send({ error: 'Session expired. Please sign in again.' });

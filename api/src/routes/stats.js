@@ -44,13 +44,12 @@ async function statsRoutes(fastify, options) {
       // Fire-and-forget: persist a snapshot for historical charts.
       // Never block (or fail) the live-stats response on the write.
       try {
-        await statsRepo.insertStats({
-          project_id: project.id,
-          cpu_percent: safeStats.cpu_percent,
-          memory_mb: stats.memory_mb ?? 0,
-          memory_limit_mb: stats.memory_limit_mb ?? 0,
-          rx_bytes: stats.rx_bytes ?? 0,
-          tx_bytes: stats.tx_bytes ?? 0,
+        await statsRepo.insertStats(project.id, {
+          cpuPercent: safeStats.cpu_percent,
+          memoryMb: stats.memory_mb ?? 0,
+          memoryLimitMb: stats.memory_limit_mb ?? 0,
+          rxBytes: stats.rx_bytes ?? 0,
+          txBytes: stats.tx_bytes ?? 0,
         });
         // Occasionally trim old history so the table doesn't grow without bound
         // (this endpoint is polled for every running system on an interval).

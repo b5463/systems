@@ -9,6 +9,8 @@ jobs:
   macos-compatibility:
     name: macOS — scripts + native install
     runs-on: macos-latest
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/systems_test
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v6
@@ -20,9 +22,24 @@ jobs:
             dashboard/package-lock.json
       - name: Check macOS shell helpers
         run: bash -n scripts/*macos.sh scripts/_systems-common.sh
+      - name: Start PostgreSQL (Homebrew)
+        run: |
+          brew install postgresql@16
+          export PATH="$(brew --prefix postgresql@16)/bin:$PATH"
+          brew services start postgresql@16
+          for i in $(seq 1 30); do pg_isready -h localhost -p 5432 && break; sleep 1; done
+          # brew's postgres superuser is the current user with no password; create
+          # the role + database the test DATABASE_URL expects.
+          createuser -h localhost -s postgres || true
+          psql -h localhost -d postgres -c "ALTER ROLE postgres WITH PASSWORD 'postgres';"
+          createdb -h localhost -O postgres systems_test
       - name: Test API on macOS
         working-directory: api
-        run: npm ci && npm test
+        run: |
+          npm ci
+          npx prisma generate
+          npx prisma migrate deploy
+          npm test
       - name: Build dashboard on macOS
         working-directory: dashboard
         run: npm ci && npm run build
@@ -33,6 +50,22 @@ jobs:
     defaults:
       run:
         working-directory: api
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: systems
+          POSTGRES_PASSWORD: systems
+          POSTGRES_DB: systems_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U systems"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://systems:systems@localhost:5432/systems_test
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v6
@@ -41,6 +74,8 @@ jobs:
           cache: npm
           cache-dependency-path: api/package-lock.json
       - run: npm ci
+      - run: npx prisma generate
+      - run: npx prisma migrate deploy
       - run: npm run lint
       - run: npm test
       # Enforce a coverage floor on the unit-tested core (util/*). Routes and

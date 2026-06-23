@@ -57,7 +57,10 @@ export const useAuthStore = defineStore('auth', {
       const { api } = await import('../api/client')
       const me = await api.get('/auth/me')
       this.user = me
-      this.setCsrf(me.csrfToken)
+      // Guard like client.js does: only overwrite the token when one is present,
+      // so a /me payload without csrfToken can't null it out and lock the user
+      // out of every state-changing request.
+      if (me.csrfToken) this.setCsrf(me.csrfToken)
       return me
     },
 
