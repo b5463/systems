@@ -3,10 +3,17 @@
 ## Unified Identity, Entitlements, Licensing, and Product-User Analytics
 
 **Status:** Proposed V4 companion specification  
-**Parent specification:** `V4_PROPOSAL.md`  
+**Parent specification:** `docs/V4/V4_PROPOSAL.md`  
 **Product:** SYSTEMS. by Acronym  
 **Document version:** 1.0  
-**Date:** 19 June 2026
+**Date:** 19 June 2026  
+**Companion documents:**
+
+- `docs/V4/V4_PROPOSAL.md` — definitive product and architecture proposal (parent)
+- `docs/V4/SYSTEMS_V4_IMPLEMENTATION_ROADMAP_FIXED.md` — phased implementation roadmap (Phase 7 and 7.5)
+- `docs/V4/SYSTEMS_V4_TECHNICAL_UPGRADE_PLAN.md` — technical upgrade plan based on current repository
+- `docs/V4/SYSTEMS_V4_APP_BUILDER_GUIDE_FIXED.md` — app builder integration guide; defines how products consume the identity and entitlement API
+- `docs/V4/V4_DEVELOPER_ALLOCATION.md` — task allocation between Alex and Tomas
 
 > **SYSTEMS. standardises identity and entitlement communication across Acronym products; it does not force products to share one database.**
 

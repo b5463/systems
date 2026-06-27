@@ -3,7 +3,13 @@
 **Document status:** implementation plan  
 **Repository inspected:** uploaded `systems-main(2).zip`  
 **Target product direction:** SYSTEMS. is Acronym's private control plane for building, deploying, operating, publishing and commercialising digital products.  
-**Companion docs:** `docs/V4_PROPOSAL.md`, `docs/V4_IDENTITY_LICENSING_ADDITION.md`, `SYSTEMS_V4_APP_BUILDER_GUIDE.md`
+**Companion documents:**
+
+- `docs/V4/V4_PROPOSAL.md` — definitive product and architecture proposal
+- `docs/V4/SYSTEMS_V4_IMPLEMENTATION_ROADMAP_FIXED.md` — phased implementation roadmap with exit gates and rollback paths
+- `docs/V4/V4_IDENTITY_LICENSING_ADDITION.md` — identity, entitlements, licensing and product-user analytics
+- `docs/V4/SYSTEMS_V4_APP_BUILDER_GUIDE_FIXED.md` — app builder integration guide and acceptance levels
+- `docs/V4/V4_DEVELOPER_ALLOCATION.md` — task allocation between Alex and Tomas
 
 ---
 

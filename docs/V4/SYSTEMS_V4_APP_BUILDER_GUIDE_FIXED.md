@@ -3,7 +3,14 @@
 **Document status:** Developer guide, reviewed and corrected  
 **Target audience:** Developers building products, apps, APIs, workers, desktop tools or external systems that must be accepted by SYSTEMS. V4  
 **Platform role:** SYSTEMS. is Acronym’s private control plane for building, deploying, operating, publishing and commercialising digital products.  
-**Public role:** Acronym is the public-facing portfolio, storefront and customer surface.
+**Public role:** Acronym is the public-facing portfolio, storefront and customer surface.  
+**Companion documents:**
+
+- `docs/V4/V4_PROPOSAL.md` — definitive product and architecture proposal
+- `docs/V4/SYSTEMS_V4_IMPLEMENTATION_ROADMAP_FIXED.md` — phased implementation roadmap (Phase 8.5)
+- `docs/V4/SYSTEMS_V4_TECHNICAL_UPGRADE_PLAN.md` — technical upgrade plan based on current repository
+- `docs/V4/V4_IDENTITY_LICENSING_ADDITION.md` — identity, entitlements, licensing and product-user analytics; defines the APIs this guide tells apps to consume
+- `docs/V4/V4_DEVELOPER_ALLOCATION.md` — task allocation between Alex and Tomas
 
 ---
 

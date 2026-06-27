@@ -2,7 +2,14 @@
 
 **Status:** Active  
 **Branch:** `claude/v4-roadmap-allocation-jxue3e`  
-**Updated:** 2026-06-27
+**Updated:** 2026-06-27  
+**Source documents:**
+
+- `docs/V4/V4_PROPOSAL.md` — definitive product and architecture proposal
+- `docs/V4/SYSTEMS_V4_IMPLEMENTATION_ROADMAP_FIXED.md` — phased implementation roadmap with exit gates and rollback paths
+- `docs/V4/SYSTEMS_V4_TECHNICAL_UPGRADE_PLAN.md` — technical upgrade plan based on current repository
+- `docs/V4/V4_IDENTITY_LICENSING_ADDITION.md` — identity, entitlements, licensing and product-user analytics (Phases 7 and 7.5)
+- `docs/V4/SYSTEMS_V4_APP_BUILDER_GUIDE_FIXED.md` — app builder integration guide and acceptance levels (Phase 8.5)
 
 Two full stack developers split ownership by domain:
 

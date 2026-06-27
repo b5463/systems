@@ -4,7 +4,14 @@
 **Product:** SYSTEMS. by Acronym  
 **Target domain:** `acronym.sk`  
 **Document version:** 1.2  
-**Date:** 18 June 2026
+**Date:** 18 June 2026  
+**Companion documents:**
+
+- `docs/V4/SYSTEMS_V4_IMPLEMENTATION_ROADMAP_FIXED.md` — phased implementation roadmap with exit gates and rollback paths
+- `docs/V4/SYSTEMS_V4_TECHNICAL_UPGRADE_PLAN.md` — technical upgrade plan based on current repository
+- `docs/V4/V4_IDENTITY_LICENSING_ADDITION.md` — identity, entitlements, licensing and product-user analytics
+- `docs/V4/SYSTEMS_V4_APP_BUILDER_GUIDE_FIXED.md` — app builder integration guide and acceptance levels
+- `docs/V4/V4_DEVELOPER_ALLOCATION.md` — task allocation between Alex and Tomas
 
 > **SYSTEMS. is Acronym's private control plane for building, deploying, operating, publishing, and commercialising digital products.**
 

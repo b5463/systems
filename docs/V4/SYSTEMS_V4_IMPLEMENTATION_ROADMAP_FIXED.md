@@ -5,10 +5,11 @@
 **Roadmap style:** conservative, phased, test-gated, rollback-friendly  
 **Companion documents:**
 
-- `docs/V4/V4_PROPOSAL.md`
-- `docs/V4/SYSTEMS_V4_TECHNICAL_UPGRADE_PLAN.md`
-- `docs/V4/V4_IDENTITY_LICENSING_ADDITION.md`
-- `docs/V4/SYSTEMS_V4_APP_BUILDER_GUIDE.md`
+- `docs/V4/V4_PROPOSAL.md` — definitive product and architecture proposal
+- `docs/V4/SYSTEMS_V4_TECHNICAL_UPGRADE_PLAN.md` — technical upgrade plan based on current repository
+- `docs/V4/V4_IDENTITY_LICENSING_ADDITION.md` — identity, entitlements, licensing and product-user analytics
+- `docs/V4/SYSTEMS_V4_APP_BUILDER_GUIDE_FIXED.md` — app builder integration guide and acceptance levels
+- `docs/V4/V4_DEVELOPER_ALLOCATION.md` — task allocation between Alex and Tomas
 
 ---
 
