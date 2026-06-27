@@ -160,7 +160,9 @@ Both devs work on every phase. The split below is by primary ownership — the o
 | APIs: `POST /api/entitlements/check|admin/grant|admin/revoke`, `POST /api/licensing/redeem|activate|validate|deactivate` | Alex |
 | Signed licence leases (`validUntil`, `offlineUntil`, `features`, subscription state, signature) | Alex |
 | Licence signing-key management: table, current/previous key support, key ID in leases, public-key endpoint, revocation-list endpoint, emergency key-rotation runbook | Alex |
-| Subscription access grace/suspension flow (`active → payment failed → past_due → grace → suspended → recovered|cancelled`) | Alex |
+| Full subscription state machine: `active → payment_failed → past_due → grace → suspended → recovered|cancelled|expired|refunded|chargeback|manual_revoked` — all 13 states with distinct behaviour | Alex |
+| Payment recovery and reactivation workflows (Stripe retry, self-serve update, admin reactivate, data restoration on reactivation) | Alex |
+| Grace policy per offer: configurable grace duration, full vs. read-only access during grace | Alex |
 | Email fulfilment: purchase confirmation, redemption link, billing portal link, licence activation instructions, support link | Alex |
 | Tests: one-time purchase creates perpetual entitlement, subscription creates renewable entitlement, duplicate webhook dedup, refund/chargeback revocation, key redemption once, activation limit, signed lease, expired subscription grace/suspension, SYSTEMS outage offline lease | Alex |
 | Licence redemption UI | Tomas |
@@ -171,6 +173,31 @@ Both devs work on every phase. The split below is by primary ownership — the o
 ---
 
 ## Milestone E — Intelligence and Launch
+
+### Phase 7.5 — Identity, accounts and product users
+
+| Task | Owner |
+|------|-------|
+| Tables: `accounts`, `account_emails`, `account_sessions`, `account_links`, `product_users`, `product_user_links` | Alex |
+| Tables: `seats`, `seat_assignments`, `signing_keys_metadata` | Alex |
+| Tables: `integration_clients`, `integration_credentials`, `integration_webhook_endpoints`, `integration_webhook_deliveries` | Alex |
+| Mode A — Acronym Identity: OIDC/OAuth 2.1 Authorization Code + PKCE for browser/native clients | Alex |
+| Mode B — Bring-your-own-identity (BYOI): scoped `external_user_id` product-user record | Alex |
+| Mode C — Licence-only: binds to installation/device or optional account, no general login identity | Alex |
+| Account merge: audited, never implicit from matching email alone | Alex |
+| Entitlement resolver: full multi-grant (order + subscription + trial + manual + promo overlap), cancelling one source must not revoke access from another | Alex |
+| Effective state machine: `pending`, `trial`, `active`, `grace`, `read_only`, `suspended`, `expired`, `denied` | Alex |
+| Offline signed licence leases: Ed25519 asymmetric signing, clock-rollback detection, `offlineUntil`, degraded/read-only access modes | Alex |
+| Device activations: privacy-minimised device ID, activation limits, self-service reset | Alex |
+| Seats: assignable units within multi-user entitlements, invitation and release flows | Alex |
+| Integration webhook delivery: signed outbound webhooks on access changes, retry with exponential backoff, idempotency, dead-letter routing | Alex |
+| New APIs: `POST /api/identity/authorize`, `POST /api/identity/token`, `POST /api/product-users/upsert`, `POST /api/product-users/link-account`, `POST /api/entitlements/batch-check`, `POST /api/integration-webhooks/acknowledge` | Alex |
+| Server SDK responsibilities: credential handling, local entitlement cache, signature verification, webhook verification and deduplication | Alex |
+| Emergency key-rotation runbook | Alex |
+| Dashboard — new Customers area: Accounts, Product Users, Entitlements, Licences, Activations, Access Incidents sub-sections | Tomas |
+| Admin actions UI: grant complimentary/time-limited access, extend grace, replace/revoke licence, reset device, assign/release seat, resend redemption, reconcile with Stripe, export entitlement evidence | Tomas |
+| Product-user analytics dashboard (active users, registered users, entitlement state breakdown per product) | Tomas |
+| SDK documentation and integration guide for Mode A, B, and C | Tomas |
 
 ### Phase 8 — Product analytics and external integrations
 
@@ -190,6 +217,28 @@ Both devs work on every phase. The split below is by primary ownership — the o
 | External system health display | Tomas |
 | Event volume monitoring display | Tomas |
 
+### Phase 8.5 — App Builder Framework and SDKs
+
+| Task | Owner |
+|------|-------|
+| `systems.app.json` manifest schema definition (`schema: systems.app.v4`) and server-side validation tooling | Alex |
+| App acceptance level definitions and enforcement at deploy time: Level 0 (static), 1 (managed web), 2 (commercial), 3 (licensed/subscription), 4 (external), 5 (fully native) | Alex |
+| Build detection and framework inference (Dockerfile, static output dir, supported frameworks) | Alex |
+| Health/ready/version endpoint contract enforcement: `GET /api/health`, `GET /api/ready`, `GET /api/version` | Alex |
+| Smoke test framework: run `scripts/systems-smoke-test.*` after deploy, gate release on result | Alex |
+| Integration testing harness and 41-item acceptance checklist validation | Alex |
+| Runtime requirement enforcement: listen on `0.0.0.0`, graceful SIGTERM shutdown, no root privilege, stdout/stderr logs | Alex |
+| App-level data export/deletion workflows (GDPR compliance per app) | Alex |
+| Server SDK: `@systems/node` — entitlement check, event batching, webhook verification, local cache, signature verification | Alex |
+| CLI tool: `systems-cli` — manifest validate, acceptance check, smoke test runner | Alex |
+| SDK for Python: `systems-python` — same server-side responsibilities | Alex |
+| Dashboard: app acceptance level display and certification status per system | Tomas |
+| Dashboard: app monitoring and health aggregation (per acceptance level) | Tomas |
+| Dashboard: developer-facing integration status and manifest validation results | Tomas |
+| Browser SDK: `@systems/browser` — public-client entitlement check (no secret keys), event emission | Tomas |
+| Developer documentation: API reference, integration contract spec, guides per app type, `RUNBOOK.md` template | Tomas |
+| Common rejection reasons and troubleshooting guide | Tomas |
+
 ### Phase 9 — Hardening, operations and launch readiness
 
 | Task | Owner |
@@ -201,12 +250,15 @@ Both devs work on every phase. The split below is by primary ownership — the o
 | Integration key hashing | Alex |
 | Licence signing key rotation runbook + tooling | Alex |
 | Stripe webhook signing enforcement | Alex |
-| Media quarantine | Alex |
-| Public API allowlist audit | Alex |
-| Admin audit coverage audit | Alex |
+| Media quarantine pipeline: SVG/script sanitization, malware detection/rejection, content-type verification by bytes, responsive variant generation, focal point + alt-text recording, metadata stripping | Alex |
+| Emergency controls: revoke all sessions, disable/rotate all credentials, freeze deployments and publishing, quarantine product routes, activate maintenance mode | Alex |
+| Structured observability: JSON logging standard, request ID correlation across checkout/webhook/deployment, latency/error rate metrics, secret redaction rules, product key non-logging enforcement | Alex |
+| Public API allowlist automated enforcement and audit (no container IDs, ports, repo URLs, logs, admin IDs, customer/billing data, secret names) | Alex |
+| Admin audit coverage audit (every dangerous action has an audit event) | Alex |
 | Rate limits per route class | Alex |
 | Backup/restore reliability drill: PostgreSQL, Caddy, media, portfolio snapshot, commerce, entitlement, licence, jobs | Alex |
 | `V4_DEPLOY_RUNBOOK.md`, `V4_ROLLBACK_RUNBOOK.md`, `V4_STRIPE_INCIDENT_RUNBOOK.md`, `V4_ENTITLEMENT_RECOVERY_RUNBOOK.md`, `V4_BACKUP_RESTORE_RUNBOOK.md` | Alex |
+| `V4_LICENSING_KEY_ROTATION_RUNBOOK.md`, `V4_DEVICE_RESET_RUNBOOK.md`, `V4_APP_INTEGRATION_RUNBOOK.md` | Alex |
 | Load and resource protection testing: large upload cap, build concurrency, disk admission, container memory/CPU limits, analytics event flood, webhook burst, public catalog cache, renderer last-known-good | Tomas |
 | Legal/compliance launch gate coordination (terms, privacy, cookie policy, withdrawal flow, subscription cancellation wording, VAT/accounting, refund/complaints, GDPR export/delete, accessibility) | Tomas |
 | `V4_DOMAIN_RECOVERY_RUNBOOK.md`, `V4_SECURITY_INCIDENT_RUNBOOK.md` | Tomas |
@@ -228,8 +280,10 @@ Both devs work on every phase. The split below is by primary ownership — the o
 | 5 | Public catalog API, acronym.sk deployment | Portfolio CMS, snapshot pipeline, renderer |
 | 6 | Commerce backend, Stripe, reconciliation jobs | Checkout UI, compliance capture UI |
 | 7 | Entitlements, licences, signing keys, emails | Customer UI, admin grant/revoke UI |
+| 7.5 | OIDC/BYOI identity, multi-grant resolver, offline leases, devices, seats, integration webhooks | Customers dashboard area, admin entitlement actions UI, SDK docs |
 | 8 | Integration keys, ingestion, aggregation jobs | Analytics dashboards, integration key UI |
-| 9 | RBAC, hardening, backup drills, ops runbooks | Load testing, legal gates, launch rehearsal |
+| 8.5 | Manifest schema, acceptance levels, smoke test, server SDK, CLI | App certification UI, browser SDK, developer docs |
+| 9 | RBAC, hardening, media quarantine, emergency controls, observability, backup drills, runbooks | Load testing, legal gates, launch rehearsal |
 
 ---
 
