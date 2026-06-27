@@ -40,11 +40,8 @@ Tick a phase when its exit gate passes — not when coding is done.
 
 ### Milestone A — Safe Base
 - [ ] **Phase 0** — Stabilise current repository
-  - [ ] CORS, request IDs, schema/features endpoints, error shape, pagination, SQLite warning, feature flags
-  - [ ] `schema_migrations` table, migration runner, no silent ALTER TABLE, test reset utility
-  - [ ] `jobs` table, in-process runner, lock/unlock, retry/backoff
-  - [ ] Host-protection invariants confirmed
-  - [ ] Job UI placeholder and pagination controls (Tomas)
+  - [ ] CORS, request IDs, feature flag helper, schema_migrations runner, ALTER TABLE stop, test reset, jobs table, host invariants (Alex)
+  - [ ] Schema/features endpoints, error response shape, pagination defaults, SQLite-in-production warning, job UI placeholder, pagination controls (Tomas)
   - [ ] All Phase 0 tests pass; legacy dashboard and deploy flow unaffected
   - [ ] Staging environment allocated and deploying (separate PostgreSQL, Stripe test account, Caddy, staging domains)
   - [ ] Email provider chosen and smoke-tested (SEND_EMAIL_PROVIDER env var set; test email sends on staging startup)
@@ -242,19 +239,20 @@ Tick a phase when its exit gate passes — not when coding is done.
 |------|-------|
 | Add `PATCH` to Fastify CORS | Alex |
 | Global request ID generation + add to logs and audit entries | Alex |
-| `GET /api/server/schema` endpoint | Alex |
-| `GET /api/server/features` endpoint | Alex |
-| Global API error response shape | Alex |
+| `GET /api/server/schema` endpoint | Tomas |
+| `GET /api/server/features` endpoint | Tomas |
+| Global API error response shape | Tomas |
 | Stricter JSON payload-size defaults | Alex |
-| Pagination defaults and maximums | Alex |
-| SQLite-in-production warning | Alex |
+| Pagination defaults and maximums | Tomas |
+| SQLite-in-production warning | Tomas |
 | Feature flag helper for V4 gates | Alex |
 | `schema_migrations` table + migration runner skeleton | Alex |
 | Stop using silent `ALTER TABLE` blocks for new schema | Alex |
 | Test-only migration reset utility | Alex |
 | `jobs` table, in-process runner (disabled by default), lock/unlock, retry/backoff | Alex |
 | Confirm host-protection invariants (concurrency caps, disk admission, upload limits, cache headers, container limits) | Alex |
-| Tests: CORS PATCH, schema endpoint, feature flags, migration runner, job table | Alex |
+| Tests: CORS PATCH, feature flags, migration runner, job table | Alex |
+| Tests: schema endpoint responses, error shape contract, pagination envelope | Tomas |
 | Job dashboard placeholder under Server | Tomas |
 | Pagination controls on existing list views | Tomas |
 | Choose and document email provider; set SEND_EMAIL_PROVIDER env var; add staging email smoke test to exit gate | Alex |
@@ -283,7 +281,8 @@ Tick a phase when its exit gate passes — not when coding is done.
 | Migration scripts: `migrate-sqlite-to-postgres.js`, `verify-postgres-migration.js`, Windows PowerShell equivalents | Alex |
 | Repository facades: `usersRepository`, `settingsRepository`, `auditRepository`, `jobsRepository` | Alex |
 | Extend backup/restore scripts to include PostgreSQL `pg_dump`, migration state, job table, platform settings, audit | Alex |
-| Tests: connection, migration order, checksum, failure, backup includes PG, restore dry run, SQLite legacy mode | Alex |
+| Tests: connection, migration order, checksum, failure, backup includes PG, restore dry run | Alex |
+| Verify SQLite legacy mode: all pre-V4 tests and Phase 0.5 namespace boundary tests still pass after Phase 1 migration; regression check included in Phase 1 exit gate | Tomas |
 | Deploy PgBouncer as sidecar; configure pool_mode=transaction, max_db_connections=20, default_pool_size=5; all code connects via port 6432; pool exhaustion returns 503 | Alex |
 | Configure S3-compatible backup destination (bucket, encryption key, retention policy); backup uploads to S3; restore drill on clean host with zero local files | Alex |
 | Define composite indexes for all Phase 1 tables in same migration file (audit_log_v4, jobs, admin_sessions) | Alex |
@@ -301,10 +300,11 @@ Tick a phase when its exit gate passes — not when coding is done.
 | New tables: `products`, `systems`, `system_environments`, `releases`, `domains`, `environment_secrets`, `infrastructure_metrics`, `health_snapshots`, `legacy_project_map` | Alex |
 | Migration bridge: `projects → legacy_project_map → systems → production env → release → domain` | Alex |
 | Field mapping script (name, slug, deploy_type, status, repo, visibility, health_path, container_id, port, previous_*, etc.) | Alex |
-| Read APIs: `GET /api/systems`, `/api/systems/:id`, `/api/systems/:id/environments`, `/api/systems/:id/releases`, `GET /api/products`, `/api/products/:id` | Alex |
+| Read APIs: `GET /api/systems`, `/api/systems/:id`, `/api/systems/:id/environments`, `/api/systems/:id/releases`, `GET /api/products`, `/api/products/:id` | Tomas |
 | Write APIs: `POST /api/systems`, `PATCH /api/systems/:id`, `POST /api/products`, `PATCH /api/products/:id` | Alex |
-| Legacy API compatibility layer (`GET /api/projects` reads from V4 tables when `ENABLE_V4_SYSTEMS=true`) | Alex |
-| Tests: project-to-system migration, legacy API still works, systems API returns migrated projects, health/stats/route mapping | Alex |
+| Legacy API compatibility layer (`GET /api/projects` reads from V4 tables when `ENABLE_V4_SYSTEMS=true`) | Tomas |
+| Tests: legacy API still works, read API returns migrated projects, health/stats/route mapping correctness | Tomas |
+| Tests: project-to-system migration integrity, field mapping completeness | Alex |
 | Dashboard Systems page renders V4-backed systems through same visual layout | Tomas |
 | Hidden admin/test Product page | Tomas |
 | Org-scoping enforcement: every repository method includes WHERE organisation_id = $n; CI lint rule rejects unscoped queries on scoped tables | Alex |
@@ -322,12 +322,13 @@ Tick a phase when its exit gate passes — not when coding is done.
 | Task | Owner |
 |------|-------|
 | New deployment routes: `POST /api/systems/:id/environments/:env/deploy|redeploy|rollback`, `GET /api/systems/:id/environments/:env/logs|stats` | Alex |
-| Legacy routes (`POST /api/deploy`, `POST /api/projects/:slug/redeploy|rollback`) wired through mapping layer | Alex |
+| Legacy routes (`POST /api/deploy`, `POST /api/projects/:slug/redeploy|rollback`) wired through mapping layer | Tomas |
+| Tests: legacy deploy routes return identical response contract as new routes for same input; routing transparency verified | Tomas |
 | Extract `deployService`: `detect`, `extract`, `build`, `runContainer`, `verifyHealth`, `recordRelease`, `publishRoute`, `rollback` | Alex |
 | Docker container labels: `systems.organisation_id`, `system_id`, `environment_id`, `release_id`, `slug`, `environment` | Alex |
 | Backend support for `production` + `preview` environments | Alex |
 | `POST /api/systems/:id/promote` with full promotion flow (health pass → container start → route switch → retain previous if one exists → record release); retain step is a no-op on first-ever deployment | Alex |
-| Tests: new deploy route, legacy deploy route, container labels, preview/production isolation, promotion health gate, rollback, failed deploy safety, **first deployment succeeds with no previous release** | Alex |
+| Tests: new deploy route, container labels, preview/production isolation, promotion health gate, rollback, failed deploy safety, **first deployment succeeds with no previous release** | Alex |
 
 ### Phase 4 — Domains, routing, access and maintenance
 
@@ -384,8 +385,9 @@ Tick a phase when its exit gate passes — not when coding is done.
 | Manual order + complimentary order creation | Alex |
 | Subscription state mirroring from Stripe (`trialing`, `active`, `past_due`, `cancel_at_period_end`, `cancelled`, `expired`) | Alex |
 | Reconciliation jobs: `stripe.reconcile.checkout_sessions`, `subscriptions`, `invoices`, `orders` (NOT entitlements — that table doesn't exist until Phase 7) | Alex |
-| Capture per-checkout: terms version, privacy version, withdrawal consent, marketing consent, locale, billing country, VAT evidence | Alex |
-| Tests: checkout session creation, webhook signature verification, duplicate webhook dedup, subscription lifecycle, manual order audit, disclosure capture | Alex |
+| Capture per-checkout: terms version, privacy version, withdrawal consent, marketing consent, locale, billing country, VAT evidence | Tomas |
+| Tests: checkout session creation, webhook signature verification, duplicate webhook dedup, subscription lifecycle, manual order audit | Alex |
+| Tests: disclosure record created per checkout session, per-locale disclosure verified, withdrawal consent stored and retrievable | Tomas |
 | Checkout flow UI (product page → create session → Stripe Checkout → confirmation page) | Tomas |
 | Legal/compliance capture UI (consent checkboxes, withdrawal consent, marketing consent) | Tomas |
 | Orders and subscriptions dashboard views | Tomas |
@@ -411,7 +413,7 @@ Tick a phase when its exit gate passes — not when coding is done.
 | Full subscription state machine: `active → payment_failed → past_due → grace → suspended → recovered|cancelled|expired|refunded|chargeback|manual_revoked` — all 13 states with distinct behaviour | Alex |
 | Payment recovery and reactivation workflows (Stripe retry, self-serve update, admin reactivate, data restoration on reactivation) | Alex |
 | Grace policy per offer: configurable grace duration, full vs. read-only access during grace | Alex |
-| Email fulfilment: purchase confirmation, redemption link, billing portal link, licence activation instructions, support link | Alex |
+| Email fulfilment: purchase confirmation, redemption link, billing portal link, licence activation instructions, support link | Tomas |
 | Tests: one-time purchase creates perpetual entitlement, subscription creates renewable entitlement, duplicate webhook dedup, refund/chargeback revocation, key redemption once, activation limit, signed lease, expired subscription grace/suspension, SYSTEMS outage offline lease | Alex |
 | Licence redemption UI | Tomas |
 | Admin entitlement grant/revoke UI | Tomas |
@@ -419,8 +421,8 @@ Tick a phase when its exit gate passes — not when coding is done.
 | Subscription state display with grace/suspension indicators | Tomas |
 | Webhook handler decouples from side effects: INSERT event + INSERT job in one transaction, return 200 immediately; no inline entitlement creation or email sending | Alex |
 | Auth class table: every route tagged with auth class; middleware enforces class; routes without class fail to register at startup | Alex |
-| Rate limits per route class: /api/licensing/validate 100/min per licence, /api/entitlements/check 500/min per key, /api/identity/token 20/min per IP; RateLimit-* headers on all responses | Alex |
-| Error response contract: canonical error code list in spec; no inline error codes in route handlers; SDKs treat unknown codes as INTERNAL_ERROR | Alex |
+| Rate limits per route class: /api/licensing/validate 100/min per licence, /api/entitlements/check 500/min per key, /api/identity/token 20/min per IP; RateLimit-* headers on all responses | Tomas |
+| Error response contract: canonical error code list in spec; no inline error codes in route handlers; SDKs treat unknown codes as INTERNAL_ERROR | Tomas |
 | effective_entitlements materialised projection: UPSERT on every grant/revocation write; checks read from projection only; reconciliation job detects and repairs divergence | Alex |
 | Trial expiry job: 3-day reminder email; incomplete on trial end with no payment method; cancelled + expired after 30 days incomplete | Alex |
 | Ed25519 public key endpoint /api/public/signing-keys: 30-day rotation, 7-day overlap, 5-min clock skew tolerance, 30-day offline grace, clock rollback detection | Alex |
@@ -451,7 +453,7 @@ Tick a phase when its exit gate passes — not when coding is done.
 | Device activations: privacy-minimised device ID, activation limits, self-service reset | Alex |
 | Seats: assignable units within multi-user entitlements, invitation and release flows | Alex |
 | Integration webhook delivery: signed outbound webhooks on access changes, retry with exponential backoff, idempotency, dead-letter routing | Alex |
-| New APIs: `POST /api/identity/authorize`, `POST /api/identity/token`, `POST /api/product-users/upsert`, `POST /api/product-users/link-account`, `POST /api/entitlements/batch-check`, `POST /api/integration-webhooks/acknowledge` | Alex |
+| New APIs: `POST /api/identity/authorize`, `POST /api/identity/token`, `POST /api/product-users/upsert`, `POST /api/product-users/link-account`, `POST /api/entitlements/batch-check`, `POST /api/integration-webhooks/acknowledge` | Tomas |
 | Server SDK responsibilities: credential handling, local entitlement cache, signature verification, webhook verification and deduplication | Alex |
 | Emergency key-rotation runbook | Alex |
 | Dashboard — new Customers area: Accounts, Product Users, Entitlements, Licences, Activations, Access Incidents sub-sections | Tomas |
@@ -477,8 +479,8 @@ Tick a phase when its exit gate passes — not when coding is done.
 | External system health display | Tomas |
 | Event volume monitoring display | Tomas |
 | Analytics dedicated PgBouncer pool (max 5 connections, 5s statement timeout); batched COPY/bulk INSERT; aggregation jobs defer if lock unavailable within 1s | Alex |
-| CORS middleware: /api/public/* = any origin; integration routes = registered origins only; admin routes = same-origin only; origin registration in integration_keys.allowed_origins | Alex |
-| Public DTO allowlist serialiser: explicit field whitelist; throws in non-prod on extra fields; audit event in prod | Alex |
+| CORS middleware: /api/public/* = any origin; integration routes = registered origins only; admin routes = same-origin only; origin registration in integration_keys.allowed_origins | Tomas |
+| Public DTO allowlist serialiser: explicit field whitelist; throws in non-prod on extra fields; audit event in prod | Tomas |
 | Webhook rotation: Stripe dual-secret (try both, remove old after 7 days); outbound dual-sign (7-day overlap); drill in Phase 9 | Alex |
 | SSRF prevention: outbound webhook URLs checked against blocked CIDRs (10.x, 172.16.x, 192.168.x, 169.254.x); re-resolved on every delivery (DNS rebinding prevention) | Alex |
 
@@ -491,7 +493,7 @@ Tick a phase when its exit gate passes — not when coding is done.
 | Build detection and framework inference (Dockerfile, static output dir, supported frameworks) | Alex |
 | Health/ready/version endpoint contract enforcement: `GET /api/health`, `GET /api/ready`, `GET /api/version` | Alex |
 | Smoke test framework: run `scripts/systems-smoke-test.*` after deploy, gate release on result | Alex |
-| Integration testing harness and 41-item acceptance checklist validation | Alex |
+| Integration testing harness and 41-item acceptance checklist validation | Tomas |
 | Runtime requirement enforcement: listen on `0.0.0.0`, graceful SIGTERM shutdown, no root privilege, stdout/stderr logs | Alex |
 | App-level data export/deletion workflows (GDPR compliance per app) | Alex |
 | Server SDK: `@systems/node` — entitlement check, event batching, webhook verification, local cache, signature verification | Alex |
@@ -513,7 +515,7 @@ Tick a phase when its exit gate passes — not when coding is done.
 | RBAC roles: owner/admin/operator/commerce/viewer | Alex |
 | TOTP enforced option | Alex |
 | Session revocation | Alex |
-| Secret write-only UI (write but never display raw) | Alex |
+| Secret write-only UI (write but never display raw) | Tomas |
 | Integration key hashing | Alex |
 | Licence signing key rotation runbook + tooling | Alex |
 | Stripe webhook signing enforcement | Alex |
@@ -521,7 +523,7 @@ Tick a phase when its exit gate passes — not when coding is done.
 | Emergency controls: revoke all sessions, disable/rotate all credentials, freeze deployments and publishing, quarantine product routes, activate maintenance mode | Alex |
 | Structured observability: JSON logging standard, request ID correlation across checkout/webhook/deployment, latency/error rate metrics, secret redaction rules, product key non-logging enforcement | Alex |
 | Public API allowlist automated enforcement and audit (no container IDs, ports, repo URLs, logs, admin IDs, customer/billing data, secret names) | Alex |
-| Admin audit coverage audit (every dangerous action has an audit event) | Alex |
+| Admin audit coverage audit (every dangerous action has an audit event) | Tomas |
 | Rate limits per route class | Alex |
 | Backup/restore reliability drill: PostgreSQL, Caddy, media, portfolio snapshot, commerce, entitlement, licence, jobs | Alex |
 | `V4_DEPLOY_RUNBOOK.md`, `V4_ROLLBACK_RUNBOOK.md`, `V4_STRIPE_INCIDENT_RUNBOOK.md`, `V4_ENTITLEMENT_RECOVERY_RUNBOOK.md`, `V4_BACKUP_RESTORE_RUNBOOK.md` | Alex |
@@ -540,17 +542,13 @@ Tick a phase when its exit gate passes — not when coding is done.
 | npm audit in CI: fails on high/critical vulnerabilities with available fix; exceptions documented in SECURITY_EXCEPTIONS.md | Alex |
 | Container security enforcement: non-root USER required for acceptance level ≥ 2; memory 512MB, CPU 0.5, pids 100; no privileged, no host network, no docker socket | Alex |
 | Docker build admission control: CPU/RAM headroom check (25% reserved) before accepting deploy; per-system deploy lock; max 10 pending builds in queue | Alex |
-| Emergency controls UI: one-click actions for all 7 emergency scenarios; 60-second cooldown; audit event for every action | Alex |
-| Attack response playbook: credential stuffing, webhook forgery, key compromise, session hijack, DDoS — each tested in the Phase 9 rehearsal | Alex |
+| Emergency controls UI: one-click actions for all 7 emergency scenarios; 60-second cooldown; audit event for every action | Tomas |
+| Attack response playbook: credential stuffing, webhook forgery, key compromise, session hijack, DDoS — each tested in the Phase 9 rehearsal | Tomas |
 | Domain verification token: crypto.randomBytes(32); 48-hour expiry; no oracle leak (expired vs. never existed indistinguishable) | Alex |
 | PostgreSQL character set verification: UTF8 encoding, LC_COLLATE='C' | Alex |
 | Media upload atomicity: pending record → S3 upload → confirm; orphan cleanup job active | Alex |
-| V4_SECURITY_INCIDENT_RUNBOOK.md covering all attack types with step-by-step response | Alex |
 | TOTP mandatory for all admin accounts; 8-hour session timeout; no exceptions | Alex |
 | Idempotency requirements: Idempotency-Key header required and enforced on all state-mutating external-facing endpoints | Alex |
-| Load and resource protection testing: media flood, analytics event flood, webhook burst, public catalog cache, renderer last-known-good | Tomas |
-| Legal/compliance launch gate: GDPR erasure flow, VAT treatment, withdrawal right, cancellation wording — all approved by legal professional | Tomas |
-| Launch rehearsal including: GDPR erasure end-to-end, domain verification, emergency control drill, restore from S3, security header verification | Tomas |
 
 ---
 
@@ -558,20 +556,20 @@ Tick a phase when its exit gate passes — not when coding is done.
 
 | Phase | Primary Alex | Primary Tomas |
 |-------|--------------|--------------|
-| 0 | Backend hardening, migration runner, jobs | Job UI placeholder, pagination UI |
-| 0.5 | — | Baseline report, namespace tests |
-| 1 | PostgreSQL foundation, all migration tooling | — |
-| 2 | DB tables, migration bridge, all APIs | Systems/Products dashboard display |
+| 0 | Backend hardening (CORS, request IDs, migration runner, jobs, host invariants) | Schema/features endpoints, error shape, pagination, SQLite warning, job UI, pagination UI |
+| 0.5 | — | Baseline report, namespace tests, deprecation helper |
+| 1 | PostgreSQL foundation, all migration tooling, PgBouncer, S3 | SQLite legacy mode regression verification |
+| 2 | DB tables, migration bridge, write APIs, org-scoping | Read APIs, legacy compatibility layer, Systems/Products dashboard |
 | 2.5 | — | Reconciliation script, operator report |
-| 3 | Full deploy engine refactor | — |
+| 3 | Deploy engine (deployService, new routes, promotion, Docker labels) | Legacy route wiring through mapping layer |
 | 4 | Caddy service, domain verification backend | Domain management UI, maintenance UI |
-| 5 | Public catalog API, acronym.sk deployment | Portfolio CMS, snapshot pipeline, renderer |
-| 6 | Commerce backend, Stripe, reconciliation jobs | Checkout UI, compliance capture UI |
-| 7 | Entitlements, licences, signing keys, emails | Customer UI, admin grant/revoke UI |
-| 7.5 | OIDC/BYOI identity, multi-grant resolver, offline leases, devices, seats, integration webhooks | Customers dashboard area, admin entitlement actions UI, SDK docs |
-| 8 | Integration keys, ingestion, aggregation jobs | Analytics dashboards, integration key UI |
-| 8.5 | Manifest schema, acceptance levels, smoke test, server SDK, CLI | App certification UI, browser SDK, developer docs |
-| 9 | RBAC, hardening, media quarantine, emergency controls, observability, backup drills, runbooks | Load testing, legal gates, launch rehearsal |
+| 5 | Public catalog API, S3 pipeline, acronym.sk deployment | Portfolio CMS, snapshot pipeline, renderer, locale support |
+| 6 | Commerce backend, Stripe, reconciliation jobs, GDPR erasure | Checkout UI, disclosure capture (backend + UI), compliance UI |
+| 7 | Entitlements engine, licences, signing keys, state machine | Customer UI, admin UI, email fulfilment, error contract, rate limit headers |
+| 7.5 | OIDC/BYOI identity, multi-grant resolver, offline leases, devices, seats | Identity API routes, customers dashboard area, admin entitlement actions UI, SDK docs |
+| 8 | Integration keys, ingestion, aggregation jobs, SSRF/security | Analytics dashboards, integration key UI, CORS policy, public DTO serialiser |
+| 8.5 | Manifest schema, acceptance levels, smoke test, server SDK, CLI | Integration testing harness, app certification UI, browser SDK, developer docs |
+| 9 | RBAC, security hardening, media quarantine, observability, backup drills, core runbooks | Secret write-only UI, emergency controls UI, audit coverage audit, attack playbook, load testing, legal gates, launch rehearsal |
 
 ---
 
