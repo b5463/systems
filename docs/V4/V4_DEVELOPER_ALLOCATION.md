@@ -32,6 +32,9 @@ Tick a phase when its exit gate passes — not when coding is done.
   - [ ] Host-protection invariants confirmed
   - [ ] Job UI placeholder and pagination controls (Tomas)
   - [ ] All Phase 0 tests pass; legacy dashboard and deploy flow unaffected
+  - [ ] Staging environment allocated and deploying (separate PostgreSQL, Stripe test account, Caddy, staging domains)
+  - [ ] Email provider chosen and smoke-tested (SEND_EMAIL_PROVIDER env var set; test email sends on staging startup)
+  - [ ] Monitoring stack chosen; alert thresholds defined; on-call rotation assigned
 - [ ] **Phase 0.5** — Baseline snapshot and namespace lock
   - [ ] Baseline report committed (tests, lint, routes, schema dump, Caddy inventory, Docker labels, backup dry run, feature flags)
   - [ ] Namespace boundary tests pass
@@ -44,6 +47,11 @@ Tick a phase when its exit gate passes — not when coding is done.
   - [ ] Repository facades: users, settings, audit, jobs
   - [ ] Backup/restore extended for PostgreSQL
   - [ ] SQLite legacy mode still passes all tests
+  - [ ] PgBouncer deployed as sidecar; all code connects via port 6432
+  - [ ] Backup destination set to S3-compatible remote; restore from S3 tested on clean host
+  - [ ] Composite indexes defined in same migration as each table
+  - [ ] Job runner enforces per-type concurrency limits; dead-letter queue active at 3 failures
+  - [ ] Session tokens use crypto.randomBytes(32); session ID rotated on every login
 
 ### Milestone B — V4 Operational Core
 - [ ] **Phase 2** — Introduce V4 Products/Systems data model
@@ -51,6 +59,8 @@ Tick a phase when its exit gate passes — not when coding is done.
   - [ ] Migration bridge: projects → systems → environments → releases → domains
   - [ ] Read APIs live; write APIs stable
   - [ ] Legacy `/api/projects/*` compatibility working
+  - [ ] Org-scoping enforced in every repository method; CI lint rule rejects unscoped queries
+  - [ ] Acceptance test: org A admin cannot read org B systems by ID
   - [ ] Systems page renders V4-backed data (Tomas)
 - [ ] **Phase 2.5** — Migration reconciliation checkpoint
   - [ ] `reconcile-v4-migration.js` passes on all test data
@@ -69,6 +79,9 @@ Tick a phase when its exit gate passes — not when coding is done.
   - [ ] Route publication transaction (write → validate → reload → probe → mark active)
   - [ ] Custom domain verification flow end to end
   - [ ] Domain management, maintenance, and canonical redirect UI (Tomas)
+  - [ ] route_status enum (inactive/pending/active/failed/superseded) replaces boolean on system_environments
+  - [ ] system_environment_routes junction table deployed; domain↔environment routing is explicit
+  - [ ] Route publication is atomic: Caddy reload failure reverts status to 'failed', old route unchanged
 
 ### Milestone C — Acronym Public Portfolio
 - [ ] **Phase 5** — Portfolio CMS and Acronym public renderer
@@ -76,7 +89,10 @@ Tick a phase when its exit gate passes — not when coding is done.
   - [ ] Draft → preview → publish → immutable snapshot pipeline
   - [ ] Dashboard Portfolio area: homepage, nav, product-page, media, legal, redirects, locales, publish history, rollback (Tomas)
   - [ ] SK/EN locale support with translation completeness indicator
-  - [ ] Public catalog API: `/api/public/catalog`, `/api/public/products/:slug`, `/api/public/snapshot/latest` (Phase 5 snapshots contain static text pricing only — no live offer data until Phase 6)
+  - [ ] Public catalog API served from precomputed S3 snapshots — never from live PostgreSQL on public reads
+  - [ ] Media assets stored by CDN URL only; never embedded in snapshot JSON; max snapshot size 2MB enforced
+  - [ ] Concurrent publish lock prevents simultaneous publishes
+  - [ ] Snapshot schema versioning: renderer validates renderer_min_version before serving; never silent fallback
   - [ ] `acronym.sk` renderer: pre-rendered, snapshot cache, last-known-good, ETag, no live DB dependency
   - [ ] Renderer stays up during SYSTEMS. API outage
 
@@ -88,6 +104,13 @@ Tick a phase when its exit gate passes — not when coding is done.
   - [ ] Manual and complimentary order creation
   - [ ] All 6 subscription states mirrored from Stripe
   - [ ] Reconciliation jobs: checkout_sessions, subscriptions, invoices, orders (no entitlement job until Phase 7)
+  - [ ] Soft-delete columns (deleted_at) on customers, accounts, product_users, account_emails, entitlement_grants
+  - [ ] GDPR data_subject_requests table and erasure workflow (Stripe deletion + anonymisation + audit)
+  - [ ] VAT/Stripe Tax: automatic_tax enabled on all sessions; tax amounts stored per order; legal approval obtained
+  - [ ] Subscription cancellation flow built in SYSTEMS. (not delegated to Stripe Portal); Slovak withdrawal rights disclosed
+  - [ ] Webhook advisory lock (pg_try_advisory_xact_lock) prevents concurrent duplicate event processing
+  - [ ] subscriptions.entitlement_grant_id FK added (NULL until Phase 7); idempotency_key UNIQUE on orders
+  - [ ] offers.entitlement_template_version INT column; grace_policy_snapshot JSONB planned for Phase 7
   - [ ] Per-checkout legal/compliance capture (terms, privacy, withdrawal consent, locale, VAT evidence)
   - [ ] Checkout flow and compliance UI (Tomas)
   - [ ] Test-mode Stripe purchase works end to end; success redirect grants no access
@@ -95,6 +118,17 @@ Tick a phase when its exit gate passes — not when coding is done.
   - [ ] Entitlement tables: grants (with nullable account_id), revocations, snapshots, effective_entitlements, licences, activations, events, signing_keys
   - [ ] Multi-grant resolver (order + subscription + trial + manual + promo overlap handled correctly)
   - [ ] Full 13-state subscription state machine
+  - [ ] Webhook handler decoupled: returns 200 within 500ms; side effects run from job queue only
+  - [ ] Auth class table: every route tagged; untagged routes fail to register at startup
+  - [ ] Rate limits per route class with RateLimit-* response headers; 429 on limit with Retry-After
+  - [ ] Error response contract: canonical error codes enumerated; no inline error codes in code
+  - [ ] effective_entitlements materialised projection: UPSERT on every grant/revocation write; checks read from projection
+  - [ ] Trial expiry job: reminder email 3 days before, incomplete → suspended → cancelled after 30 days
+  - [ ] Ed25519 key distribution: /api/public/signing-keys endpoint; 30-day rotation with 7-day overlap; 5-min clock skew tolerance; 30-day offline grace
+  - [ ] Server-side lease cache (LRU keyed by licence+policy+key version); invalidated on entitlement change
+  - [ ] entitlement_grants.subscription_id and .order_id FKs populated atomically at grant creation
+  - [ ] Grace policy stored as grace_policy_snapshot JSONB at grant creation time
+  - [ ] Composite indexes for all Phase 7 tables in same migration
   - [ ] Grace policy per offer; payment recovery and reactivation flows
   - [ ] Product-key generation (high entropy, hash-only storage, revocation, activation limits)
   - [ ] Entitlements and licensing APIs live
@@ -123,6 +157,11 @@ Tick a phase when its exit gate passes — not when coding is done.
   - [ ] Aggregation jobs: hourly, daily, compact.raw, retention.cleanup
   - [ ] Rate-limiting and size caps on all ingestion endpoints
   - [ ] Analytics never blocks Stripe webhooks, entitlement checks, or deploy rollback
+  - [ ] Analytics uses dedicated PgBouncer pool (max 5 connections, 5s statement timeout); COPY/bulk INSERT only
+  - [ ] CORS policy enforced by Fastify middleware: public-safe = *, integration-key = registered origins only, admin = same-origin only
+  - [ ] Public DTO serialiser allowlist enforced in code; throws in non-prod if non-whitelisted field present; logs audit event in prod
+  - [ ] Webhook HMAC rotation: dual-secret inbound (Stripe), dual-sign outbound (7-day overlap)
+  - [ ] SSRF prevention: outbound webhook URLs validated against blocked CIDR list; re-resolved on every delivery
   - [ ] Integration key UI, analytics dashboards, error groups, release reports (Tomas)
 - [ ] **Phase 8.5** — App Builder Framework and SDKs
   - [ ] `systems.app.json` manifest schema and server-side validation
@@ -137,6 +176,8 @@ Tick a phase when its exit gate passes — not when coding is done.
   - [ ] `@systems/browser` SDK — no secret keys (Tomas)
   - [ ] Developer docs: API reference, per-app-type guide, RUNBOOK.md template (Tomas)
   - [ ] External developer guide withheld until Phase 9 completes (guide assumes Phase 7 entitlements and Phase 8 integration keys are both live)
+  - [ ] Container security enforced: non-root USER required; read-only rootfs; memory 512MB, CPU 0.5, pids 100
+  - [ ] Docker build admission control: CPU/RAM headroom check before accept; per-system deploy lock; max 10 pending
 - [ ] **Phase 9** — Hardening, operations and launch readiness
   - [ ] RBAC roles: owner / admin / operator / commerce / viewer
   - [ ] TOTP enforced option; session revocation
@@ -153,7 +194,29 @@ Tick a phase when its exit gate passes — not when coding is done.
   - [ ] Load and resource protection testing (Tomas)
   - [ ] Legal/compliance launch gates signed off (Tomas)
   - [ ] Launch rehearsal completed (both)
-  - [ ] All V4 + legacy tests pass; restore drill passes; test purchase and subscription lifecycle passes
+  - [ ] All V4 + legacy tests pass
+  - [ ] Restore drill from S3 passes on a completely clean host with no local files
+  - [ ] Test purchase and full subscription lifecycle (including cancellation and GDPR erasure) passes
+  - [ ] Emergency controls UI tested: each button executes the correct action and creates an audit event
+  - [ ] Security headers verified on all responses (HSTS, CSP, X-Content-Type-Options, etc.)
+  - [ ] SQL injection lint rule: zero template literals inside db.query() calls
+  - [ ] Timing-safe comparison: crypto.timingSafeEqual used for all HMAC/signature verification
+  - [ ] Input size limits verified: 413 returned before body parsing on oversized payloads
+  - [ ] Secret scanning CI check passes with zero findings
+  - [ ] npm audit returns zero high/critical vulnerabilities with available fixes
+  - [ ] Path traversal prevention: all user-provided filenames replaced with UUID; extension from bytes
+  - [ ] Log injection: all user-supplied strings sanitised before logging
+  - [ ] Attack response playbook tested (credential stuffing simulation, webhook forgery simulation)
+  - [ ] Security incident response runbook reviewed by both Alex and Tomas
+  - [ ] TOTP mandatory for all admin accounts; session timeout set to 8 hours
+  - [ ] Domain verification token uses 256 bits of entropy; expires after 48 hours
+  - [ ] Stripe API rate limit handling: exponential backoff with Retry-After in all reconciliation jobs
+  - [ ] Media upload atomicity: pending record + S3 upload + confirm; orphan cleanup job active
+  - [ ] Stripe raw body preservation verified: signature check passes using pre-parse bytes
+  - [ ] No regex constructed from user input in any domain matching code
+  - [ ] PostgreSQL database encoding verified as UTF8 with LC_COLLATE='C'
+  - [ ] Legal/compliance launch gates signed off (Tomas)
+  - [ ] Launch rehearsal completed (both)
 
 ---
 
@@ -180,6 +243,9 @@ Tick a phase when its exit gate passes — not when coding is done.
 | Tests: CORS PATCH, schema endpoint, feature flags, migration runner, job table | Alex |
 | Job dashboard placeholder under Server | Tomas |
 | Pagination controls on existing list views | Tomas |
+| Choose and document email provider; set SEND_EMAIL_PROVIDER env var; add staging email smoke test to exit gate | Alex |
+| Allocate staging environment (separate PostgreSQL, Stripe test account, Caddy, staging.systems.acronym.sk, staging.acronym.sk) | Alex |
+| Choose monitoring stack; define alert thresholds (disk, connections, checkout error rate, webhook queue age, build queue depth, dead-letter count); assign on-call rotation | Alex |
 
 ### Phase 0.5 — Baseline snapshot and namespace lock
 
@@ -203,6 +269,11 @@ Tick a phase when its exit gate passes — not when coding is done.
 | Repository facades: `usersRepository`, `settingsRepository`, `auditRepository`, `jobsRepository` | Alex |
 | Extend backup/restore scripts to include PostgreSQL `pg_dump`, migration state, job table, platform settings, audit | Alex |
 | Tests: connection, migration order, checksum, failure, backup includes PG, restore dry run, SQLite legacy mode | Alex |
+| Deploy PgBouncer as sidecar; configure pool_mode=transaction, max_db_connections=20, default_pool_size=5; all code connects via port 6432; pool exhaustion returns 503 | Alex |
+| Configure S3-compatible backup destination (bucket, encryption key, retention policy); backup uploads to S3; restore drill on clean host with zero local files | Alex |
+| Define composite indexes for all Phase 1 tables in same migration file (audit_log_v4, jobs, admin_sessions) | Alex |
+| Enforce per-type job concurrency (build: 1, reconciliation: 3, email: 10, analytics: 5, webhook retry: 20); dead-letter after 3 attempts; purge completed after 7 days | Alex |
+| Session tokens: crypto.randomBytes(32); session ID rotated on every login; max 5 concurrent sessions per admin | Alex |
 
 ---
 
@@ -221,6 +292,8 @@ Tick a phase when its exit gate passes — not when coding is done.
 | Tests: project-to-system migration, legacy API still works, systems API returns migrated projects, health/stats/route mapping | Alex |
 | Dashboard Systems page renders V4-backed systems through same visual layout | Tomas |
 | Hidden admin/test Product page | Tomas |
+| Org-scoping enforcement: every repository method includes WHERE organisation_id = $n; CI lint rule rejects unscoped queries on scoped tables | Alex |
+| Phase 2 acceptance tests: org A admin cannot read org B systems by ID; direct ID manipulation is rejected | Alex |
 
 ### Phase 2.5 — Migration reconciliation checkpoint
 
@@ -254,6 +327,9 @@ Tick a phase when its exit gate passes — not when coding is done.
 | Custom domain add/verify wizard UI | Tomas |
 | Maintenance mode UI controls | Tomas |
 | Canonical redirect configuration UI | Tomas |
+| Replace route_published BOOLEAN with route_status TEXT enum (inactive/pending/active/failed/superseded) + route_last_error + route_last_published_at | Alex |
+| Create system_environment_routes junction table with (system_id, environment_id, domain_id, route_status) and composite indexes | Alex |
+| Route publication atomicity: Caddy reload failure reverts status to 'failed'; never mark active before probe passes; promotion uses junction table | Alex |
 
 ---
 
@@ -272,6 +348,11 @@ Tick a phase when its exit gate passes — not when coding is done.
 | SK/EN locale support: localised slugs, SEO, language switch mapping, translation completeness indicator, fallback rules, localised legal pages | Tomas |
 | `acronym.sk` renderer: pre-rendered pages, snapshot cache, last-known-good snapshot, ETag, stale-while-revalidate, hashed assets, no live DB dependency | Tomas |
 | Tests: draft change does not alter public site, publish creates immutable snapshot, snapshot rollback, SK/EN render, missing translation visible, public API hides private fields, renderer works during SYSTEMS API outage | Tomas |
+| Precomputed S3 catalog: publish action serialises catalog JSON to S3; CDN pointer updated atomically; /api/public/* reads from S3/CDN, never from PostgreSQL | Alex |
+| Media upload pipeline: quarantine → security scan (SVG sanitize, malware check, content-type by bytes) → convert → permanent S3 URL; EXIF strip; variants generated | Alex |
+| Max snapshot size 2MB enforced; media stored by URL only (never embedded); orphan cleanup job for failed uploads | Alex |
+| Concurrent publish lock (publish_locks table with 5-minute TTL); concurrent publishes rejected | Tomas |
+| Snapshot schema versioning: schema_version + renderer_min_version columns; renderer refuses incompatible snapshots and alerts (never silent fallback) | Tomas |
 
 ---
 
@@ -293,6 +374,14 @@ Tick a phase when its exit gate passes — not when coding is done.
 | Checkout flow UI (product page → create session → Stripe Checkout → confirmation page) | Tomas |
 | Legal/compliance capture UI (consent checkboxes, withdrawal consent, marketing consent) | Tomas |
 | Orders and subscriptions dashboard views | Tomas |
+| Soft-delete columns (deleted_at TIMESTAMPTZ) on customers, accounts, product_users, account_emails, entitlement_grants; all repository queries filter WHERE deleted_at IS NULL | Alex |
+| data_subject_requests table and erasure workflow: legal hold check → Stripe customer deletion → PII anonymisation → entitlement revocation → session invalidation (all atomic) | Alex |
+| VAT/Stripe Tax: automatic_tax enabled on all checkout sessions; tax amounts stored in orders table; B2B zero-rate with VAT number validation; no manual override | Alex |
+| Subscription cancellation flow: SYSTEMS. UI (not Stripe Portal); Slovak 14-day withdrawal right disclosure; pro-rata refund calculation; durable cancellation record | Tomas |
+| Webhook advisory lock: pg_try_advisory_xact_lock on event ID before any processing; concurrent duplicate test in acceptance suite | Alex |
+| subscriptions.entitlement_grant_id FK (NULL until Phase 7); idempotency_key UNIQUE on orders; idempotency_key UNIQUE on entitlement_grants | Alex |
+| offers.entitlement_template_version INT; Phase 7 reads this to know which schema to validate against | Alex |
+| Stripe API rate limit handling: exponential backoff with Retry-After header in all Stripe API calls from reconciliation jobs | Alex |
 
 ### Phase 7 — Entitlements, product keys and licensing
 
@@ -313,6 +402,17 @@ Tick a phase when its exit gate passes — not when coding is done.
 | Admin entitlement grant/revoke UI | Tomas |
 | Customer account area (subscription status, active licences, billing portal link) | Tomas |
 | Subscription state display with grace/suspension indicators | Tomas |
+| Webhook handler decouples from side effects: INSERT event + INSERT job in one transaction, return 200 immediately; no inline entitlement creation or email sending | Alex |
+| Auth class table: every route tagged with auth class; middleware enforces class; routes without class fail to register at startup | Alex |
+| Rate limits per route class: /api/licensing/validate 100/min per licence, /api/entitlements/check 500/min per key, /api/identity/token 20/min per IP; RateLimit-* headers on all responses | Alex |
+| Error response contract: canonical error code list in spec; no inline error codes in route handlers; SDKs treat unknown codes as INTERNAL_ERROR | Alex |
+| effective_entitlements materialised projection: UPSERT on every grant/revocation write; checks read from projection only; reconciliation job detects and repairs divergence | Alex |
+| Trial expiry job: 3-day reminder email; incomplete on trial end with no payment method; cancelled + expired after 30 days incomplete | Alex |
+| Ed25519 public key endpoint /api/public/signing-keys: 30-day rotation, 7-day overlap, 5-min clock skew tolerance, 30-day offline grace, clock rollback detection | Alex |
+| Server-side lease cache: LRU keyed by (licence_id, policy_version, key_version); refresh_after at 4 min (validUntil at 5 min); invalidated on entitlement change | Alex |
+| entitlement_grants.subscription_id FK and .order_id FK populated atomically at grant creation; grace_policy_snapshot JSONB stored at grant time | Alex |
+| Composite indexes for all Phase 7 tables in same migration as table creation | Alex |
+| Stripe raw body preservation: rawBody stored before JSON parsing; passed to stripe.webhooks.constructEvent() directly | Alex |
 
 ---
 
@@ -361,6 +461,11 @@ Tick a phase when its exit gate passes — not when coding is done.
 | Release reports UI | Tomas |
 | External system health display | Tomas |
 | Event volume monitoring display | Tomas |
+| Analytics dedicated PgBouncer pool (max 5 connections, 5s statement timeout); batched COPY/bulk INSERT; aggregation jobs defer if lock unavailable within 1s | Alex |
+| CORS middleware: /api/public/* = any origin; integration routes = registered origins only; admin routes = same-origin only; origin registration in integration_keys.allowed_origins | Alex |
+| Public DTO allowlist serialiser: explicit field whitelist; throws in non-prod on extra fields; audit event in prod | Alex |
+| Webhook rotation: Stripe dual-secret (try both, remove old after 7 days); outbound dual-sign (7-day overlap); drill in Phase 9 | Alex |
+| SSRF prevention: outbound webhook URLs checked against blocked CIDRs (10.x, 172.16.x, 192.168.x, 169.254.x); re-resolved on every delivery (DNS rebinding prevention) | Alex |
 
 ### Phase 8.5 — App Builder Framework and SDKs
 
@@ -383,6 +488,8 @@ Tick a phase when its exit gate passes — not when coding is done.
 | Browser SDK: `@systems/browser` — public-client entitlement check (no secret keys), event emission | Tomas |
 | Developer documentation: API reference, integration contract spec, guides per app type, `RUNBOOK.md` template | Tomas |
 | Common rejection reasons and troubleshooting guide | Tomas |
+| Container security enforcement: non-root USER required for acceptance level ≥ 2; memory 512MB, CPU 0.5, pids 100; no privileged, no host network, no docker socket | Alex |
+| Docker build admission control: CPU/RAM headroom check (25% reserved) before accepting deploy; per-system deploy lock; max 10 pending builds in queue | Alex |
 
 ### Phase 9 — Hardening, operations and launch readiness
 
@@ -408,6 +515,27 @@ Tick a phase when its exit gate passes — not when coding is done.
 | Legal/compliance launch gate coordination (terms, privacy, cookie policy, withdrawal flow, subscription cancellation wording, VAT/accounting, refund/complaints, GDPR export/delete, accessibility) | Tomas |
 | `V4_DOMAIN_RECOVERY_RUNBOOK.md`, `V4_SECURITY_INCIDENT_RUNBOOK.md` | Tomas |
 | Launch rehearsal: deploy portfolio renderer, publish SK/EN snapshot, deploy test product, create offer, Stripe test purchase, create entitlement, redeem licence, simulate failed payment, simulate recovery, simulate refund, restore backup on clean machine, roll back product release, roll back portfolio snapshot | Tomas |
+| SQL injection lint rule: CI fails on any template literal inside db.query() call | Alex |
+| Timing-safe comparison: all HMAC/signature verification uses crypto.timingSafeEqual(); code review checklist includes this check | Alex |
+| Security response headers: HSTS preload, X-Content-Type-Options, X-Frame-Options DENY, strict CSP with nonce on admin HTML | Alex |
+| Input size limits: 413 returned before body parsing on all endpoints; limits documented in API contract | Alex |
+| Path traversal prevention: all user-provided filenames replaced with UUID; file extension from bytes only | Alex |
+| Log injection prevention: sanitizeForLog() applied to all user-supplied strings before logging | Alex |
+| Secret scanning in CI: trufflehog or gitleaks on every push; build fails on any detected secret | Alex |
+| npm audit in CI: fails on high/critical vulnerabilities with available fix; exceptions documented in SECURITY_EXCEPTIONS.md | Alex |
+| Container security enforcement: non-root USER required for acceptance level ≥ 2; memory 512MB, CPU 0.5, pids 100; no privileged, no host network, no docker socket | Alex |
+| Docker build admission control: CPU/RAM headroom check (25% reserved) before accepting deploy; per-system deploy lock; max 10 pending builds in queue | Alex |
+| Emergency controls UI: one-click actions for all 7 emergency scenarios; 60-second cooldown; audit event for every action | Alex |
+| Attack response playbook: credential stuffing, webhook forgery, key compromise, session hijack, DDoS — each tested in the Phase 9 rehearsal | Alex |
+| Domain verification token: crypto.randomBytes(32); 48-hour expiry; no oracle leak (expired vs. never existed indistinguishable) | Alex |
+| PostgreSQL character set verification: UTF8 encoding, LC_COLLATE='C' | Alex |
+| Media upload atomicity: pending record → S3 upload → confirm; orphan cleanup job active | Alex |
+| V4_SECURITY_INCIDENT_RUNBOOK.md covering all attack types with step-by-step response | Alex |
+| TOTP mandatory for all admin accounts; 8-hour session timeout; no exceptions | Alex |
+| Idempotency requirements: Idempotency-Key header required and enforced on all state-mutating external-facing endpoints | Alex |
+| Load and resource protection testing: media flood, analytics event flood, webhook burst, public catalog cache, renderer last-known-good | Tomas |
+| Legal/compliance launch gate: GDPR erasure flow, VAT treatment, withdrawal right, cancellation wording — all approved by legal professional | Tomas |
+| Launch rehearsal including: GDPR erasure end-to-end, domain verification, emergency control drill, restore from S3, security header verification | Tomas |
 
 ---
 
