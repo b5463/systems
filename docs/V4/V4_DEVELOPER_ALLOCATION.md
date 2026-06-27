@@ -20,7 +20,142 @@ Both devs work on every phase. The split below is by primary ownership — the o
 
 ---
 
-## Milestone A — Safe Base
+## Master checklist
+
+Tick a phase when its exit gate passes — not when coding is done.
+
+### Milestone A — Safe Base
+- [ ] **Phase 0** — Stabilise current repository
+  - [ ] CORS, request IDs, schema/features endpoints, error shape, pagination, SQLite warning, feature flags
+  - [ ] `schema_migrations` table, migration runner, no silent ALTER TABLE, test reset utility
+  - [ ] `jobs` table, in-process runner, lock/unlock, retry/backoff
+  - [ ] Host-protection invariants confirmed
+  - [ ] Job UI placeholder and pagination controls (Tomas)
+  - [ ] All Phase 0 tests pass; legacy dashboard and deploy flow unaffected
+- [ ] **Phase 0.5** — Baseline snapshot and namespace lock
+  - [ ] Baseline report committed (tests, lint, routes, schema dump, Caddy inventory, Docker labels, backup dry run, feature flags)
+  - [ ] Namespace boundary tests pass
+  - [ ] Deprecation header helper in place
+- [ ] **Phase 1** — PostgreSQL and migration foundation
+  - [ ] `postgres.js`, `sqlite-legacy.js`, `repositories/`, `migrate.js`, `migrations/`
+  - [ ] `SYSTEMS_DB_ENGINE`, `DATABASE_URL`, `MIGRATIONS_AUTO_RUN` env vars
+  - [ ] Migration scripts (JS + PowerShell)
+  - [ ] Foundational schema: `schema_migrations`, `organisations`, `admin_users`, `admin_sessions`, `platform_settings`, `audit_log_v4`, `jobs`
+  - [ ] Repository facades: users, settings, audit, jobs
+  - [ ] Backup/restore extended for PostgreSQL
+  - [ ] SQLite legacy mode still passes all tests
+
+### Milestone B — V4 Operational Core
+- [ ] **Phase 2** — Introduce V4 Products/Systems data model
+  - [ ] Tables: `products`, `systems`, `system_environments`, `releases`, `domains`, `environment_secrets`, `infrastructure_metrics`, `health_snapshots`, `legacy_project_map`
+  - [ ] Migration bridge: projects → systems → environments → releases → domains
+  - [ ] Read APIs live; write APIs stable
+  - [ ] Legacy `/api/projects/*` compatibility working
+  - [ ] Systems page renders V4-backed data (Tomas)
+- [ ] **Phase 2.5** — Migration reconciliation checkpoint
+  - [ ] `reconcile-v4-migration.js` passes on all test data
+  - [ ] Operator dashboard report visible
+  - [ ] No orphan containers, no unknown routes, all env secrets decrypt
+- [ ] **Phase 3** — Move deploy engine to Systems/Environments
+  - [ ] New `/api/systems/:id/environments/:env/deploy|redeploy|rollback|logs|stats` routes live
+  - [ ] `deployService` extracted (detect, extract, build, runContainer, verifyHealth, recordRelease, publishRoute, rollback)
+  - [ ] Docker labels on all containers
+  - [ ] Preview + production environments coexist
+  - [ ] Promote flow with health gate works
+  - [ ] Legacy deploy routes still work
+- [ ] **Phase 4** — Domains, routing, access and maintenance
+  - [ ] `domains`, `maintenance_windows`, `route_publication_attempts` tables
+  - [ ] Domain-driven `renderRoute()` Caddy service
+  - [ ] Route publication transaction (write → validate → reload → probe → mark active)
+  - [ ] Custom domain verification flow end to end
+  - [ ] Domain management, maintenance, and canonical redirect UI (Tomas)
+
+### Milestone C — Acronym Public Portfolio
+- [ ] **Phase 5** — Portfolio CMS and Acronym public renderer
+  - [ ] Portfolio tables: pages, profiles, blocks, snapshots, redirects, forms, submissions, lead_status, media_assets, legal_versions
+  - [ ] Draft → preview → publish → immutable snapshot pipeline
+  - [ ] Dashboard Portfolio area: homepage, nav, product-page, media, legal, redirects, locales, publish history, rollback (Tomas)
+  - [ ] SK/EN locale support with translation completeness indicator
+  - [ ] Public catalog API: `/api/public/catalog`, `/api/public/products/:slug`, `/api/public/snapshot/latest`
+  - [ ] `acronym.sk` renderer: pre-rendered, snapshot cache, last-known-good, ETag, no live DB dependency
+  - [ ] Renderer stays up during SYSTEMS. API outage
+
+### Milestone D — Paid Products
+- [ ] **Phase 6** — Commerce foundation
+  - [ ] Tables: `offers`, `customers`, `orders`, `subscriptions`, `payment_webhook_events`, `checkout_disclosures`
+  - [ ] Stripe Checkout + Customer Portal integrated
+  - [ ] Signed webhook endpoint with idempotency
+  - [ ] Manual and complimentary order creation
+  - [ ] All 6 subscription states mirrored from Stripe
+  - [ ] Reconciliation jobs: checkout_sessions, subscriptions, invoices, entitlements
+  - [ ] Per-checkout legal/compliance capture (terms, privacy, withdrawal consent, locale, VAT evidence)
+  - [ ] Checkout flow and compliance UI (Tomas)
+  - [ ] Test-mode Stripe purchase works end to end; success redirect grants no access
+- [ ] **Phase 7** — Entitlements, product keys and licensing
+  - [ ] Entitlement tables: grants, revocations, snapshots, effective_entitlements, licences, activations, events, signing_keys
+  - [ ] Multi-grant resolver (order + subscription + trial + manual + promo overlap handled correctly)
+  - [ ] Full 13-state subscription state machine
+  - [ ] Grace policy per offer; payment recovery and reactivation flows
+  - [ ] Product-key generation (high entropy, hash-only storage, revocation, activation limits)
+  - [ ] Entitlements and licensing APIs live
+  - [ ] Signed lease with `validUntil`, `offlineUntil`, Ed25519 signature
+  - [ ] Signing-key management: table, current/previous key, public-key endpoint, rotation runbook
+  - [ ] Email fulfilment: confirmation, redemption link, billing portal, activation instructions
+  - [ ] Customer area, admin grant/revoke, subscription state UI (Tomas)
+- [ ] **Phase 7.5** — Identity, accounts and product users
+  - [ ] Tables: accounts, account_emails, account_sessions, account_links, product_users, product_user_links, seats, seat_assignments, signing_keys_metadata, integration_clients, integration_credentials, integration_webhook_endpoints, integration_webhook_deliveries
+  - [ ] Mode A (Acronym Identity / OIDC), Mode B (BYOI), Mode C (licence-only)
+  - [ ] Multi-grant effective state machine: pending → trial → active → grace → read_only → suspended → expired → denied
+  - [ ] Offline signed leases with clock-rollback detection
+  - [ ] Device activation limits and self-service reset
+  - [ ] Seats with invitation and release flows
+  - [ ] Outbound integration webhooks: signed, retry, idempotent, dead-letter
+  - [ ] Integration webhook acknowledge endpoint
+  - [ ] Customers dashboard area: Accounts, Product Users, Entitlements, Licences, Activations, Access Incidents (Tomas)
+  - [ ] Admin entitlement actions UI (Tomas)
+
+### Milestone E — Intelligence and Launch
+- [ ] **Phase 8** — Product analytics and external integrations
+  - [ ] Tables: integration_keys, integration_key_events, product_events, product_metric_hourly, product_metric_daily, error_groups, release_reports, external_heartbeats
+  - [ ] Integration key scopes: heartbeat, events, errors, releases, metrics, entitlements:check, licences:validate
+  - [ ] Ingestion endpoints: heartbeat, releases, errors, events, metrics
+  - [ ] Aggregation jobs: hourly, daily, compact.raw, retention.cleanup
+  - [ ] Rate-limiting and size caps on all ingestion endpoints
+  - [ ] Analytics never blocks Stripe webhooks, entitlement checks, or deploy rollback
+  - [ ] Integration key UI, analytics dashboards, error groups, release reports (Tomas)
+- [ ] **Phase 8.5** — App Builder Framework and SDKs
+  - [ ] `systems.app.json` manifest schema and server-side validation
+  - [ ] Acceptance levels 0–5 enforced at deploy time
+  - [ ] Health/ready/version endpoint contract enforcement
+  - [ ] Smoke test framework gates releases
+  - [ ] Integration testing harness and 41-item acceptance checklist
+  - [ ] `@systems/node` server SDK
+  - [ ] `systems-python` SDK
+  - [ ] `systems-cli` (manifest validate, acceptance check, smoke test runner)
+  - [ ] App certification UI, integration status dashboard (Tomas)
+  - [ ] `@systems/browser` SDK — no secret keys (Tomas)
+  - [ ] Developer docs: API reference, per-app-type guide, RUNBOOK.md template (Tomas)
+- [ ] **Phase 9** — Hardening, operations and launch readiness
+  - [ ] RBAC roles: owner / admin / operator / commerce / viewer
+  - [ ] TOTP enforced option; session revocation
+  - [ ] Secret write-only UI; integration key hashing; licence signing key rotation
+  - [ ] Stripe webhook signing enforcement
+  - [ ] Media quarantine: SVG sanitization, malware rejection, content-type-by-bytes, metadata stripping
+  - [ ] Emergency controls: revoke all sessions, freeze deployments, quarantine routes
+  - [ ] Structured observability: JSON logging, request ID correlation, latency/error metrics, secret redaction
+  - [ ] Public API allowlist automated enforcement and audit
+  - [ ] Admin audit coverage audit
+  - [ ] Rate limits per route class
+  - [ ] Backup/restore reliability drill (all subsystems)
+  - [ ] Runbooks: deploy, rollback, Stripe incident, entitlement recovery, backup/restore, key rotation, device reset, app integration, domain recovery, security incident
+  - [ ] Load and resource protection testing (Tomas)
+  - [ ] Legal/compliance launch gates signed off (Tomas)
+  - [ ] Launch rehearsal completed (both)
+  - [ ] All V4 + legacy tests pass; restore drill passes; test purchase and subscription lifecycle passes
+
+---
+
+## Detailed task tables by phase
 
 ### Phase 0 — Stabilise current repository
 
