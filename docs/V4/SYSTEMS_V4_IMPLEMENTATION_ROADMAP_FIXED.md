@@ -207,6 +207,58 @@ Hard rule: dashboard/admin APIs, public APIs, webhooks and app-ingestion APIs mu
 
 ---
 
+# Pre-flight decisions — make these before Phase 0 begins
+
+These are human decisions that cannot be deferred to the phase where they are first needed. If they are not resolved before Phase 0 starts, the first relevant phase will hit a hard blocker with no warning.
+
+## Decision 1 — Email provider
+
+**Needed by:** Phase 7 (fulfilment), but must be configured in Phase 0 staging so the path is tested.
+**Owner:** Alex (infrastructure decision; Tomas integrates the templates).
+**What to decide:** Which provider to use: SendGrid, AWS SES, Mailgun, or SMTP relay. Set `SEND_EMAIL_PROVIDER` in the Phase 0 env spec. Add a transactional email smoke test to the Phase 0 exit gate so staging confirms delivery works before Phase 7 depends on it.
+**Risk of deferring:** Phase 7 begins. Fulfilment jobs fire immediately after payment. If the transport is not wired, every purchase produces a silent failure with no key, no confirmation, and no recovery path.
+
+## Decision 2 — Monitoring and alerting stack
+
+**Needed by:** Phase 5 (first public traffic), but must be wired in Phase 1.
+**Owner:** Alex (infrastructure); on-call rotation must be named by Acronym management.
+**What to decide:** Which monitoring system (Prometheus + Grafana, Datadog, or self-hosted equivalent), which alerting channel (Slack, PagerDuty, email), and who is on-call for production incidents. Define these alert thresholds before Phase 5:
+
+```text
+disk used > 80%                     → alert immediately
+PostgreSQL connections > 18 of 20   → alert immediately (PgBouncer pool near exhaustion)
+checkout error rate > 2%            → alert immediately
+webhook queue depth > 500 jobs      → alert immediately
+build queue depth > 10 jobs         → alert (admission control may be too lenient)
+dead-letter queue > 0 items         → alert within 5 minutes
+pg_dump failure                     → alert immediately
+restore drill failure               → alert immediately
+```
+
+**Risk of deferring:** Phase 5 launches public traffic. The first traffic spike, disk issue, or payment failure is discovered by a customer reporting an error, not by an alert. Incident response cannot begin until someone notices.
+
+## Decision 3 — Legal review engagement
+
+**Needed by:** Phase 6 (first commerce), minimum 4 weeks before Phase 6 go-live.
+**Owner:** Acronym management must engage a Slovak/EU-licensed legal professional. Alex coordinates the technical questions; Tomas coordinates the copy review.
+**What to submit for review:**
+```text
+1. VAT treatment: Stripe Tax enabled; Slovak 20% VAT on B2C; EU B2B zero-rate with VIES;
+   micro-business exemption evaluated and documented.
+2. Cancellation and withdrawal: cancellation flow UI copy, 14-day withdrawal right wording,
+   pro-rata refund calculation, digital-content immediate-supply waiver wording.
+3. GDPR erasure: data_subject_requests workflow, PII anonymisation scope, legal hold
+   criteria, 30-day SLA, financial data 7-year retention rationale.
+4. Consumer disclosures: checkout consent checkboxes, legal terms version attached to
+   each order, cookie consent (Act 108/2024 compliance).
+```
+
+**What approval unlocks:** Phase 6 go-live. Without legal sign-off, the commerce layer must not be connected to live Stripe keys regardless of engineering readiness.
+
+**Risk of deferring:** Legal review at a reputable Slovak/EU firm takes 2–4 weeks. Starting it in Phase 5 is the latest safe window. Starting it in Phase 6 means the engineering is done but go-live is blocked waiting for sign-off — potentially for weeks after the team considers itself "done."
+
+---
+
 # Phase 0 — Stabilise the current repository
 
 ## Goal

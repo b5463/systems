@@ -20,6 +20,20 @@ Both devs work on every phase. The split below is by primary ownership — the o
 
 ---
 
+## Pre-flight — non-engineering decisions (resolve before Phase 0 starts)
+
+These have no code to write. Each one is a human decision or an external engagement. If any of the three is still open when the relevant phase begins, that phase is immediately blocked.
+
+| Decision | Owner | Hard deadline | Risk if missed |
+|---|---|---|---|
+| Choose email provider; set `SEND_EMAIL_PROVIDER`; add staging smoke test | Alex | Before Phase 0 exit gate | Phase 7 fulfilment fires into nothing; all purchases silent-fail |
+| Choose monitoring stack; name alerting channel; assign on-call | Alex + Acronym management | Before Phase 1 exit gate | First production incident discovered by customers, not alerts |
+| Engage Slovak/EU legal professional for commerce review | Acronym management | Start of Phase 5 at the latest | Phase 6 go-live blocked waiting for 2–4 week legal turnaround |
+
+Legal review must cover: VAT/Stripe Tax treatment, Slovak 14-day withdrawal right wording, GDPR erasure workflow, and all checkout consent disclosures. Engineering and legal review run in parallel during Phase 5. Phase 6 go-live requires written sign-off before live Stripe keys are connected.
+
+---
+
 ## Master checklist
 
 Tick a phase when its exit gate passes — not when coding is done.
@@ -246,6 +260,7 @@ Tick a phase when its exit gate passes — not when coding is done.
 | Choose and document email provider; set SEND_EMAIL_PROVIDER env var; add staging email smoke test to exit gate | Alex |
 | Allocate staging environment (separate PostgreSQL, Stripe test account, Caddy, staging.systems.acronym.sk, staging.acronym.sk) | Alex |
 | Choose monitoring stack; define alert thresholds (disk, connections, checkout error rate, webhook queue age, build queue depth, dead-letter count); assign on-call rotation | Alex |
+| **[Management action]** Engage Slovak/EU legal professional — submit VAT treatment, withdrawal right wording, GDPR erasure workflow, and checkout consent copy for review; obtain written sign-off before Phase 6 go-live | Acronym management |
 
 ### Phase 0.5 — Baseline snapshot and namespace lock
 
