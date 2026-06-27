@@ -255,7 +255,7 @@ GET  /legal/cookies
 GET  /legal/accessibility
 GET  /legal/complaints
 GET  /contact
-POST /api/v4/public/forms/{public-form-id}/submissions
+POST /api/public/forms/{public-form-id}/submissions
 ```
 
 These routes are controlled by the portfolio CMS route registry. Reserved commerce/legal routes cannot be shadowed by an editor-created page. Changing a published slug creates an explicit redirect from the prior path unless an administrator deliberately retires it.
@@ -327,58 +327,71 @@ IDs are immutable identifiers. Slugs are editable presentation/routing identifie
 
 ### 6.4 API namespaces
 
+All routes use `/api/...`. Do not use `/v1/...` or `/api/v4/...` paths. Versioning belongs in payload schemas, not URLs.
+
 ```text
-/api/v4/admin/*          Authenticated dashboard operations
-/api/v4/public/*         Strictly allow-listed catalog and checkout surfaces
-/api/v4/integrations/*   Scoped external-system ingestion
-/api/v4/webhooks/*       Signed provider callbacks
+/api/auth/*              administrator authentication
+/api/admin/*             SYSTEMS. administration
+/api/products/*          product management
+/api/systems/*           system, environment, release and deployment management
+/api/portfolio/*         Portfolio CMS, drafts, snapshots and publishing
+/api/public/*            public-safe catalog, product pages, checkout helpers and forms
+/api/commerce/*          offers, orders, subscriptions and billing portal actions
+/api/customers/*         customer records and customer-linked access state
+/api/entitlements/*      effective access checks and admin grants/revocations
+/api/licensing/*         product-key redemption, activation, validation and device handling
+/api/analytics/*         aggregated product and operations analytics
+/api/integrations/*      integration-key administration
+/api/ingest/*            app/external heartbeat, release, error, event and metric ingestion
+/api/webhooks/*          Stripe, GitHub and provider webhooks
 ```
 
 Initial representative routes:
 
 ```text
-GET    /api/v4/public/catalog
-GET    /api/v4/public/site
-GET    /api/v4/public/snapshots/current
-GET    /api/v4/public/products/{slug}
-POST   /api/v4/public/checkout-sessions
-GET    /api/v4/public/checkout-sessions/{public-token}/status
+GET    /api/public/catalog
+GET    /api/public/site
+GET    /api/public/snapshot/latest
+GET    /api/public/products/{slug}
+POST   /api/public/checkout-sessions
+GET    /api/public/checkout-sessions/{public-token}/status
 
-GET    /api/v4/admin/products
-GET    /api/v4/admin/portfolio
-PATCH  /api/v4/admin/portfolio
-GET    /api/v4/admin/portfolio/pages
-POST   /api/v4/admin/portfolio/pages
-PATCH  /api/v4/admin/portfolio/pages/{id}
-POST   /api/v4/admin/portfolio/preview
-POST   /api/v4/admin/portfolio/publish
-POST   /api/v4/admin/portfolio/publications/{id}/rollback
-POST   /api/v4/admin/portfolio/media
-POST   /api/v4/admin/portfolio/redirects
-POST   /api/v4/admin/products
-PATCH  /api/v4/admin/products/{id}
-POST   /api/v4/admin/products/{id}/publish
-POST   /api/v4/admin/products/{id}/unpublish
-POST   /api/v4/admin/products/{id}/preview
+GET    /api/products
+POST   /api/products
+PATCH  /api/products/{id}
+POST   /api/products/{id}/publish
+POST   /api/products/{id}/unpublish
+POST   /api/products/{id}/preview
 
-GET    /api/v4/admin/systems
-POST   /api/v4/admin/systems
-POST   /api/v4/admin/environments/{id}/deployments
-POST   /api/v4/admin/deployments/{id}/promote
-POST   /api/v4/admin/environments/{id}/rollback
+GET    /api/portfolio
+PATCH  /api/portfolio
+GET    /api/portfolio/pages
+POST   /api/portfolio/pages
+PATCH  /api/portfolio/pages/{id}
+POST   /api/portfolio/preview
+POST   /api/portfolio/publish
+POST   /api/portfolio/publications/{id}/rollback
+POST   /api/portfolio/media
+POST   /api/portfolio/redirects
 
-POST   /api/v4/admin/domains
-POST   /api/v4/admin/domains/{id}/verify
-POST   /api/v4/admin/domains/{id}/activate
+GET    /api/systems
+POST   /api/systems
+POST   /api/systems/{id}/environments/{env}/deploy
+POST   /api/systems/{id}/promote
+POST   /api/systems/{id}/environments/{env}/rollback
 
-POST   /api/v4/integrations/heartbeat
-POST   /api/v4/integrations/releases
-POST   /api/v4/integrations/errors
-POST   /api/v4/integrations/events
-POST   /api/v4/integrations/metrics
+POST   /api/admin/domains
+POST   /api/admin/domains/{id}/verify
+POST   /api/admin/domains/{id}/activate
 
-POST   /api/v4/webhooks/stripe
-POST   /api/v4/webhooks/github
+POST   /api/ingest/heartbeat
+POST   /api/ingest/releases
+POST   /api/ingest/errors
+POST   /api/ingest/events
+POST   /api/ingest/metrics
+
+POST   /api/webhooks/stripe
+POST   /api/webhooks/github
 ```
 
 ### 6.5 Routing rules

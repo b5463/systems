@@ -981,11 +981,11 @@ Mark as legacy once V4 replacements exist.
 /api/licensing/validate
 /api/licensing/deactivate
 
-/v1/ingest/heartbeat
-/v1/ingest/releases
-/v1/ingest/errors
-/v1/ingest/events
-/v1/ingest/metrics
+/api/ingest/heartbeat
+/api/ingest/releases
+/api/ingest/errors
+/api/ingest/events
+/api/ingest/metrics
 ```
 
 ### 10.3 Route compatibility adapter
@@ -1670,11 +1670,11 @@ licences:validate
 ### 17.2 Ingestion endpoints
 
 ```text
-POST /v1/ingest/heartbeat
-POST /v1/ingest/releases
-POST /v1/ingest/errors
-POST /v1/ingest/events
-POST /v1/ingest/metrics
+POST /api/ingest/heartbeat
+POST /api/ingest/releases
+POST /api/ingest/errors
+POST /api/ingest/events
+POST /api/ingest/metrics
 ```
 
 ### 17.3 Authentication

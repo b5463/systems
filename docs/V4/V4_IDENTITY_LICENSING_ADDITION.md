@@ -590,35 +590,35 @@ The model supports a purchasing organisation, billing owner, product organisatio
 ### 13.1 Namespaces
 
 ```text
-/api/v4/identity/*
-/api/v4/entitlements/*
-/api/v4/licences/*
-/api/v4/product-users/*
-/api/v4/product-events/*
-/api/v4/integration-webhooks/*
+/api/identity/*
+/api/entitlements/*
+/api/licensing/*
+/api/customers/*
+/api/ingest/*
+/api/webhooks/*
 ```
 
 Representative endpoints:
 
 ```text
-POST /api/v4/product-users/upsert
-POST /api/v4/product-users/{external-id}/link-account
-POST /api/v4/product-events/batch
+POST /api/customers/product-users
+POST /api/customers/product-users/{external-id}/link-account
+POST /api/ingest/events
 
-POST /api/v4/entitlements/check
-POST /api/v4/entitlements/batch-check
-GET  /api/v4/entitlements/{id}
+POST /api/entitlements/check
+POST /api/entitlements/batch-check
+GET  /api/entitlements/{id}
 
-POST /api/v4/licences/redeem
-POST /api/v4/licences/activate
-POST /api/v4/licences/refresh
-POST /api/v4/licences/deactivate-device
-GET  /api/v4/licences/revocations/{product-id}
+POST /api/licensing/redeem
+POST /api/licensing/activate
+POST /api/licensing/validate
+POST /api/licensing/deactivate
+GET  /api/licensing/revocations/{product-id}
 
-POST /api/v4/integration-webhooks/acknowledge
+POST /api/webhooks/integration/acknowledge
 ```
 
-Administrator APIs for grants, revocations, replacements, seats, and device resets remain under `/api/v4/admin/*` and require stronger permissions.
+Administrator APIs for grants, revocations, replacements, seats, and device resets remain under `/api/admin/*` and require stronger permissions.
 
 ### 13.2 Authentication classes
 
