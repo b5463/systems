@@ -61,7 +61,7 @@ Tick a phase when its exit gate passes — not when coding is done.
   - [ ] `deployService` extracted (detect, extract, build, runContainer, verifyHealth, recordRelease, publishRoute, rollback)
   - [ ] Docker labels on all containers
   - [ ] Preview + production environments coexist
-  - [ ] Promote flow with health gate works
+  - [ ] Promote flow with health gate works; retain-previous step is a no-op on first-ever deployment
   - [ ] Legacy deploy routes still work
 - [ ] **Phase 4** — Domains, routing, access and maintenance
   - [ ] `domains`, `maintenance_windows`, `route_publication_attempts` tables
@@ -76,7 +76,7 @@ Tick a phase when its exit gate passes — not when coding is done.
   - [ ] Draft → preview → publish → immutable snapshot pipeline
   - [ ] Dashboard Portfolio area: homepage, nav, product-page, media, legal, redirects, locales, publish history, rollback (Tomas)
   - [ ] SK/EN locale support with translation completeness indicator
-  - [ ] Public catalog API: `/api/public/catalog`, `/api/public/products/:slug`, `/api/public/snapshot/latest`
+  - [ ] Public catalog API: `/api/public/catalog`, `/api/public/products/:slug`, `/api/public/snapshot/latest` (Phase 5 snapshots contain static text pricing only — no live offer data until Phase 6)
   - [ ] `acronym.sk` renderer: pre-rendered, snapshot cache, last-known-good, ETag, no live DB dependency
   - [ ] Renderer stays up during SYSTEMS. API outage
 
@@ -87,12 +87,12 @@ Tick a phase when its exit gate passes — not when coding is done.
   - [ ] Signed webhook endpoint with idempotency
   - [ ] Manual and complimentary order creation
   - [ ] All 6 subscription states mirrored from Stripe
-  - [ ] Reconciliation jobs: checkout_sessions, subscriptions, invoices, entitlements
+  - [ ] Reconciliation jobs: checkout_sessions, subscriptions, invoices, orders (no entitlement job until Phase 7)
   - [ ] Per-checkout legal/compliance capture (terms, privacy, withdrawal consent, locale, VAT evidence)
   - [ ] Checkout flow and compliance UI (Tomas)
   - [ ] Test-mode Stripe purchase works end to end; success redirect grants no access
 - [ ] **Phase 7** — Entitlements, product keys and licensing
-  - [ ] Entitlement tables: grants, revocations, snapshots, effective_entitlements, licences, activations, events, signing_keys
+  - [ ] Entitlement tables: grants (with nullable account_id), revocations, snapshots, effective_entitlements, licences, activations, events, signing_keys
   - [ ] Multi-grant resolver (order + subscription + trial + manual + promo overlap handled correctly)
   - [ ] Full 13-state subscription state machine
   - [ ] Grace policy per offer; payment recovery and reactivation flows
@@ -103,7 +103,8 @@ Tick a phase when its exit gate passes — not when coding is done.
   - [ ] Email fulfilment: confirmation, redemption link, billing portal, activation instructions
   - [ ] Customer area, admin grant/revoke, subscription state UI (Tomas)
 - [ ] **Phase 7.5** — Identity, accounts and product users
-  - [ ] Tables: accounts, account_emails, account_sessions, account_links, product_users, product_user_links, seats, seat_assignments, signing_keys_metadata, integration_clients, integration_credentials, integration_webhook_endpoints, integration_webhook_deliveries
+  - [ ] Tables: accounts, account_emails, account_sessions, account_links, product_users, product_user_links, seats, seat_assignments, signing_keys_metadata (extends Phase 7 licence_signing_keys), integration_clients, integration_credentials, integration_webhook_endpoints, integration_webhook_deliveries
+  - [ ] Phase 7 → 7.5 bridge migration: populate entitlement_grants.account_id where customer email matches account email
   - [ ] Mode A (Acronym Identity / OIDC), Mode B (BYOI), Mode C (licence-only)
   - [ ] Multi-grant effective state machine: pending → trial → active → grace → read_only → suspended → expired → denied
   - [ ] Offline signed leases with clock-rollback detection
@@ -135,6 +136,7 @@ Tick a phase when its exit gate passes — not when coding is done.
   - [ ] App certification UI, integration status dashboard (Tomas)
   - [ ] `@systems/browser` SDK — no secret keys (Tomas)
   - [ ] Developer docs: API reference, per-app-type guide, RUNBOOK.md template (Tomas)
+  - [ ] External developer guide withheld until Phase 9 completes (guide assumes Phase 7 entitlements and Phase 8 integration keys are both live)
 - [ ] **Phase 9** — Hardening, operations and launch readiness
   - [ ] RBAC roles: owner / admin / operator / commerce / viewer
   - [ ] TOTP enforced option; session revocation
@@ -236,8 +238,8 @@ Tick a phase when its exit gate passes — not when coding is done.
 | Extract `deployService`: `detect`, `extract`, `build`, `runContainer`, `verifyHealth`, `recordRelease`, `publishRoute`, `rollback` | Alex |
 | Docker container labels: `systems.organisation_id`, `system_id`, `environment_id`, `release_id`, `slug`, `environment` | Alex |
 | Backend support for `production` + `preview` environments | Alex |
-| `POST /api/systems/:id/promote` with full promotion flow (health pass → container start → route switch → retain previous → record release) | Alex |
-| Tests: new deploy route, legacy deploy route, container labels, preview/production isolation, promotion health gate, rollback, failed deploy safety | Alex |
+| `POST /api/systems/:id/promote` with full promotion flow (health pass → container start → route switch → retain previous if one exists → record release); retain step is a no-op on first-ever deployment | Alex |
+| Tests: new deploy route, legacy deploy route, container labels, preview/production isolation, promotion health gate, rollback, failed deploy safety, **first deployment succeeds with no previous release** | Alex |
 
 ### Phase 4 — Domains, routing, access and maintenance
 
@@ -279,13 +281,13 @@ Tick a phase when its exit gate passes — not when coding is done.
 
 | Task | Owner |
 |------|-------|
-| Commerce tables: `offers`, `customers`, `orders`, `subscriptions`, `payment_webhook_events`, `checkout_disclosures` | Alex |
+| Commerce tables: `offers` (with `entitlement_template` JSON column), `customers`, `orders`, `subscriptions`, `payment_webhook_events`, `checkout_disclosures` | Alex |
 | Stripe Checkout integration | Alex |
 | Stripe Customer Portal integration | Alex |
 | Signed Stripe webhook endpoint with idempotency | Alex |
 | Manual order + complimentary order creation | Alex |
 | Subscription state mirroring from Stripe (`trialing`, `active`, `past_due`, `cancel_at_period_end`, `cancelled`, `expired`) | Alex |
-| Reconciliation jobs: `stripe.reconcile.checkout_sessions`, `subscriptions`, `invoices`, `entitlements` | Alex |
+| Reconciliation jobs: `stripe.reconcile.checkout_sessions`, `subscriptions`, `invoices`, `orders` (NOT entitlements — that table doesn't exist until Phase 7) | Alex |
 | Capture per-checkout: terms version, privacy version, withdrawal consent, marketing consent, locale, billing country, VAT evidence | Alex |
 | Tests: checkout session creation, webhook signature verification, duplicate webhook dedup, subscription lifecycle, manual order audit, disclosure capture | Alex |
 | Checkout flow UI (product page → create session → Stripe Checkout → confirmation page) | Tomas |
@@ -296,7 +298,7 @@ Tick a phase when its exit gate passes — not when coding is done.
 
 | Task | Owner |
 |------|-------|
-| Entitlement tables: `entitlement_grants`, `entitlement_revocations`, `entitlement_resolution_snapshots`, `effective_entitlements`, `licences`, `licence_activations`, `entitlement_events`, `licence_events`, `licence_signing_keys` | Alex |
+| Entitlement tables: `entitlement_grants` (with nullable `account_id` FK for Phase 7.5 forward-compat), `entitlement_revocations`, `entitlement_resolution_snapshots`, `effective_entitlements`, `licences`, `licence_activations`, `entitlement_events`, `licence_events`, `licence_signing_keys` | Alex |
 | Entitlement grant resolver (handles lifetime purchase + subscription, grace access, refund overlap, upgrade/downgrade, admin grants) | Alex |
 | Product-key generation (high entropy, store hash only, raw key shown only at creation/redemption, revocation, replacement, activation limits, full audit) | Alex |
 | APIs: `POST /api/entitlements/check|admin/grant|admin/revoke`, `POST /api/licensing/redeem|activate|validate|deactivate` | Alex |
@@ -327,6 +329,7 @@ Tick a phase when its exit gate passes — not when coding is done.
 | Mode B — Bring-your-own-identity (BYOI): scoped `external_user_id` product-user record | Alex |
 | Mode C — Licence-only: binds to installation/device or optional account, no general login identity | Alex |
 | Account merge: audited, never implicit from matching email alone | Alex |
+| Phase 7 → 7.5 bridge migration: populate `entitlement_grants.account_id` where customer email matches a known account email (audited, non-destructive) | Alex |
 | Entitlement resolver: full multi-grant (order + subscription + trial + manual + promo overlap), cancelling one source must not revoke access from another | Alex |
 | Effective state machine: `pending`, `trial`, `active`, `grace`, `read_only`, `suspended`, `expired`, `denied` | Alex |
 | Offline signed licence leases: Ed25519 asymmetric signing, clock-rollback detection, `offlineUntil`, degraded/read-only access modes | Alex |

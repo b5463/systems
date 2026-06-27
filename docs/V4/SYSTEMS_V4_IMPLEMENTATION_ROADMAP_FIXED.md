@@ -92,6 +92,8 @@ existing projects must not disappear
 
 A phase is not finished unless there is a documented rollback path.
 
+**Cross-phase rollback rule:** Rolling back across a phase boundary (e.g., reverting Phase 7 after Phase 8 has run) requires restoring a database backup taken immediately before that phase started — schema rollback alone is insufficient because forward migrations may have transformed data irreversibly. Every phase must begin with a labelled backup that includes the schema version marker (`schema_migrations` snapshot). The backup must be verified restorable before any phase migration runs.
+
 ### 2.4 Feature flags are mandatory
 
 Every new V4 surface starts behind a flag.
@@ -761,9 +763,11 @@ preview release exists
 → health/readiness passes
 → production container starts
 → production route switches
-→ previous production retained
+→ previous production retained (no-op on first deployment — no prior release exists)
 → release recorded
 ```
+
+On the very first promote (no prior production release), the "retain previous" step is skipped rather than failing. The deployment still succeeds and is recorded normally.
 
 ## Tests
 
@@ -1051,11 +1055,18 @@ public API exposes no private fields
 renderer works when SYSTEMS API is temporarily down
 ```
 
+## CTA links and offer data in Phase 5
+
+Portfolio product pages include call-to-action buttons. In Phase 5 these are stored as plain URLs (authored as static text in the CMS and baked into the snapshot). There is no link to the `offers` table and no offer-data validation at publish time.
+
+Offer-aware checkout links (dynamic price display, currency formatting, trial terms, checkout session creation) are added in Phase 6 as a product-page enhancement. Phase 5 snapshots do not include live offer prices, trial conditions, or Stripe price IDs.
+
 ## Do not build yet
 
 - live payments
 - product-key emails
 - entitlement enforcement
+- offer-aware pricing blocks (Phase 6)
 
 ## Exit gate
 
@@ -1093,6 +1104,19 @@ orders
 subscriptions
 payment_webhook_events
 checkout_disclosures
+```
+
+The `offers` table must include an `entitlement_template` JSON column. This column stores the entitlement parameters (type, duration, features, grace policy, trial duration) that Phase 7 reads to create `entitlement_grants` automatically after a payment event. Define this schema in Phase 6 even though it is only consumed in Phase 7.
+
+Example shape (non-normative):
+```json
+{
+  "type": "perpetual|subscription|trial",
+  "features": ["feature_a", "feature_b"],
+  "trial_days": 14,
+  "grace_days": 7,
+  "access_level": "full|read_only"
+}
 ```
 
 ## Stripe integration
@@ -1164,10 +1188,12 @@ Webhook idempotency is not enough. Add reconciliation jobs before any live billi
 stripe.reconcile.checkout_sessions
 stripe.reconcile.subscriptions
 stripe.reconcile.invoices
-stripe.reconcile.entitlements
+stripe.reconcile.orders
 ```
 
-These jobs handle delayed, missed, duplicated and out-of-order Stripe events.
+These jobs handle delayed, missed, duplicated and out-of-order Stripe events. They ensure all Stripe payment events have corresponding `orders` and `subscriptions` records in SYSTEMS.
+
+Do not add an entitlement reconciliation job in Phase 6. The `entitlement_grants` table does not exist until Phase 7. Entitlement creation from orders is Phase 7's responsibility.
 
 ## Tests
 
@@ -1189,6 +1215,7 @@ checkout disclosure captured
 - entitlement-based app locking
 - licence revocation
 - subscription suspension logic
+- entitlement_grants table (Phase 7)
 
 ## Exit gate
 
@@ -1231,6 +1258,8 @@ entitlement_events
 licence_events
 licence_signing_keys
 ```
+
+The `entitlement_grants` table must include `account_id` as a **nullable** FK from day one. In Phase 7 this column is always `NULL` (no accounts exist yet). Phase 7.5 adds accounts and runs a migration that links existing grants to accounts where a customer email matches an account email. Defining the column in Phase 7 avoids a schema lock when Phase 7.5 runs on a table that may have millions of rows.
 
 ## Core flow
 

@@ -973,25 +973,28 @@ erDiagram
 - `product_users`
 - `product_user_links`
 
-#### Access
+#### Access (Phase 7.5 additions/extensions)
 
-- `entitlements`
-- `entitlement_grants`
-- `entitlement_policies`
-- `entitlement_decisions`
-- `entitlement_projection`
+The following tables from Phase 7 already exist and are extended here:
+
+- `entitlement_grants` — Phase 7 creates this table with a nullable `account_id` FK. Phase 7.5 populates that column via a customer-email → account-email matching migration and adds account-linked grant sources.
+- `licences`, `licence_activations`, `entitlement_revocations`, `effective_entitlements` — already in Phase 7; not recreated.
+
+New tables added in Phase 7.5:
+
 - `seats`
 - `seat_assignments`
 
-#### Licensing
+#### Licensing (Phase 7.5 additions)
 
-- `licences`
-- `licence_key_fingerprints`
-- `licence_certificates`
-- `devices`
-- `activations`
-- `revocations`
-- `signing_keys_metadata`
+`licence_signing_keys` is created in Phase 7 and holds actual Ed25519 key material. Phase 7.5 adds:
+
+- `signing_keys_metadata` — extended metadata for managing multiple key algorithms, key lifecycle states, and public-key distribution. Supplements (does not replace) `licence_signing_keys`.
+- `licence_key_fingerprints` — maps fingerprints to active keys for fast lookup without exposing raw key material.
+- `licence_certificates` — structured certificate records for multi-device or seat-based licence delivery.
+- `devices` — privacy-minimised device records (hashed device ID) for activation tracking.
+- `activations` — canonical activation records (previously in `licence_activations`; Phase 7.5 renames and extends with device/seat linkage).
+- `revocations` — extends Phase 7 revocation audit with device-level and certificate-level entries.
 
 #### Integration and analytics
 
@@ -1011,6 +1014,8 @@ erDiagram
 - One activation request/idempotency key creates at most one activation.
 - Effective entitlement is reproducible from canonical grants, revocations, policy, and time.
 - Revocation and manual override history is append-only.
+- `entitlement_grants.account_id` is nullable — NULL in Phase 7, populated in Phase 7.5 by the customer-email → account-email matching migration. Cancelling one grant source must never revoke access from a separate grant source (multi-grant resolver invariant).
+- Account merge is audited and never implicit from a matching email alone. Two accounts must be explicitly merged by an admin action.
 
 ---
 

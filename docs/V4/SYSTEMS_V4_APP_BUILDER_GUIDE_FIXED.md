@@ -18,6 +18,8 @@
 
 This guide defines what an application must provide to be accepted by SYSTEMS. V4.
 
+> **Infrastructure prerequisite:** This guide assumes Phase 7 entitlements and licensing infrastructure and Phase 8 integration keys are both live. Do not share this guide with external developers until Phase 9 (hardening) is complete and those systems are confirmed production-ready.
+
 A SYSTEMS.-ready app must be deployable, observable, secure, commercially attachable and operationally recoverable. It must also be able to report its health, expose or emit product analytics, and integrate with entitlements, subscriptions and product-key/licence validation when applicable.
 
 The goal is not to force every app to share one database or one framework. The goal is to make every product speak a common operational and commercial protocol.
