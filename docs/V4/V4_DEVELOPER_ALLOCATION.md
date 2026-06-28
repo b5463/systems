@@ -47,8 +47,8 @@ Tick a phase when its exit gate passes — not when coding is done.
   - [ ] Email provider chosen and smoke-tested (SEND_EMAIL_PROVIDER env var set; test email sends on staging startup)
   - [ ] Monitoring stack chosen; alert thresholds defined; on-call rotation assigned
 - [ ] **Phase 0.5** — Baseline snapshot and namespace lock
-  - [ ] Baseline report committed (tests, lint, routes, schema dump, Caddy inventory, Docker labels, backup dry run, feature flags)
-  - [ ] Namespace boundary tests pass
+  - [x] Baseline report committed (tests, lint, routes, schema dump, Caddy inventory, Docker labels, backup dry run, feature flags)
+  - [x] Namespace boundary tests pass
   - [x] Deprecation header helper in place
 - [ ] **Phase 1** — PostgreSQL and migration foundation
   - [ ] `postgres.js`, `sqlite-legacy.js`, `repositories/`, `migrate.js`, `migrations/`
@@ -264,9 +264,9 @@ Tick a phase when its exit gate passes — not when coding is done.
 
 | Task | Owner |
 |------|-------|
-| Commit baseline report (tests, lint, API route list, SQLite schema dump, Caddy inventory, Docker labels, backup dry run, feature flags) | Tomas |
-| Namespace boundary tests (`/api/public/*`, `/api/ingest/*`, `/api/webhooks/*`, admin routes) | Tomas |
-| Document namespace strategy | Tomas |
+| ~~Commit baseline report (tests, lint, API route list, SQLite schema dump, Caddy inventory, Docker labels, backup dry run, feature flags)~~ ✅ | Tomas |
+| ~~Namespace boundary tests (`/api/public/*`, `/api/ingest/*`, `/api/webhooks/*`, admin routes)~~ ✅ | Tomas |
+| ~~Document namespace strategy~~ ✅ | Tomas |
 | ~~Deprecation header helper (ready to apply once V4 replacements exist)~~ ✅ | Tomas |
 
 ### Phase 1 — PostgreSQL and migration foundation
