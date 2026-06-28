@@ -49,7 +49,7 @@ Tick a phase when its exit gate passes — not when coding is done.
 - [ ] **Phase 0.5** — Baseline snapshot and namespace lock
   - [ ] Baseline report committed (tests, lint, routes, schema dump, Caddy inventory, Docker labels, backup dry run, feature flags)
   - [ ] Namespace boundary tests pass
-  - [ ] Deprecation header helper in place
+  - [x] Deprecation header helper in place
 - [ ] **Phase 1** — PostgreSQL and migration foundation
   - [ ] `postgres.js`, `sqlite-legacy.js`, `repositories/`, `migrate.js`, `migrations/`
   - [ ] `SYSTEMS_DB_ENGINE`, `DATABASE_URL`, `MIGRATIONS_AUTO_RUN` env vars
@@ -237,14 +237,14 @@ Tick a phase when its exit gate passes — not when coding is done.
 
 | Task | Owner |
 |------|-------|
-| Add `PATCH` to Fastify CORS | Alex |
-| Global request ID generation + add to logs and audit entries | Alex |
-| `GET /api/server/schema` endpoint | Tomas |
-| `GET /api/server/features` endpoint | Tomas |
-| Global API error response shape | Tomas |
+| ~~Add `PATCH` to Fastify CORS~~ ✅ | Alex |
+| ~~Global request ID generation + add to logs and audit entries~~ ✅ | Alex |
+| ~~`GET /api/server/schema` endpoint~~ ✅ | Tomas |
+| ~~`GET /api/server/features` endpoint~~ ✅ | Tomas |
+| ~~Global API error response shape~~ ✅ | Tomas |
 | Stricter JSON payload-size defaults | Alex |
-| Pagination defaults and maximums | Tomas |
-| SQLite-in-production warning | Tomas |
+| ~~Pagination defaults and maximums~~ ✅ | Tomas |
+| ~~SQLite-in-production warning~~ ✅ | Tomas |
 | Feature flag helper for V4 gates | Alex |
 | `schema_migrations` table + migration runner skeleton | Alex |
 | Stop using silent `ALTER TABLE` blocks for new schema | Alex |
@@ -252,7 +252,7 @@ Tick a phase when its exit gate passes — not when coding is done.
 | `jobs` table, in-process runner (disabled by default), lock/unlock, retry/backoff | Alex |
 | Confirm host-protection invariants (concurrency caps, disk admission, upload limits, cache headers, container limits) | Alex |
 | Tests: CORS PATCH, feature flags, migration runner, job table | Alex |
-| Tests: schema endpoint responses, error shape contract, pagination envelope | Tomas |
+| ~~Tests: schema endpoint responses, error shape contract, pagination envelope~~ ✅ | Tomas |
 | Job dashboard placeholder under Server | Tomas |
 | Pagination controls on existing list views | Tomas |
 | Choose and document email provider; set SEND_EMAIL_PROVIDER env var; add staging email smoke test to exit gate | Alex |
@@ -267,7 +267,7 @@ Tick a phase when its exit gate passes — not when coding is done.
 | Commit baseline report (tests, lint, API route list, SQLite schema dump, Caddy inventory, Docker labels, backup dry run, feature flags) | Tomas |
 | Namespace boundary tests (`/api/public/*`, `/api/ingest/*`, `/api/webhooks/*`, admin routes) | Tomas |
 | Document namespace strategy | Tomas |
-| Deprecation header helper (ready to apply once V4 replacements exist) | Tomas |
+| ~~Deprecation header helper (ready to apply once V4 replacements exist)~~ ✅ | Tomas |
 
 ### Phase 1 — PostgreSQL and migration foundation
 
