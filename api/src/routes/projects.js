@@ -10,14 +10,22 @@ const health = require('../services/health');
 const { confirmMatches } = require('../util/thresholds');
 const { projectContainerOptions } = require('../util/limits');
 const { pub, loadOr404 } = require('../util/project');
+const { parsePagination, paginationEnvelope } = require('../util/pagination');
 const { DATA_DIR } = require('../util/paths');
 
 async function projectsRoutes(fastify, options) {
   fastify.get('/api/projects', {
     preHandler: [fastify.authenticate],
-  }, async () => {
-    const projects = (await projectRepo.listAll()).map(pub);
-    return { projects };
+  }, async (request) => {
+    const all = (await projectRepo.listAll()).map(pub);
+    const q = request.query || {};
+    if (q.page || q.per_page || q.perPage) {
+      const pg = parsePagination(q);
+      const slice = all.slice(pg.offset, pg.offset + pg.perPage);
+      const { pagination } = paginationEnvelope(slice, all.length, pg);
+      return { projects: slice, pagination };
+    }
+    return { projects: all };
   });
 
   fastify.get('/api/projects/:slug', {

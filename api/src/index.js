@@ -47,6 +47,16 @@ async function initDefaultUsers() {
 async function main() {
   await prisma.$connect();
 
+  const dbUrl = process.env.DATABASE_URL || '';
+  if (!dbUrl.startsWith('postgresql://') && !dbUrl.startsWith('postgres://')) {
+    const msg = '[startup] WARNING: DATABASE_URL does not point to PostgreSQL. SQLite or non-PostgreSQL databases are unsupported in production.';
+    if (process.env.NODE_ENV === 'production') {
+      console.error(msg);
+    } else {
+      console.warn(msg);
+    }
+  }
+
   const fastify = await buildApp({ fastify: { logger: true } });
 
   await initDefaultUsers();

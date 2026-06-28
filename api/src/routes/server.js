@@ -11,6 +11,12 @@ const { getSetting } = require('../util/settings');
 const PLATFORM_VERSION = '2.0.0-rc.1';
 const PLATFORM_STAGE = 'repo-complete · host validation pending';
 
+const SCHEMA_TABLES = [
+  'users', 'projects', 'audit_log', 'sessions', 'ip_bans',
+  'platform_settings', 'deploy_history', 'stats_history',
+  'secrets', 'api_tokens', 'nodes', 'backup_records',
+];
+
 function dataDir() {
   return process.env.SYSTEMS_DATA_DIR || process.env.DATA_DIR || path.join(__dirname, '..', '..', '..', 'data');
 }
@@ -168,6 +174,42 @@ async function serverRoutes(fastify, options) {
     } catch { /* not_measured */ }
 
     return info;
+  });
+
+  fastify.get('/api/server/schema', {
+    preHandler: [fastify.authenticate],
+  }, async () => {
+    const { prisma } = require('../repo');
+    const tables = [];
+    for (const table of SCHEMA_TABLES) {
+      try {
+        const rows = await prisma.$queryRawUnsafe(`SELECT count(*) AS c FROM "${table}"`);
+        tables.push({ table, rows: Number(rows[0].c) });
+      } catch {
+        tables.push({ table, rows: null, error: 'unavailable' });
+      }
+    }
+    return {
+      database: 'postgresql',
+      schema: 'prisma',
+      version: PLATFORM_VERSION,
+      tables,
+    };
+  });
+
+  fastify.get('/api/server/features', {
+    preHandler: [fastify.authenticate],
+  }, async () => {
+    const dbEngine = process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgresql')
+      ? 'postgresql' : 'unknown';
+    const sqliteWarning = dbEngine !== 'postgresql'
+      ? 'The control plane is not using PostgreSQL. This is unsupported in production.'
+      : null;
+    return {
+      features: features(),
+      database: dbEngine,
+      sqliteWarning,
+    };
   });
 
   // Trigger an on-demand backup (online SQLite snapshot + Caddy routes).

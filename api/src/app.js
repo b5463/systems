@@ -42,7 +42,7 @@ async function buildApp(opts = {}) {
   }
   await fastify.register(require('@fastify/cors'), {
     origin: corsOrigins,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'X-CSRF-Token'],
     credentials: true,
   });
@@ -60,6 +60,31 @@ async function buildApp(opts = {}) {
   });
 
   await fastify.register(require('@fastify/websocket'));
+
+  const { randomUUID } = require('crypto');
+  fastify.addHook('onRequest', async (request) => {
+    request.requestId = request.headers['x-request-id'] || randomUUID();
+  });
+  fastify.addHook('onSend', async (request, reply) => {
+    reply.header('X-Request-Id', request.requestId);
+  });
+
+  fastify.setErrorHandler((error, request, reply) => {
+    const statusCode = error.statusCode || 500;
+    const body = {
+      error: error.message || 'Internal Server Error',
+      statusCode,
+      requestId: request.requestId,
+    };
+    if (error.validation) {
+      body.error = 'Validation failed';
+      body.details = error.validation;
+    }
+    if (statusCode >= 500 && request.log) {
+      request.log.error({ err: error, requestId: request.requestId }, '[error] unhandled');
+    }
+    reply.code(statusCode).send(body);
+  });
 
   // Hardened response headers on every reply (including errors). This API is
   // JSON-only — the dashboard SPA is served separately by the reverse proxy —
