@@ -466,18 +466,23 @@ Tick a phase when its exit gate passes — not when coding is done.
 | Task | Owner |
 |------|-------|
 | `integration_keys` and `integration_key_events` tables | Alex |
-| Integration key scopes: `heartbeat:write`, `events:write`, `errors:write`, `releases:write`, `metrics:write`, `entitlements:check`, `licences:validate` | Alex |
-| Ingestion endpoints: `POST /api/ingest/heartbeat|releases|errors|events|metrics` | Alex |
+| Integration key scopes: `heartbeat:write`, `events:write`, `errors:write`, `releases:write`, `metrics:write`, `feedback:write`, `bug-reports:write`, `entitlements:check`, `licences:validate` | Alex |
+| Ingestion endpoints: `POST /api/ingest/heartbeat|releases|errors|events|metrics|feedback|bug-reports` | Alex |
 | Event storage tables: `product_events`, `product_metric_hourly`, `product_metric_daily`, `error_groups`, `release_reports`, `external_heartbeats` | Alex |
+| Feedback/bug tables: `feedback_channels`, `feedback_threads`, `feedback_messages`, `feedback_labels`, `bug_reports`, `bug_report_events`, `feedback_email_ingest_events` | Alex |
 | Aggregation jobs: `analytics.aggregate.hourly`, `analytics.aggregate.daily`, `analytics.compact.raw`, `analytics.retention.cleanup` | Alex |
 | Rate-limiting and payload size caps on ingestion endpoints | Alex |
 | Tests: bad key rejected, scoped key access enforcement, event size cap, heartbeat updates system health, release report in dashboard, daily metric aggregation, high-volume rate limiting, analytics failure isolation from entitlement checks | Alex |
 | Integration key management UI (create, rotate, revoke) | Tomas |
-| Analytics dashboard (product metrics, operational metrics — separated) | Tomas |
+| Analytics dashboard (product metrics, operational metrics, onboarding funnel, retention, subscription revenue — separated) | Tomas |
+| Feedback Inbox UI per product: triage, status, labels, owner, customer/product-user links, response history | Tomas |
+| Bug Reports UI per product: severity, reproduction notes, release/version, linked error group, fix status | Tomas |
 | Error groups UI | Tomas |
 | Release reports UI | Tomas |
 | External system health display | Tomas |
 | Event volume monitoring display | Tomas |
+| Inbound feedback/bug email webhook verification, spam/attachment limits, product routing and dead-letter handling | Alex |
+| Tests: inbound email produces feedback thread; bug report links to release/error group; feedback/bug intake failure does not block commerce/entitlements | Alex |
 | Analytics dedicated PgBouncer pool (max 5 connections, 5s statement timeout); batched COPY/bulk INSERT; aggregation jobs defer if lock unavailable within 1s | Alex |
 | CORS middleware: /api/public/* = any origin; integration routes = registered origins only; admin routes = same-origin only; origin registration in integration_keys.allowed_origins | Tomas |
 | Public DTO allowlist serialiser: explicit field whitelist; throws in non-prod on extra fields; audit event in prod | Tomas |

@@ -40,6 +40,8 @@ Canonical app-facing paths:
 /api/ingest/errors          scrubbed error reporting
 /api/ingest/events          product analytics events
 /api/ingest/metrics         bounded operational/product metrics
+/api/ingest/feedback        product feedback submissions
+/api/ingest/bug-reports     product bug reports
 /api/entitlements/check     effective access checks for hosted apps
 /api/licensing/redeem       product-key redemption
 /api/licensing/activate     licence/device/account activation
@@ -596,6 +598,11 @@ page_viewed
 signup_started
 signup_completed
 login_completed
+onboarding_started
+onboarding_step_viewed
+onboarding_step_completed
+onboarding_completed
+first_meaningful_action_completed
 demo_started
 checkout_started
 checkout_completed
@@ -603,6 +610,8 @@ entitlement_checked
 entitlement_denied
 subscription_required
 subscription_recovered
+feedback_submitted
+bug_report_submitted
 ```
 
 For licensed desktop/download apps:
@@ -629,6 +638,72 @@ api_request_rejected
 usage_limit_warning
 usage_limit_exceeded
 ```
+
+### Product feedback and bug reports
+
+Apps may send user feedback and bug reports to SYSTEMS. through dedicated endpoints or through the official SDK. These are support/product-intelligence records, not ordinary analytics events.
+
+```http
+POST /api/ingest/feedback
+POST /api/ingest/bug-reports
+Authorization: Bearer <SYSTEMS_INTEGRATION_KEY>
+Content-Type: application/json
+Idempotency-Key: fb_<uuid> or bug_<uuid>
+```
+
+Minimum feedback payload:
+
+```json
+{
+  "schema": "systems.feedback.v1",
+  "productId": "prod_plot",
+  "systemId": "sys_plot_web",
+  "environment": "production",
+  "source": "in_app",
+  "type": "feedback",
+  "message": "The invite screen is confusing.",
+  "anonymousId": "anon_7f6a",
+  "productUserId": "user_123",
+  "context": {
+    "page": "/invite",
+    "locale": "en",
+    "appVersion": "1.4.2"
+  },
+  "timestamp": "2026-06-20T12:00:00.000Z"
+}
+```
+
+Minimum bug-report payload:
+
+```json
+{
+  "schema": "systems.bug_report.v1",
+  "productId": "prod_plot",
+  "systemId": "sys_plot_web",
+  "environment": "production",
+  "severity": "medium",
+  "title": "Cannot save expense",
+  "description": "Save button spins and nothing happens.",
+  "stepsToReproduce": ["Open Expenses", "Add item", "Tap Save"],
+  "expected": "Expense is saved",
+  "actual": "Spinner never stops",
+  "context": {
+    "page": "/expenses/new",
+    "appVersion": "1.4.2",
+    "release": "rel_123"
+  },
+  "timestamp": "2026-06-20T12:00:00.000Z"
+}
+```
+
+Feedback/bug-report rules:
+
+- Do not send passwords, access tokens, card data, raw cookies or full personal profiles.
+- Screenshots and attachments must be size-limited, type-checked and optional.
+- Include app version, route/page and release when available.
+- Link to an error fingerprint when the user-visible issue matches an automatic error group.
+- Do not treat feedback as a legal complaint unless an administrator escalates it.
+- Do not let feedback or bug-report failure break the product.
 
 ### Analytics rules
 
@@ -1643,10 +1718,18 @@ Before SYSTEMS. accepts an app as V4-ready, it should pass this checklist.
 ### Analytics
 
 - Required events are emitted.
+- Onboarding, activation and first-meaningful-action events are emitted where applicable.
 - Events are batched.
 - Analytics failure does not break the app.
 - Locale/page context is included where applicable.
 - Personal data is minimised.
+
+### Feedback and bug reports
+
+- Feedback submission works or fails gracefully.
+- Bug reports include safe context: product, system, environment, page, version and release where available.
+- Bug reports can link to an error fingerprint without exposing secrets.
+- Feedback and bug-report failures do not block checkout, entitlement checks or normal product usage.
 
 ### Operations
 

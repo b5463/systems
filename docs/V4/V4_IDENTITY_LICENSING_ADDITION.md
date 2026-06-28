@@ -700,6 +700,9 @@ SYSTEMS. validates the manifest against offer policy. Applications cannot extend
 - Daily/monthly active users.
 - Paying customers versus active product users.
 - Trial users and trial-to-paid conversion.
+- Signup, onboarding, activation and first-meaningful-action completion.
+- Onboarding drop-off by step, product version, plan, locale and referrer.
+- D1/D7/D30 retention, cohort retention and reactivation.
 - Active, grace, suspended, expired, and revoked entitlements.
 - Licences issued, redeemed, active, unredeemed, replaced, and revoked.
 - Device activations and seat utilisation.
@@ -715,6 +718,10 @@ product_user_registered
 account_linked
 session_started
 meaningful_activity
+onboarding_started
+onboarding_step_completed
+onboarding_completed
+first_meaningful_action_completed
 trial_started
 licence_issued
 licence_redeemed
@@ -726,6 +733,8 @@ access_suspended
 access_reactivated
 seat_assigned
 seat_released
+feedback_submitted
+bug_report_submitted
 ```
 
 Products may define additional allow-listed events, but arbitrary properties and raw business records are not accepted.
@@ -736,6 +745,8 @@ Products may define additional allow-listed events, but arbitrary properties and
 - Applications send events or periodic bounded summaries.
 - Active-user definitions are explicit per product; opening a background process may not count as meaningful activity.
 - Billing analytics use verified commerce records, not client claims.
+- Revenue, MRR, refunds, chargebacks and payment status are read from canonical commerce state.
+- Retention and onboarding analytics are derived from bounded standard events and explicit product definitions.
 - Product events use pseudonymous product-user IDs.
 - Dashboards use aggregates by default; access to individual activity is restricted and justified.
 - Internal/admin/test traffic can be marked and excluded without deleting audit history.
@@ -766,7 +777,9 @@ Product
 ├── Licences
 ├── Seats and devices
 ├── Integration
-└── User analytics
+├── User analytics
+├── Feedback
+└── Bug reports
 ```
 
 ### 16.3 Product user view
@@ -780,9 +793,16 @@ Shows only authorized, relevant data:
 - Assigned seats/devices.
 - Licence/activation state.
 - Access-decision history with safe reasons.
+- Linked feedback threads and bug reports where authorised.
 - Support/manual actions and audit.
 
-### 16.4 Administrator actions
+### 16.4 Feedback and bug report links
+
+Feedback and bug reports may be linked to product users, accounts, customers, orders, subscriptions, entitlements, licences, activations, releases and error groups. The link must record who created it, why it was created and whether the link exposes customer-identifying data to an administrator.
+
+Feedback is not used to make automatic access decisions. It may inform support, product planning and bug triage, but entitlement and billing state remain canonical.
+
+### 16.5 Administrator actions
 
 - Grant complimentary/time-limited access.
 - Extend grace with reason.
@@ -1156,7 +1176,8 @@ Products adopt the contract independently. SYSTEMS. dashboards label integration
 
 - Standard event contract and batching.
 - Aggregates and product dashboards.
-- Registration, active, paid, trial, churn, seat/device, and licence metrics.
+- Registration, onboarding, activation, active, paid, trial, retention, churn, seat/device, and licence metrics.
+- Feedback and bug-report links to product-user context where permitted.
 - Privacy/retention controls.
 
 **Exit:** Analytics reconcile with canonical commerce/access state and do not require product DB reads.
@@ -1215,7 +1236,7 @@ Products adopt the contract independently. SYSTEMS. dashboards label integration
 
 ### Analytics
 
-- Registered, active, paid, trial, grace, suspended, churn, licence, activation, seat, and device metrics have explicit definitions.
+- Registered, onboarding, activation, retention, active, paid, trial, grace, suspended, churn, licence, activation, seat, and device metrics have explicit definitions.
 - Revenue/payment status comes from canonical commerce state.
 - Product-user activity uses pseudonymous bounded events.
 - Analytics failure cannot change entitlement state.

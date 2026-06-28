@@ -1048,13 +1048,18 @@ Payloads are schema-versioned, size-limited, timestamp-bounded, and stripped of 
 
 ### 15.1 Separation
 
-**Product analytics** measure discovery and commercial performance:
+**Product analytics** measure discovery, onboarding, retention and commercial performance:
 
 - Product views and anonymous visitors.
-- CTA and demo launches.
+- CTA, demo launches and demo-to-signup conversion.
+- Signup, onboarding, activation and first-meaningful-action funnel steps.
+- Onboarding drop-off by step, product version, plan, locale and referrer.
 - Checkout starts and completions.
-- One-time revenue and MRR/ARR-derived views.
-- Subscription starts, churn, recovery, and conversion.
+- One-time revenue, net revenue, refunds, chargebacks and MRR/ARR-derived views.
+- Subscription starts, upgrades, downgrades, churn, recovery and conversion.
+- Active subscriptions, paid-through value, trial-to-paid conversion and payment-failure recovery.
+- DAU/WAU/MAU, cohort retention, N-day retention and reactivation by product.
+- Feedback, bug-report and support-signal volume by product, version and severity.
 - Referrers and declared product events.
 
 **Operational analytics** measure system performance:
@@ -1081,7 +1086,25 @@ flowchart LR
     DAILY --> DASH[Analytics dashboard]
 ```
 
-### 15.3 Privacy and retention
+### 15.3 Required product dashboard questions
+
+Each product analytics page must answer:
+
+```text
+How much money did this product make?
+What is current MRR/ARR and active subscription count?
+Where are users dropping during onboarding?
+How many users activated and performed the first meaningful action?
+What is D1/D7/D30 retention?
+What changed after the latest release?
+Which plans, locales and referrers convert best?
+What feedback, bugs and support issues are increasing?
+Which failed payments recovered and which churned?
+```
+
+Commercial revenue and payment status always come from canonical commerce/order/subscription records. Product events may explain conversion and retention, but they must not be treated as financial authority.
+
+### 15.4 Privacy and retention
 
 - Use first-party anonymous identifiers.
 - Do not implement session replay.
@@ -1114,13 +1137,34 @@ This is the editorial and publishing control centre for `acronym.sk`. It include
 
 ### 16.3 Product workspace
 
-Tabs: Overview, Portfolio, Offers, Commerce, Analytics, Systems, Domains, Customers, Settings.
+Tabs: Overview, Portfolio, Offers, Commerce, Analytics, Users, Feedback, Bug Reports, Systems, Domains, Customers, Settings.
 
 ### 16.4 System workspace
 
 Tabs: Overview, Environments, Releases, Deployments, Operations, Logs, Domains, Access, Integrations, Settings.
 
-### 16.5 Global navigation
+### 16.5 Product feedback and bug reports workspace
+
+Every product has a private Feedback and Bug Reports area. It receives submissions from in-app forms, public product forms, product-specific feedback addresses, product-specific bug-report addresses, and administrator-created support notes.
+
+Required views:
+
+```text
+Feedback Inbox
+Bug Reports
+Triage Queue
+Linked Error Groups
+Linked Customers / Product Users
+Linked Orders / Subscriptions / Entitlements
+Release Impact
+Response History
+```
+
+Feedback items are not legal complaints by default. A triaged item can be escalated into a complaint, incident, refund case, accessibility issue, security vulnerability or product task without losing the original message history.
+
+Bug reports are separate from automatic error groups. Error groups describe what the system observed; bug reports describe what the customer or tester experienced. The two must be linkable.
+
+### 16.6 Global navigation
 
 ```text
 Overview
@@ -1135,7 +1179,7 @@ Server
 Admin
 ```
 
-### 16.6 Safety UX
+### 16.7 Safety UX
 
 - Preview impact before publish, domain, access, and production actions.
 - Require typed confirmation for destructive/purge actions.
@@ -1386,6 +1430,8 @@ SYSTEMS. provides auditable complaint cases linked to product, order, entitlemen
 
 Operational incidents and legal complaints are separate but linkable: an outage may affect many customers, while each consumer remedy still needs an individual record.
 
+Product feedback and ordinary bug reports are also separate from legal complaints. SYSTEMS. may link a feedback thread or bug report to a complaint, incident, accessibility issue, security vulnerability, order, entitlement, release or error group, but it must not silently reclassify informal feedback as a legal complaint without an administrator decision.
+
 ### 18.11 Accessibility
 
 The portfolio, product pages, forms, checkout entry, authentication/access delivery, customer-facing communications, and support paths target WCAG 2.2 AA and the applicable European/Slovak accessibility requirements. The renderer enforces semantic components, keyboard operation, visible focus, contrast, reduced motion, error identification, captions/transcripts, alt text, responsive zoom, and language attributes.
@@ -1403,6 +1449,13 @@ Add at minimum:
 - `price_history`
 - `tax_evidence`
 - `complaints` and `complaint_events`
+- `feedback_channels`
+- `feedback_threads`
+- `feedback_messages`
+- `feedback_labels`
+- `bug_reports`
+- `bug_report_events`
+- `feedback_email_ingest_events`
 - `data_subject_requests`
 - `processing_activities`
 - `processor_register`
@@ -1860,13 +1913,15 @@ flowchart LR
 
 **Exit:** One-time and recurring transactions produce correct, replay-safe entitlements.
 
-### Phase 5 — analytics and external systems
+### Phase 5 — analytics, feedback and external systems
 
 - Public/product event collection and aggregates.
+- Onboarding, activation, retention, churn, revenue and subscription analytics per product.
 - External-system registration, credentials, heartbeat, releases, errors, events, and metrics.
-- Business and operational dashboards.
+- Product feedback and bug-report intake from forms, in-app SDK calls and product-specific email channels.
+- Business, operational, feedback and bug triage dashboards.
 
-**Exit:** Managed and external products can be measured without conflating business and infrastructure data.
+**Exit:** Managed and external products can be measured without conflating business, infrastructure, feedback and support data.
 
 ### Phase 6 — hardening and scale readiness
 

@@ -2410,14 +2410,18 @@ refunded purchase revokes entitlement
 licence activation limit works
 ```
 
-### Phase 8 — Analytics and integrations
+### Phase 8 — Analytics, feedback and integrations
 
 ```text
 Add integration keys
 Add ingestion endpoints
 Add product_events
 Add metric aggregates
+Add onboarding, activation, retention and subscription revenue aggregates
+Add feedback and bug-report intake
+Add inbound product-email webhook handling
 Add dashboard analytics
+Add product Feedback and Bug Reports workspaces
 Add SDK skeleton
 ```
 
@@ -2427,7 +2431,11 @@ Acceptance:
 external app can heartbeat
 events aggregate into product dashboard
 bad integration key rejected
-analytics pressure does not affect commerce
+revenue/payment analytics reconcile with commerce state
+onboarding and retention metrics appear per product
+feedback email creates a triage item under the correct product
+bug report can link to release/version and error group
+analytics/feedback pressure does not affect commerce
 ```
 
 ### Phase 9 — Hardening and launch
@@ -2512,6 +2520,8 @@ api/src/modules/subscriptions/*
 api/src/modules/entitlements/*
 api/src/modules/licensing/*
 api/src/modules/analytics/*
+api/src/modules/feedback/*
+api/src/modules/bug-reports/*
 api/src/modules/integrations/*
 api/src/modules/incidents/*
 api/src/modules/jobs/*
@@ -2527,6 +2537,8 @@ dashboard/src/modules/products/*
 dashboard/src/modules/systems/*
 dashboard/src/modules/commerce/*
 dashboard/src/modules/customers/*
+dashboard/src/modules/feedback/*
+dashboard/src/modules/bug-reports/*
 dashboard/src/modules/incidents/*
 ```
 
@@ -2542,6 +2554,7 @@ dashboard/src/modules/incidents/*
 | Public site overloads control DB | immutable snapshots and renderer cache |
 | Route update breaks all domains | staged Caddy validate/reload and rollback |
 | Analytics overloads host | rate limits, batching, aggregation jobs, retention |
+| Feedback/bug email intake is abused or spammed | signed provider webhooks, spam controls, attachment limits, product routing allowlists, quarantine and dead-letter review |
 | Product/user data coupling | API/SDK protocol, no shared app DB |
 | SQLite migration loses data | dry-run migration, verification script, backup first |
 | Dashboard becomes too complex | split Products, Systems, Portfolio and Commerce modules |
@@ -2563,6 +2576,8 @@ custom domains require verification
 Stripe Checkout and webhooks are idempotent
 subscriptions create/revoke entitlements correctly
 product keys are hashed, revocable and auditable
+revenue, onboarding, retention and churn analytics reconcile with canonical commerce/access state
+feedback and bug reports route into product triage workspaces
 external integration keys are scoped and hashed
 analytics is aggregated and rate-limited
 backup/restore tested on clean host

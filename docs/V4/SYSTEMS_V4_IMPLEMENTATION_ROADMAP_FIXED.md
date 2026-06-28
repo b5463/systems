@@ -213,10 +213,10 @@ These are human decisions that cannot be deferred to the phase where they are fi
 
 ## Decision 1 — Email provider
 
-**Needed by:** Phase 7 (fulfilment), but must be configured in Phase 0 staging so the path is tested.
-**Owner:** Alex (infrastructure decision; Tomas integrates the templates).
-**What to decide:** Which provider to use: SendGrid, AWS SES, Mailgun, or SMTP relay. Set `SEND_EMAIL_PROVIDER` in the Phase 0 env spec. Add a transactional email smoke test to the Phase 0 exit gate so staging confirms delivery works before Phase 7 depends on it.
-**Risk of deferring:** Phase 7 begins. Fulfilment jobs fire immediately after payment. If the transport is not wired, every purchase produces a silent failure with no key, no confirmation, and no recovery path.
+**Needed by:** Phase 7 (fulfilment) and Phase 8 (feedback/bug email intake), but must be configured in Phase 0 staging so the path is tested.
+**Owner:** Alex (infrastructure decision; Tomas integrates the templates and dashboard surfaces).
+**What to decide:** Which provider to use: SendGrid, AWS SES, Mailgun, or SMTP relay. Prefer a provider that supports both transactional sending and signed inbound/webhook processing for product-specific feedback and bug-report addresses. Set `SEND_EMAIL_PROVIDER` and, if supported, `INBOUND_EMAIL_PROVIDER` in the Phase 0 env spec. Add transactional and inbound-email smoke tests to the Phase 0 exit gate so staging confirms delivery and intake before Phase 7/8 depend on them.
+**Risk of deferring:** Phase 7 begins and fulfilment jobs fire immediately after payment, or Phase 8 begins and product feedback/bug emails disappear outside SYSTEMS. If the transport is not wired, every purchase or inbound report can silently fail with no key, no confirmation, no triage item, and no recovery path.
 
 ## Decision 2 — Monitoring and alerting stack
 
@@ -2210,6 +2210,8 @@ events:write
 errors:write
 releases:write
 metrics:write
+feedback:write
+bug-reports:write
 entitlements:check
 licences:validate
 ```
@@ -2222,6 +2224,8 @@ POST /api/ingest/releases
 POST /api/ingest/errors
 POST /api/ingest/events
 POST /api/ingest/metrics
+POST /api/ingest/feedback
+POST /api/ingest/bug-reports
 ```
 
 ## Event storage
@@ -2235,7 +2239,50 @@ product_metric_daily
 error_groups
 release_reports
 external_heartbeats
+feedback_channels
+feedback_threads
+feedback_messages
+feedback_labels
+bug_reports
+bug_report_events
+feedback_email_ingest_events
 ```
+
+## Product analytics coverage
+
+Phase 8 must make the following visible per product:
+
+```text
+revenue by product and offer
+one-time revenue, refunds and chargebacks
+MRR/ARR-derived views
+active subscriptions and payment failures
+trial-to-paid and checkout conversion
+signup, onboarding and activation funnels
+first meaningful action completion
+D1/D7/D30 retention and cohort retention
+churn, recovery and reactivation
+feedback volume and bug-report trend
+```
+
+Revenue/payment numbers come from commerce/order/subscription state. Events explain behaviour and funnels; they do not create financial truth.
+
+## Feedback and bug-report intake
+
+Each product gets first-class feedback and bug-report channels:
+
+```text
+in-app feedback form
+public product feedback form
+product-specific feedback email address
+product-specific bug-report email address
+manual admin-created support note
+linked automatic error group
+```
+
+Add signed inbound email/webhook processing so messages to product feedback addresses become triageable SYSTEMS. items. Each item stores product, source, reporter contact where permitted, message body, attachments metadata, consent/source evidence, app version, page/route, severity, status, owner, labels and links to customer/account/product user/order/subscription/entitlement/release/error group where relevant.
+
+Feedback is not a legal complaint by default. Bug reports are not automatic operational incidents by default. Both can be escalated or linked with audit history.
 
 ## Aggregation
 
@@ -2248,6 +2295,9 @@ analytics.aggregate.hourly
 analytics.aggregate.daily
 analytics.compact.raw
 analytics.retention.cleanup
+feedback.email.ingest
+feedback.triage.summarise
+bug_reports.group_candidates
 ```
 
 ## Safety
@@ -2273,6 +2323,9 @@ release report appears in dashboard
 analytics aggregation creates daily metrics
 high event volume is rate-limited
 analytics failure does not affect entitlement checks
+feedback email creates triage item with product routing
+bug report links to release/version and optional error group
+feedback/bug intake failure does not block commerce or entitlement checks
 ```
 
 ## CORS policy (enforced, not documented)
