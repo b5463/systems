@@ -9,4 +9,8 @@ module.exports = {
   auditRepo: require('./audit'),
   adminRepo: require('./admin'),
   statsRepo: require('./stats'),
+  secretRepo: require('./secrets'),
+  tokenRepo: require('./tokens'),
+  nodeRepo: require('./nodes'),
+  backupRepo: require('./backups'),
 };

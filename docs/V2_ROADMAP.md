@@ -27,15 +27,15 @@ These paths are implemented but still require end-to-end validation on the real 
 - Run the full backup and non-production restore drill from [WINDOWS_VALIDATION_CHECKLIST.md](WINDOWS_VALIDATION_CHECKLIST.md).
 
 
-## v3 — Beyond one box
+## ~~v3 — Beyond one box~~ **Built**
 
-- **Multi-node:** per-node Docker and Caddy, scheduler/placement, node health, and route distribution.
+- ~~**Multi-node:** per-node Docker and Caddy, scheduler/placement, node health, and route distribution.~~ **Built.** Node registry with CRUD API, least-loaded scheduler/placement, periodic node health reconciliation, and per-system node assignment. Behind ENABLE_MULTI_NODE.
 - ~~**Zero-downtime deploys:** blue/green or rolling cutover gated on health checks.~~ **Done.** Blue/green deploy with dual ports, slot-aware containers, health-gated cutover, automatic rollback on health failure, and proxy route swap. Env-var updates also use zero-downtime swap.
-- **Preview environments:** ephemeral branch and pull-request deployments.
-- **Secrets management:** a dedicated per-system secrets store with rotation.
-- **Build pipeline:** cache, selectable runtimes, and a build queue or farm.
-- **Backups and disaster recovery at scale:** object storage, restore drills, and Postgres point-in-time recovery.
-- **API and CLI:** scoped API tokens and a **systems** CLI for CI deployments.
+- ~~**Preview environments:** ephemeral branch and pull-request deployments.~~ **Built.** GitHub PR webhook creates/updates/destroys ephemeral preview systems with configurable TTL and automatic expiry cleanup. Behind ENABLE_PREVIEW_ENVIRONMENTS.
+- ~~**Secrets management:** a dedicated per-system secrets store with rotation.~~ **Built.** Per-system encrypted secrets store (AES-256-GCM, domain-separated from env vars) with versioned rotation, audit trail, and CRUD API. Behind ENABLE_SECRETS_MANAGEMENT.
+- ~~**Build pipeline:** cache, selectable runtimes, and a build queue or farm.~~ **Built.** Selectable runtimes (Node 18/20/22, Python 3.11/3.12/3.13) per system, Docker BuildKit cache mounts for npm/pip, and existing build queue with concurrency gate. Behind ENABLE_BUILD_CACHE for cache mounts.
+- ~~**Backups and disaster recovery at scale:** object storage, restore drills, and Postgres point-in-time recovery.~~ **Built.** S3-compatible object storage upload after local backup, backup record tracking in DB, and restore-drill verification endpoint. Behind ENABLE_OBJECT_STORAGE_BACKUPS.
+- ~~**API and CLI:** scoped API tokens and a **systems** CLI for CI deployments.~~ **Built.** Scoped API tokens (deploy, read, secrets, admin) with Bearer auth, token CRUD, expiry, and last-used tracking. CLI can authenticate via `Authorization: Bearer sys_...`. Behind ENABLE_API_TOKENS.
 
 # Done
 

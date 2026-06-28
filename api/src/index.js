@@ -61,6 +61,11 @@ async function main() {
   reconcile.start();
   backup.start();
 
+  const scheduler = require('./services/scheduler');
+  const previewcleanup = require('./services/previewcleanup');
+  scheduler.start();
+  previewcleanup.start();
+
   const auditDays = Number(process.env.AUDIT_RETENTION_DAYS) || 0;
   if (auditDays > 0) {
     try {

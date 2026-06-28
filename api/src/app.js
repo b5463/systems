@@ -107,7 +107,30 @@ async function buildApp(opts = {}) {
     }
   });
 
+  const crypto = require('crypto');
+  const { tokenRepo } = require('./repo');
+  const { features } = require('./util/flags');
+
+  async function tryApiTokenAuth(request) {
+    if (!features().apiTokens) return false;
+    const auth = request.headers && request.headers.authorization;
+    if (!auth || !auth.startsWith('Bearer sys_')) return false;
+    const raw = auth.slice(7);
+    const hash = crypto.createHash('sha256').update(raw).digest('hex');
+    const token = await tokenRepo.findByHash(hash);
+    if (!token) return false;
+    if (token.expires_at && new Date(token.expires_at) < new Date()) return false;
+    const user = await userRepo.findById(token.user_id);
+    if (!user) return false;
+    request.user = { id: user.id, username: user.username, tv: user.token_version || 0 };
+    request.apiToken = { id: token.id, scopes: JSON.parse(token.scopes) };
+    tokenRepo.touchLastUsed(token.id).catch(() => {});
+    return true;
+  }
+
   fastify.decorate('authenticate', async function (request, reply) {
+    if (await tryApiTokenAuth(request)) return;
+
     try {
       await request.jwtVerify();
     } catch (err) {
@@ -117,16 +140,10 @@ async function buildApp(opts = {}) {
     if (!u || (request.user.tv ?? 0) !== (u.token_version || 0)) {
       return reply.code(401).send({ error: 'Session expired. Please sign in again.' });
     }
-    // Every accepted credential must map to a live server-side session. Legacy
-    // bearer JWTs without a jti are intentionally invalid after this migration.
     if (!request.user.jti) return reply.code(401).send({ error: 'Session expired. Please sign in again.' });
     {
       const s = await userRepo.findSessionByJti(request.user.jti);
       if (!s) return reply.code(401).send({ error: 'This session was signed out.' });
-      // Session timestamps are stored as 'YYYY-MM-DD HH:MM:SS' (space-separated,
-      // no zone). The bare space+Z form is not reliably parseable across engines,
-      // so normalize to ISO 'T' first. An unparseable value (NaN) is treated as
-      // expired (fail closed) rather than never-expiring (fail open).
       const utc = (value) => {
         if (value instanceof Date) return value.getTime();
         const s = String(value).replace(' ', 'T');
@@ -145,8 +162,6 @@ async function buildApp(opts = {}) {
       await userRepo.touchSession(request.user.jti);
     }
 
-    // Reject cross-origin browser requests, including WebSocket handshakes.
-    // Requests without Origin remain valid for same-host server tooling/tests.
     const origin = request.headers && request.headers.origin;
     if (origin) {
       if (!corsOrigins.includes(origin)) {
@@ -154,8 +169,6 @@ async function buildApp(opts = {}) {
       }
     }
 
-    // SameSite is defense-in-depth; every authenticated mutation also needs a
-    // session-bound HMAC token in a custom header.
     if (!['GET', 'HEAD', 'OPTIONS'].includes(request.method)) {
       const supplied = request.headers && request.headers['x-csrf-token'];
       if (!validCsrf(request.user.jti, supplied)) {
@@ -177,6 +190,11 @@ async function buildApp(opts = {}) {
   await fastify.register(require('./routes/attestation'));
   await fastify.register(require('./routes/webhook'));
   await fastify.register(require('./routes/upload'));
+  await fastify.register(require('./routes/secrets'));
+  await fastify.register(require('./routes/tokens'));
+  await fastify.register(require('./routes/nodes'));
+  await fastify.register(require('./routes/preview'));
+  await fastify.register(require('./routes/buildpipeline'));
 
   return fastify;
 }

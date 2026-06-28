@@ -237,15 +237,20 @@ async function runBuildPipeline(slug, zipPath, extractDir, port, userId, ip, env
     const projectType = await detectProjectType(extractDir);
     appendBuildLog(slug, `[deploy] Detected project type: ${projectType}\n`);
 
-    // Dockerfile builds run project-defined instructions — advanced/admin-only
-    // and OFF unless ENABLE_DOCKERFILE_MODE=true. Never run it silently.
     if (projectType === 'dockerfile' && !features().dockerfileMode) {
       throw new Error('This archive contains a Dockerfile. Dockerfile mode is disabled (set ENABLE_DOCKERFILE_MODE=true to allow it).');
     }
 
     if (projectType !== 'dockerfile') {
-      appendBuildLog(slug, `[deploy] Generating Dockerfile for ${projectType} project...\n`);
-      await generateDockerfile(projectType, extractDir);
+      const project = await projectRepo.findBySlug(slug);
+      const { generateDockerfileWithRuntime } = require('../services/buildpipeline');
+      const usedCustomRuntime = project?.runtime && await generateDockerfileWithRuntime(projectType, extractDir, project.runtime);
+      if (!usedCustomRuntime) {
+        appendBuildLog(slug, `[deploy] Generating Dockerfile for ${projectType} project...\n`);
+        await generateDockerfile(projectType, extractDir);
+      } else {
+        appendBuildLog(slug, `[deploy] Using runtime ${project.runtime} for ${projectType} project...\n`);
+      }
     }
 
     stage = 'build';
@@ -329,7 +334,13 @@ async function runRedeployPipeline(slug, zipPath, extractDir, userId, ip) {
     appendBuildLog(slug, `[redeploy] Detected project type: ${projectType}\n`);
 
     if (projectType !== 'dockerfile') {
-      await generateDockerfile(projectType, extractDir);
+      const { generateDockerfileWithRuntime } = require('../services/buildpipeline');
+      const usedCustomRuntime = project.runtime && await generateDockerfileWithRuntime(projectType, extractDir, project.runtime);
+      if (!usedCustomRuntime) {
+        await generateDockerfile(projectType, extractDir);
+      } else {
+        appendBuildLog(slug, `[redeploy] Using runtime ${project.runtime}...\n`);
+      }
     }
 
     await projectRepo.setPreviousSnap(slug, oldContainerId || null, oldImageId || null);

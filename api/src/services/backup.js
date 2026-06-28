@@ -5,10 +5,11 @@ const fsp = require('fs/promises');
 const path = require('path');
 const { execFile } = require('child_process');
 const { promisify } = require('util');
-const { auditRepo } = require('../repo');
+const { auditRepo, backupRepo } = require('../repo');
 const notify = require('./notify');
 const { backupsToPrune, backupStamp } = require('../util/backup');
 const { getSetting } = require('../util/settings');
+const objectstorage = require('./objectstorage');
 
 const execFileAsync = promisify(execFile);
 
@@ -77,8 +78,36 @@ async function runBackup() {
       }
     } catch { /* best-effort */ }
 
-    await auditRepo.appendAudit({ action: 'backup_succeeded', detail: `${stamp}${caddyCopied ? ' +caddy' : ''}` });
-    return { ok: true, path: dest, pruned };
+    let backend = 'local';
+    let location = dest;
+    let totalBytes = 0;
+
+    try {
+      const dbStat = await fsp.stat(path.join(dest, 'platform.pgdump'));
+      totalBytes += dbStat.size;
+    } catch { /* best-effort */ }
+
+    const { features } = require('../util/flags');
+    if (features().objectStorageBackups && objectstorage.configured()) {
+      try {
+        const result = await objectstorage.uploadDirectory(dest, `backups/${stamp}`);
+        backend = 's3';
+        location = `s3://${objectstorage.s3Config().bucket}/backups/${stamp}`;
+        totalBytes = result.totalBytes || totalBytes;
+      } catch (s3Err) {
+        console.error('[backup] S3 upload failed, keeping local copy:', s3Err.message);
+      }
+    }
+
+    try {
+      await backupRepo.create({
+        stamp, backend, location, sizeBytes: totalBytes,
+        manifest: { ...manifest, pruned }, status: 'completed',
+      });
+    } catch { /* best-effort */ }
+
+    await auditRepo.appendAudit({ action: 'backup_succeeded', detail: `${stamp} ${backend}${caddyCopied ? ' +caddy' : ''}` });
+    return { ok: true, path: dest, backend, pruned };
   } catch (e) {
     await auditRepo.appendAudit({ action: 'backup_failed', detail: e.message });
     notify.send({ kind: 'backup_failed', detail: e.message }).catch(() => {});

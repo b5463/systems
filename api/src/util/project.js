@@ -28,6 +28,17 @@ function pub(p) {
     delete p.active_slot;
     delete p.port_blue;
     delete p.port_green;
+    p.isPreview = !!p.is_preview;
+    delete p.is_preview;
+    p.sourceBranch = p.source_branch || null;
+    delete p.source_branch;
+    p.pullRequestNumber = p.pull_request_number || null;
+    delete p.pull_request_number;
+    p.previewExpiresAt = p.preview_expires_at || null;
+    delete p.preview_expires_at;
+    p.runtime = p.runtime || null;
+    p.nodeId = p.node_id || null;
+    delete p.node_id;
   }
   return p;
 }

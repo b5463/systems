@@ -10,16 +10,23 @@ function bool(v, def = false) {
 
 function features(env = process.env) {
   return {
-    dockerfileMode: bool(env.ENABLE_DOCKERFILE_MODE, false), // advanced: builds run project Dockerfile
-    shellConsole: bool(env.ENABLE_SHELL_CONSOLE, false),     // interactive container shell
+    dockerfileMode: bool(env.ENABLE_DOCKERFILE_MODE, false),
+    shellConsole: bool(env.ENABLE_SHELL_CONSOLE, false),
     githubDeploys: bool(env.ENABLE_GITHUB_DEPLOYS, false),
     notifications: bool(env.ENABLE_NOTIFICATIONS, false),
     dbProvisioning: bool(env.ENABLE_DB_PROVISIONING, false),
-    largeUploads: bool(env.ENABLE_LARGE_UPLOADS, false),     // chunked/streamed uploads
-    backupScheduler: bool(env.ENABLE_BACKUP_SCHEDULER, false), // periodic auto-backup
-    dbMode: (env.DB_MODE || 'shared').toLowerCase(),         // 'shared' | 'per-project'
+    largeUploads: bool(env.ENABLE_LARGE_UPLOADS, false),
+    backupScheduler: bool(env.ENABLE_BACKUP_SCHEDULER, false),
+    dbMode: (env.DB_MODE || 'shared').toLowerCase(),
     uploadMaxMb: Number(env.UPLOAD_MAX_MB) || 100,
     v2UploadMaxMb: Number(env.V2_UPLOAD_MAX_MB) || 2048,
+    // v3 feature flags
+    previewEnvironments: bool(env.ENABLE_PREVIEW_ENVIRONMENTS, false),
+    multiNode: bool(env.ENABLE_MULTI_NODE, false),
+    objectStorageBackups: bool(env.ENABLE_OBJECT_STORAGE_BACKUPS, false),
+    apiTokens: bool(env.ENABLE_API_TOKENS, false),
+    secretsManagement: bool(env.ENABLE_SECRETS_MANAGEMENT, false),
+    buildCache: bool(env.ENABLE_BUILD_CACHE, false),
   };
 }
 

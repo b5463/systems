@@ -50,6 +50,12 @@ function toSnake(row) {
     port_blue: row.portBlue,
     port_green: row.portGreen,
     active_slot: row.activeSlot,
+    is_preview: row.isPreview ? 1 : 0,
+    source_branch: row.sourceBranch,
+    pull_request_number: row.pullRequestNumber,
+    preview_expires_at: row.previewExpiresAt instanceof Date ? row.previewExpiresAt.toISOString() : row.previewExpiresAt,
+    runtime: row.runtime,
+    node_id: row.nodeId,
   };
 }
 
@@ -459,6 +465,51 @@ async function pruneDeployHistory(projectId, retentionCount) {
   }
 }
 
+async function markAsPreview(slug, { branch, prNumber, expiresAt }) {
+  await prisma.project.update({
+    where: { slug },
+    data: {
+      isPreview: true,
+      sourceBranch: branch,
+      pullRequestNumber: prNumber,
+      previewExpiresAt: expiresAt,
+    },
+  });
+}
+
+async function listPreviews() {
+  const rows = await prisma.project.findMany({
+    where: { isPreview: true, NOT: { status: 'deleted' } },
+    orderBy: { createdAt: 'desc' },
+  });
+  return rows.map(toSnake);
+}
+
+async function findExpiredPreviews() {
+  const rows = await prisma.project.findMany({
+    where: {
+      isPreview: true,
+      NOT: { status: 'deleted' },
+      previewExpiresAt: { not: null, lt: new Date() },
+    },
+  });
+  return rows.map(toSnake);
+}
+
+async function updateRuntime(slug, runtime) {
+  await prisma.project.update({
+    where: { slug },
+    data: { runtime, updatedAt: new Date() },
+  });
+}
+
+async function assignNode(slug, nodeId) {
+  await prisma.project.update({
+    where: { slug },
+    data: { nodeId, updatedAt: new Date() },
+  });
+}
+
 module.exports = {
   findBySlug, findById, findBySlugOrName, findBySlugNotDeleted,
   listAll, listNonDeleted, getAllPorts,
@@ -475,4 +526,6 @@ module.exports = {
   findRunningWithPort, findBuildingOlderThan,
   getAllImageIds, getAllSlugs, getSystemsSnapshot,
   createDeployHistory, getDeployHistory, pruneDeployHistory,
+  markAsPreview, listPreviews, findExpiredPreviews,
+  updateRuntime, assignNode,
 };
