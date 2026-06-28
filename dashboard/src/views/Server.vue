@@ -394,6 +394,17 @@ onMounted(() => { load(); loadCleanup(); })
       </div>
     </div>
 
+    <!-- Background jobs (placeholder — jobs table and runner are Phase 0 / Alex) -->
+    <h2 class="section-label">Background jobs</h2>
+    <div class="card stack" style="margin-bottom: 22px">
+      <div class="kv"><span class="k">Job runner</span><span class="v">In-process (single node)</span></div>
+      <div class="kv"><span class="k">Status</span><span class="v"><span class="sdot idle"></span> Not yet active</span></div>
+      <div class="hint">
+        Background job processing is planned for this release. Once the jobs table and runner are wired,
+        this section will show active, queued, and failed jobs with retry controls.
+      </div>
+    </div>
+
     <!-- Disk cleanup -->
     <h2 v-if="cleanupInfo" class="section-label">Disk cleanup</h2>
     <div v-if="cleanupInfo" class="card stack" style="margin-bottom: 22px">

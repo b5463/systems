@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { api } from '../api/client'
 import SelectMenu from '../components/SelectMenu.vue'
 import Icon from '../components/Icon.vue'
+import PaginationControls from '../components/PaginationControls.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -518,11 +519,14 @@ onBeforeUnmount(() => clearTimeout(textDebounce))
   </template>
 
   <!-- Pagination -->
-  <div v-if="!loading && !error && pageCount > 1" class="ev-pagination">
-    <button class="btn btn-sm btn-ghost" :disabled="page === 1" @click="goPage(page - 1)"><Icon name="arrow-left" /> Prev</button>
-    <span class="small muted">Page {{ page }} of {{ pageCount }}</span>
-    <button class="btn btn-sm btn-ghost" :disabled="page === pageCount" @click="goPage(page + 1)">Next <Icon name="arrow-right" /></button>
-  </div>
+  <PaginationControls
+    v-if="!loading && !error"
+    :page="page"
+    :page-count="pageCount"
+    :total="total"
+    noun="event"
+    @update:page="goPage($event)"
+  />
 </template>
 
 <style scoped>
@@ -596,15 +600,6 @@ onBeforeUnmount(() => clearTimeout(textDebounce))
   font-size: 13px;
 }
 @media (prefers-reduced-motion: reduce) { .ev-caret span { transition: none; } }
-.ev-pagination {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  margin-top: 20px;
-  padding-top: 16px;
-  border-top: 1px solid var(--border-soft);
-}
 @media (max-width: 599px) {
   .ev-card-list { display: block; }
   .ev-table-scroll { display: none; }

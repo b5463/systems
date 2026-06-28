@@ -1,10 +1,11 @@
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '../api/client'
 import StatusBadge from '../components/StatusBadge.vue'
 import SelectMenu from '../components/SelectMenu.vue'
 import Icon from '../components/Icon.vue'
+import PaginationControls from '../components/PaginationControls.vue'
 import { useToast } from '../composables/useToast'
 import { BASE_DOMAIN, LOCAL_MODE, hostFor, urlFor } from '../config'
 import { fmtAgo } from '../utils/date'
@@ -136,6 +137,16 @@ const visibleSystems = computed(() => {
   else arr.sort((a, b) => new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at))
   return arr
 })
+
+const systemsPerPage = 12
+const systemsPage = ref(1)
+const systemsPageCount = computed(() => Math.max(1, Math.ceil(visibleSystems.value.length / systemsPerPage)))
+const pagedSystems = computed(() => {
+  const start = (systemsPage.value - 1) * systemsPerPage
+  return visibleSystems.value.slice(start, start + systemsPerPage)
+})
+
+watch([query, sortBy], () => { systemsPage.value = 1 })
 
 const counts = computed(() => {
   const c = { live: 0, building: 0, stopped: 0, failed: 0 }
@@ -295,7 +306,7 @@ onBeforeUnmount(() => clearInterval(timer))
     </div>
     <div v-if="!visibleSystems.length" class="muted small" style="margin-bottom:18px">{{ query.trim() ? `No systems match “${query}”.` : 'No active systems.' }}</div>
     <div class="grid grid-auto">
-      <div v-for="s in visibleSystems" :key="s.id" class="card card-tap sys-card" :class="{ 'sys-selectable': selectMode, 'sys-selected': selectMode && isSelected(s.slug) }" role="button" tabindex="0" :aria-label="selectMode ? `Select ${s.name}` : `Open ${s.name}`" :aria-pressed="selectMode ? isSelected(s.slug) : null" @click="cardClick(s)" @keydown.enter="cardClick(s)" @keydown.space.prevent="cardClick(s)">
+      <div v-for="s in pagedSystems" :key="s.id" class="card card-tap sys-card" :class="{ 'sys-selectable': selectMode, 'sys-selected': selectMode && isSelected(s.slug) }" role="button" tabindex="0" :aria-label="selectMode ? `Select ${s.name}` : `Open ${s.name}`" :aria-pressed="selectMode ? isSelected(s.slug) : null" @click="cardClick(s)" @keydown.enter="cardClick(s)" @keydown.space.prevent="cardClick(s)">
         <span v-if="selectMode" class="sys-check" :class="{ on: isSelected(s.slug) }" aria-hidden="true"><Icon v-if="isSelected(s.slug)" name="check" /></span>
         <div class="sc-top">
           <div style="min-width:0">
@@ -322,6 +333,14 @@ onBeforeUnmount(() => clearInterval(timer))
         </div>
       </div>
     </div>
+
+    <PaginationControls
+      :page="systemsPage"
+      :page-count="systemsPageCount"
+      :total="visibleSystems.length"
+      noun="system"
+      @update:page="systemsPage = $event"
+    />
 
     <!-- Deleted (history kept; purge from detail) -->
     <template v-if="deleted.length">

@@ -253,8 +253,8 @@ Tick a phase when its exit gate passes — not when coding is done.
 | Confirm host-protection invariants (concurrency caps, disk admission, upload limits, cache headers, container limits) | Alex |
 | Tests: CORS PATCH, feature flags, migration runner, job table | Alex |
 | ~~Tests: schema endpoint responses, error shape contract, pagination envelope~~ ✅ | Tomas |
-| Job dashboard placeholder under Server | Tomas |
-| Pagination controls on existing list views | Tomas |
+| ~~Job dashboard placeholder under Server~~ ✅ | Tomas |
+| ~~Pagination controls on existing list views~~ ✅ | Tomas |
 | Choose and document email provider; set SEND_EMAIL_PROVIDER env var; add staging email smoke test to exit gate | Alex |
 | Allocate staging environment (separate PostgreSQL, Stripe test account, Caddy, staging.systems.acronym.sk, staging.acronym.sk) | Alex |
 | Choose monitoring stack; define alert thresholds (disk, connections, checkout error rate, webhook queue age, build queue depth, dead-letter count); assign on-call rotation | Alex |
