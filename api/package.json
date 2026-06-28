@@ -25,12 +25,12 @@
     "@fastify/cors": "^11.2.0",
     "@fastify/jwt": "^10.1.0",
     "@fastify/multipart": "^9.4.0",
-    "@fastify/rate-limit": "^11.0.0",
+    "@fastify/rate-limit": "^11.1.0",
     "@fastify/websocket": "^11.2.0",
     "@prisma/client": "^6.19.3",
     "bcrypt": "^6",
     "dockerode": "^4",
-    "fastify": "^5.8.5",
+    "fastify": "^5.9.0",
     "pg": "^8",
     "unzipper": "^0.12",
     "uuid": "^14"
@@ -38,8 +38,8 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "dotenv-cli": "^11.0.0",
-    "eslint": "^10.5.0",
-    "globals": "^17.6.0",
+    "eslint": "^10.6.0",
+    "globals": "^17.7.0",
     "prisma": "^6.19.3"
   }
 }
