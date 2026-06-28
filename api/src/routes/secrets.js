@@ -1,7 +1,7 @@
 'use strict';
 
 const crypto = require('crypto');
-const { secretRepo, projectRepo, auditRepo } = require('../repo');
+const { secretRepo, auditRepo } = require('../repo');
 const { features } = require('../util/flags');
 const { loadOr404 } = require('../util/project');
 

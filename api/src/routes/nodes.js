@@ -1,6 +1,6 @@
 'use strict';
 
-const { nodeRepo, projectRepo, auditRepo } = require('../repo');
+const { nodeRepo, auditRepo } = require('../repo');
 const { features } = require('../util/flags');
 
 async function nodeRoutes(fastify) {
