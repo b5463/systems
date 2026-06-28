@@ -30,7 +30,7 @@ These paths are implemented but still require end-to-end validation on the real 
 ## v3 — Beyond one box
 
 - **Multi-node:** per-node Docker and Caddy, scheduler/placement, node health, and route distribution.
-- **Zero-downtime deploys:** blue/green or rolling cutover gated on health checks.
+- ~~**Zero-downtime deploys:** blue/green or rolling cutover gated on health checks.~~ **Done.** Blue/green deploy with dual ports, slot-aware containers, health-gated cutover, automatic rollback on health failure, and proxy route swap. Env-var updates also use zero-downtime swap.
 - **Preview environments:** ephemeral branch and pull-request deployments.
 - **Secrets management:** a dedicated per-system secrets store with rotation.
 - **Build pipeline:** cache, selectable runtimes, and a build queue or farm.
