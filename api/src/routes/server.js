@@ -266,6 +266,24 @@ async function serverRoutes(fastify, options) {
     return result;
   });
 
+  // V4 migration readiness report — runs preflight reconciliation against V3
+  // data and returns a structured readiness summary. Rate-limited to avoid
+  // accidental hammering; this does a full table scan.
+  fastify.get('/api/server/v4-migration-report', {
+    preHandler: [fastify.authenticate],
+    config: { rateLimit: { max: 6, timeWindow: '1 minute' } },
+  }, async (request, reply) => {
+    const { runReconcile } = require('../util/v4reconcile');
+    const { prisma } = require('../repo');
+    try {
+      const report = await runReconcile(prisma);
+      return report;
+    } catch (err) {
+      request.log.error({ err }, '[v4-migration-report] reconcile failed');
+      return reply.code(502).send({ error: `Reconciliation failed: ${err.message}` });
+    }
+  });
+
   // Send a test notification through the configured webhook.
   fastify.post('/api/server/notify-test', {
     preHandler: [fastify.authenticate],

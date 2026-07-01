@@ -33,6 +33,8 @@ const EXISTING_NAMESPACES = [
   '/api/projects',
   '/api/server/',
   '/api/webhook/',
+  '/api/systems',
+  '/api/products',
 ];
 
 // ---- namespace boundary tests ----
@@ -128,8 +130,8 @@ test('namespace: no route paths contain double slashes', () => {
 
 test('namespace: route count is tracked (regression guard)', () => {
   const routes = allRoutes();
-  assert.ok(routes.length >= 75, `Expected at least 75 routes, found ${routes.length}`);
-  assert.ok(routes.length <= 120, `Unexpected route explosion: ${routes.length} routes (expected <= 120)`);
+  assert.ok(routes.length >= 85, `Expected at least 85 routes, found ${routes.length}`);
+  assert.ok(routes.length <= 125, `Unexpected route explosion: ${routes.length} routes (expected <= 125)`);
 });
 
 test('namespace: app.js registers all route files', () => {

@@ -12,20 +12,26 @@ const { projectContainerOptions } = require('../util/limits');
 const { pub, loadOr404 } = require('../util/project');
 const { parsePagination, paginationEnvelope } = require('../util/pagination');
 const { DATA_DIR } = require('../util/paths');
+const { features } = require('../util/flags');
+const { v4DeployMeta } = require('../util/v4deploymap');
 
 async function projectsRoutes(fastify, options) {
+  // V4 compatibility layer: when ENABLE_V4_SYSTEMS=true, this endpoint is the
+  // legacy bridge. Phase 2 wire-up: replace projectRepo.listAll() here with a
+  // query through legacy_project_map → systems once Alex delivers V4 tables.
   fastify.get('/api/projects', {
     preHandler: [fastify.authenticate],
   }, async (request) => {
     const all = (await projectRepo.listAll()).map(pub);
     const q = request.query || {};
+    const v4Active = features().v4Systems;
     if (q.page || q.per_page || q.perPage) {
       const pg = parsePagination(q);
       const slice = all.slice(pg.offset, pg.offset + pg.perPage);
       const { pagination } = paginationEnvelope(slice, all.length, pg);
-      return { projects: slice, pagination };
+      return { projects: slice, pagination, ...(v4Active && { _v4Source: 'v3-compat' }) };
     }
-    return { projects: all };
+    return { projects: all, ...(v4Active && { _v4Source: 'v3-compat' }) };
   });
 
   fastify.get('/api/projects/:slug', {
@@ -396,7 +402,8 @@ async function projectsRoutes(fastify, options) {
 
       await auditRepo.appendAudit({ user_id: request.user.id, action: 'rollback', target: slug, ip: request.ip });
 
-      return { project: pub(await projectRepo.findBySlug(slug)) };
+      const v4Meta = features().v4Systems ? (await v4DeployMeta(slug) || {}) : {};
+      return { project: pub(await projectRepo.findBySlug(slug)), ...v4Meta };
     } catch (err) {
       request.log.error({ err }, '[projects] Rollback failed');
       await projectRepo.updateStatus(slug, 'error');

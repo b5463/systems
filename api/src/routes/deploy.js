@@ -17,6 +17,7 @@ const { MAX_MULTIPART_BYTES } = require('../util/upload');
 const { tmpZip, tmpDir } = require('../util/tmp');
 const { features } = require('../util/flags');
 const { BuildGate } = require('../util/build');
+const { v4DeployMeta } = require('../util/v4deploymap');
 
 // In-memory build log buffers keyed by slug
 const buildLogs = new Map();
@@ -628,7 +629,8 @@ async function deployRoutes(fastify, options) {
         if (zipPath) await fsp.rm(zipPath, { force: true }).catch(() => {});
         return reply.code(result.code).send({ error: result.error });
       }
-      return reply.code(202).send({ message: 'Redeploy started', slug });
+      const v4Meta = features().v4Systems ? (await v4DeployMeta(slug) || {}) : {};
+      return reply.code(202).send({ message: 'Redeploy started', slug, ...v4Meta });
     } catch (err) {
       if (zipPath) await fsp.rm(zipPath, { force: true }).catch(() => {});
       throw err;

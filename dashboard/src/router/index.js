@@ -3,6 +3,7 @@ import { useAuthStore } from '../stores/auth'
 import Admin from '../views/Admin.vue'
 import Events from '../views/Events.vue'
 import Login from '../views/Login.vue'
+import Products from '../views/Products.vue'
 import Server from '../views/Server.vue'
 import Ship from '../views/Ship.vue'
 import SystemDetail from '../views/SystemDetail.vue'
@@ -23,6 +24,8 @@ const routes = [
   { path: '/events', name: 'events', component: Events },
   { path: '/server', name: 'server', component: Server },
   { path: '/admin', name: 'admin', component: Admin },
+  // V4 beta — not linked from main nav; access via direct URL /products
+  { path: '/products', name: 'products', component: Products },
   {
     path: '/systems/:slug',
     name: 'system-detail',

@@ -8,6 +8,7 @@ import LogConsole from '../components/LogConsole.vue'
 import ExecTerminal from '../components/ExecTerminal.vue'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 import SystemSettings from '../components/SystemSettings.vue'
+import DomainManagement from '../components/DomainManagement.vue'
 import Icon from '../components/Icon.vue'
 import { useToast } from '../composables/useToast'
 import { hostFor, urlFor, LOCAL_MODE } from '../config'
@@ -19,7 +20,7 @@ const props = defineProps({ slug: { type: String, required: true } })
 const router = useRouter()
 const route = useRoute()
 
-const TABS = ['Overview', 'Deployments', 'Logs', 'Metrics', 'Console', 'Settings']
+const TABS = ['Overview', 'Deployments', 'Logs', 'Metrics', 'Console', 'Domains', 'Settings']
 const tab = ref('Overview')
 
 function normalizeTab(value) {
@@ -692,6 +693,11 @@ watch(() => props.slug, async () => {
         </div>
       </div>
       <ExecTerminal v-if="tab === 'Console' && isRunning" :slug="system.slug" />
+    </div>
+
+    <!-- DOMAINS (Phase 4) -->
+    <div v-show="tab === 'Domains'" class="stack">
+      <DomainManagement v-if="tab === 'Domains'" :system="system" @reload="loadSystem" />
     </div>
 
     <!-- SETTINGS -->

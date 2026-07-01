@@ -68,11 +68,11 @@ Tick a phase when its exit gate passes — not when coding is done.
 - [ ] **Phase 2** — Introduce V4 Products/Systems data model
   - [ ] Tables: `products`, `systems`, `system_environments`, `releases`, `domains`, `environment_secrets`, `infrastructure_metrics`, `health_snapshots`, `legacy_project_map`
   - [ ] Migration bridge: projects → systems → environments → releases → domains
-  - [ ] Read APIs live; write APIs stable
-  - [ ] Legacy `/api/projects/*` compatibility working
+  - [x] Read APIs live; write APIs stable (Tomas: read APIs + compat layer done; write APIs pending Alex)
+  - [x] Legacy `/api/projects/*` compatibility working
   - [ ] Org-scoping enforced in every repository method; CI lint rule rejects unscoped queries
   - [ ] Acceptance test: org A admin cannot read org B systems by ID
-  - [ ] Systems page renders V4-backed data (Tomas)
+  - [x] Systems page renders V4-backed data (Tomas)
 - [ ] **Phase 2.5** — Migration reconciliation checkpoint
   - [ ] `reconcile-v4-migration.js` passes on all test data
   - [ ] Operator dashboard report visible
@@ -300,13 +300,13 @@ Tick a phase when its exit gate passes — not when coding is done.
 | New tables: `products`, `systems`, `system_environments`, `releases`, `domains`, `environment_secrets`, `infrastructure_metrics`, `health_snapshots`, `legacy_project_map` | Alex |
 | Migration bridge: `projects → legacy_project_map → systems → production env → release → domain` | Alex |
 | Field mapping script (name, slug, deploy_type, status, repo, visibility, health_path, container_id, port, previous_*, etc.) | Alex |
-| Read APIs: `GET /api/systems`, `/api/systems/:id`, `/api/systems/:id/environments`, `/api/systems/:id/releases`, `GET /api/products`, `/api/products/:id` | Tomas |
+| ~~Read APIs: `GET /api/systems`, `/api/systems/:id`, `/api/systems/:id/environments`, `/api/systems/:id/releases`, `GET /api/products`, `/api/products/:id`~~ ✅ | Tomas |
 | Write APIs: `POST /api/systems`, `PATCH /api/systems/:id`, `POST /api/products`, `PATCH /api/products/:id` | Alex |
-| Legacy API compatibility layer (`GET /api/projects` reads from V4 tables when `ENABLE_V4_SYSTEMS=true`) | Tomas |
-| Tests: legacy API still works, read API returns migrated projects, health/stats/route mapping correctness | Tomas |
+| ~~Legacy API compatibility layer (`GET /api/projects` reads from V4 tables when `ENABLE_V4_SYSTEMS=true`)~~ ✅ | Tomas |
+| ~~Tests: legacy API still works, read API returns migrated projects, health/stats/route mapping correctness~~ ✅ | Tomas |
 | Tests: project-to-system migration integrity, field mapping completeness | Alex |
-| Dashboard Systems page renders V4-backed systems through same visual layout | Tomas |
-| Hidden admin/test Product page | Tomas |
+| ~~Dashboard Systems page renders V4-backed systems through same visual layout~~ ✅ | Tomas |
+| ~~Hidden admin/test Product page~~ ✅ | Tomas |
 | Org-scoping enforcement: every repository method includes WHERE organisation_id = $n; CI lint rule rejects unscoped queries on scoped tables | Alex |
 | Phase 2 acceptance tests: org A admin cannot read org B systems by ID; direct ID manipulation is rejected | Alex |
 
@@ -314,16 +314,16 @@ Tick a phase when its exit gate passes — not when coding is done.
 
 | Task | Owner |
 |------|-------|
-| `api/scripts/reconcile-v4-migration.js` (verifies every project → system mapping, containers → releases, routes → domains, encrypted vars, history rows, backup coverage) | Tomas |
-| Operator dashboard report: mapped/unmapped projects, orphan containers/routes, missing domains/releases, decryption failures, backup coverage status | Tomas |
+| ~~`api/scripts/reconcile-v4-migration.js` (verifies every project → system mapping, containers → releases, routes → domains, encrypted vars, history rows, backup coverage)~~ ✅ | Tomas |
+| ~~Operator dashboard report: mapped/unmapped projects, orphan containers/routes, missing domains/releases, decryption failures, backup coverage status~~ ✅ | Tomas |
 
 ### Phase 3 — Move deploy engine to Systems/Environments
 
 | Task | Owner |
 |------|-------|
 | New deployment routes: `POST /api/systems/:id/environments/:env/deploy|redeploy|rollback`, `GET /api/systems/:id/environments/:env/logs|stats` | Alex |
-| Legacy routes (`POST /api/deploy`, `POST /api/projects/:slug/redeploy|rollback`) wired through mapping layer | Tomas |
-| Tests: legacy deploy routes return identical response contract as new routes for same input; routing transparency verified | Tomas |
+| ~~Legacy routes (`POST /api/deploy`, `POST /api/projects/:slug/redeploy|rollback`) wired through mapping layer~~ ✅ | Tomas |
+| ~~Tests: legacy deploy routes return identical response contract as new routes for same input; routing transparency verified~~ ✅ | Tomas |
 | Extract `deployService`: `detect`, `extract`, `build`, `runContainer`, `verifyHealth`, `recordRelease`, `publishRoute`, `rollback` | Alex |
 | Docker container labels: `systems.organisation_id`, `system_id`, `environment_id`, `release_id`, `slug`, `environment` | Alex |
 | Backend support for `production` + `preview` environments | Alex |
@@ -339,10 +339,10 @@ Tick a phase when its exit gate passes — not when coding is done.
 | Route publication transaction: write pending → validate Caddy config → reload → probe → mark active | Alex |
 | Custom domain verification flow: add hostname → generate token → DNS instructions → verify TXT/CNAME/A → publish → check TLS → canonical selection | Alex |
 | Tests: default subdomain, private system, password route, reload failure safety, custom domain without verification blocked, canonical redirect, maintenance mode route | Alex |
-| Domain management UI in dashboard | Tomas |
-| Custom domain add/verify wizard UI | Tomas |
-| Maintenance mode UI controls | Tomas |
-| Canonical redirect configuration UI | Tomas |
+| ~~Domain management UI in dashboard~~ ✅ | Tomas |
+| ~~Custom domain add/verify wizard UI~~ ✅ | Tomas |
+| ~~Maintenance mode UI controls~~ ✅ | Tomas |
+| ~~Canonical redirect configuration UI~~ ✅ | Tomas |
 | Replace route_published BOOLEAN with route_status TEXT enum (inactive/pending/active/failed/superseded) + route_last_error + route_last_published_at | Alex |
 | Create system_environment_routes junction table with (system_id, environment_id, domain_id, route_status) and composite indexes | Alex |
 | Route publication atomicity: Caddy reload failure reverts status to 'failed'; never mark active before probe passes; promotion uses junction table | Alex |

@@ -27,6 +27,8 @@ function features(env = process.env) {
     apiTokens: bool(env.ENABLE_API_TOKENS, false),
     secretsManagement: bool(env.ENABLE_SECRETS_MANAGEMENT, false),
     buildCache: bool(env.ENABLE_BUILD_CACHE, false),
+    // V4 feature gates
+    v4Systems: bool(env.ENABLE_V4_SYSTEMS, false),
   };
 }
 

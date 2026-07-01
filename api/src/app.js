@@ -220,6 +220,8 @@ async function buildApp(opts = {}) {
   await fastify.register(require('./routes/nodes'));
   await fastify.register(require('./routes/preview'));
   await fastify.register(require('./routes/buildpipeline'));
+  await fastify.register(require('./routes/systems'));
+  await fastify.register(require('./routes/products'));
 
   return fastify;
 }

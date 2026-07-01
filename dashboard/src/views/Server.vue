@@ -163,6 +163,28 @@ async function testNotify() {
   }
 }
 
+const migrationReport = ref(null)
+const migrationChecking = ref(false)
+const migrationError = ref('')
+async function runMigrationCheck() {
+  migrationError.value = ''
+  migrationChecking.value = true
+  try {
+    migrationReport.value = await api.get('/server/v4-migration-report')
+  } catch (e) {
+    migrationError.value = e.message || 'Check failed.'
+  } finally {
+    migrationChecking.value = false
+  }
+}
+const migrationStatusTone = computed(() => {
+  const r = migrationReport.value
+  if (!r) return 'idle'
+  if (r.summary.errors > 0) return 'error'
+  if (r.summary.warnings > 0) return 'warn'
+  return 'ok'
+})
+
 async function copyDiagnostic(command) {
   if (!command || !navigator.clipboard) return
   try { await navigator.clipboard.writeText(command) } catch { /* clipboard unavailable */ }
@@ -402,6 +424,58 @@ onMounted(() => { load(); loadCleanup(); })
       <div class="hint">
         Background job processing is planned for this release. Once the jobs table and runner are wired,
         this section will show active, queued, and failed jobs with retry controls.
+      </div>
+    </div>
+
+    <!-- V4 Migration Readiness (Phase 2.5) -->
+    <h2 class="section-label">V4 migration readiness</h2>
+    <div class="card stack" style="margin-bottom: 22px">
+      <div class="kv">
+        <span class="k">Preflight check</span>
+        <span class="v">
+          <template v-if="!migrationReport && !migrationChecking">
+            <span class="muted small">Not run yet</span>
+          </template>
+          <template v-else-if="migrationChecking">
+            <span class="muted small">Running…</span>
+          </template>
+          <template v-else-if="migrationReport">
+            <span :class="`sdot ${migrationStatusTone}`"></span>
+            <template v-if="migrationReport.summary.errors > 0">{{ migrationReport.summary.errors }} error{{ migrationReport.summary.errors !== 1 ? 's' : '' }}</template>
+            <template v-else-if="migrationReport.summary.warnings > 0">{{ migrationReport.summary.warnings }} warning{{ migrationReport.summary.warnings !== 1 ? 's' : '' }}</template>
+            <template v-else>All systems ready</template>
+          </template>
+        </span>
+      </div>
+      <template v-if="migrationReport">
+        <div class="kv"><span class="k">Projects mapped</span><span class="v mono">{{ migrationReport.summary.mapped }} / {{ migrationReport.summary.totalProjects }}</span></div>
+        <div class="kv"><span class="k">Routes (active / missing / orphan)</span><span class="v mono">{{ migrationReport.summary.routesActive }} / {{ migrationReport.summary.routesMissing }} / {{ migrationReport.summary.routesOrphan }}</span></div>
+        <div class="kv"><span class="k">Backup status</span><span class="v">{{ migrationReport.summary.backupStatus }}</span></div>
+        <div v-if="migrationReport.summary.encryptedVarProjects > 0" class="kv">
+          <span class="k">Projects with env vars</span>
+          <span class="v mono">{{ migrationReport.summary.encryptedVarProjects }}<template v-if="migrationReport.summary.encryptionWarnings > 0"> · <span class="warn-text">{{ migrationReport.summary.encryptionWarnings }} format warning{{ migrationReport.summary.encryptionWarnings !== 1 ? 's' : '' }}</span></template></span>
+        </div>
+        <div v-if="migrationReport.warnings.length > 0" class="kv" style="flex-direction: column; align-items: flex-start; gap: 4px">
+          <span class="k">Warnings</span>
+          <ul class="issue-list">
+            <li v-for="w in migrationReport.warnings" :key="w" class="small muted">{{ w }}</li>
+          </ul>
+        </div>
+        <div v-if="migrationReport.errors.length > 0" class="kv" style="flex-direction: column; align-items: flex-start; gap: 4px">
+          <span class="k error-text">Errors</span>
+          <ul class="issue-list">
+            <li v-for="e in migrationReport.errors" :key="e" class="small error-text">{{ e }}</li>
+          </ul>
+        </div>
+        <div class="hint small muted">Generated {{ migrationReport.generatedAt }}</div>
+      </template>
+      <div v-if="migrationError" class="hint error-text">{{ migrationError }}</div>
+      <div class="hint">Run this check before triggering Phase 2 table migration. It verifies project readiness, route files, env vars, and backup coverage without modifying any data.</div>
+      <div>
+        <button class="btn btn-sm" :disabled="migrationChecking" @click="runMigrationCheck">
+          <Icon name="refresh-cw" />
+          {{ migrationChecking ? 'Running…' : 'Run preflight check' }}
+        </button>
       </div>
     </div>
 
