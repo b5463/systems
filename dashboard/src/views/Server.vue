@@ -105,6 +105,14 @@ async function loadJobs() {
   } catch { /* endpoint is best-effort until V4 jobs are enabled */ }
 }
 
+// V4 Phase 2.5: migration reconciliation report (operator view).
+const reconcile = ref(null)
+async function loadReconcile() {
+  try {
+    reconcile.value = await api.get('/server/reconcile-v4')
+  } catch { /* best-effort; only meaningful once V4 migration work starts */ }
+}
+
 async function doCleanup() {
   cleanupMsg.value = ''
   cleaningUp.value = true
@@ -288,7 +296,7 @@ const criticals = computed(() => {
   return alerts
 })
 
-onMounted(() => { load(); loadCleanup(); loadJobs(); })
+onMounted(() => { load(); loadCleanup(); loadJobs(); loadReconcile(); })
 </script>
 
 <template>
@@ -519,6 +527,20 @@ onMounted(() => { load(); loadCleanup(); loadJobs(); })
       <div class="kv"><span class="k">Completed</span><span class="v mono">{{ jobsInfo.counts.completed }}</span></div>
       <div class="kv"><span class="k">Dead-lettered</span><span class="v mono">{{ jobsInfo.counts.dead }}</span></div>
       <div class="hint">V4 job queue (Phase 0 placeholder). The in-process runner ships disabled; enable with <span class="mono">ENABLE_V4_JOBS</span> once V4 phases start queueing work. Dead-lettered jobs need operator investigation.</div>
+    </div>
+
+    <!-- V4 Phase 2.5: migration reconciliation report -->
+    <h2 v-if="reconcile" class="section-label">V4 migration</h2>
+    <div v-if="reconcile" class="card" style="margin-bottom: 22px">
+      <div class="kv"><span class="k">Reconciliation</span><span class="v">{{ reconcile.ok ? 'Consistent' : (reconcile.failures.length + ' issue(s)') }}</span></div>
+      <div class="kv"><span class="k">Projects mapped</span><span class="v mono">{{ reconcile.projects.mapped }} / {{ reconcile.projects.active }}</span></div>
+      <div v-if="reconcile.projects.unmapped.length" class="kv"><span class="k">Unmapped</span><span class="v mono">{{ reconcile.projects.unmapped.join(', ') }}</span></div>
+      <div v-if="reconcile.drift.length" class="kv"><span class="k">Drifted</span><span class="v mono">{{ reconcile.drift.map(d => d.slug).join(', ') }}</span></div>
+      <div v-if="reconcile.missingDomains.length" class="kv"><span class="k">Missing domains</span><span class="v mono">{{ reconcile.missingDomains.join(', ') }}</span></div>
+      <div class="kv"><span class="k">Env vars decrypt</span><span class="v">{{ reconcile.envSecrets.failures.length ? reconcile.envSecrets.failures.length + ' failure(s)' : (reconcile.envSecrets.checked + ' checked, ok') }}</span></div>
+      <div class="kv"><span class="k">Containers</span><span class="v">{{ reconcile.docker.status === 'measured' ? (reconcile.docker.orphans.length ? reconcile.docker.orphans.length + ' orphan(s)' : reconcile.docker.running + ' running, all mapped') : 'not measured' }}</span></div>
+      <div class="kv"><span class="k">Routes</span><span class="v">{{ reconcile.caddy.status === 'measured' ? (reconcile.caddy.unknownRoutes.length ? reconcile.caddy.unknownRoutes.length + ' unknown' : reconcile.caddy.routeFiles + ' files, all known') : 'not measured' }}</span></div>
+      <div class="hint">Legacy projects vs. V4 systems (Phase 2.5 checkpoint). Drift means the V4 copy is stale — re-run <span class="mono">scripts/migrate-projects-to-v4.js</span> after clearing the drifted rows, or wait for Phase 3 when the deploy engine writes V4 directly.</div>
     </div>
 
     <!-- Notifications -->

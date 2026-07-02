@@ -303,6 +303,17 @@ async function serverRoutes(fastify, options) {
     const counts = await jobRepo.counts();
     return { enabled: features().v4Jobs, counts };
   });
+
+  // V4 Phase 2.5 — migration reconciliation report for operators. Read-only;
+  // Docker/Caddy checks report not_measured when unobservable (ADR 0004).
+  fastify.get('/api/server/reconcile-v4', {
+    preHandler: [fastify.authenticate],
+    config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+  }, async () => {
+    const { reconcileV4 } = require('../../scripts/reconcile-v4-migration');
+    const { prisma } = require('../repo');
+    return reconcileV4({ prisma });
+  });
 }
 
 module.exports = serverRoutes;

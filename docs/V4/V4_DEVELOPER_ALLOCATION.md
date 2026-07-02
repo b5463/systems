@@ -73,9 +73,9 @@ Tick a phase when its exit gate passes — not when coding is done.
   - [x] Acceptance test: org A admin cannot read org B systems by ID
   - [x] Systems page renders V4-backed data (Tomas — via the parity-tested compat layer; hidden `/products` test page added)
 - [ ] **Phase 2.5** — Migration reconciliation checkpoint
-  - [ ] `reconcile-v4-migration.js` passes on all test data
-  - [ ] Operator dashboard report visible
-  - [ ] No orphan containers, no unknown routes, all env secrets decrypt
+  - [x] `reconcile-v4-migration.js` passes on all test data (verifies mapping completeness, map integrity, field drift, env decryption, domains; catches unmapped/drifted/undecryptable — all test-proven)
+  - [x] Operator dashboard report visible (`GET /api/server/reconcile-v4` + "V4 migration" card in Server view)
+  - [ ] No orphan containers, no unknown routes, all env secrets decrypt (host run — Docker/Caddy checks report `not_measured` off-host)
 - [ ] **Phase 3** — Move deploy engine to Systems/Environments
   - [ ] New `/api/systems/:id/environments/:env/deploy|redeploy|rollback|logs|stats` routes live
   - [ ] `deployService` extracted (detect, extract, build, runContainer, verifyHealth, recordRelease, publishRoute, rollback)

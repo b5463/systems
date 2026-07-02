@@ -47,7 +47,22 @@ Disable `ENABLE_V4_SYSTEMS` / `ENABLE_V4_PRODUCTS` (legacy reads revert
 instantly — `projects` never stopped being the source of truth). V4 rows can
 be left in place or cleared; the bridge recreates them.
 
+## Phase 2.5 — reconciliation checkpoint (same branch)
+
+`api/scripts/reconcile-v4-migration.js` proves the projects world and the V4
+world describe the same platform: mapping completeness, map integrity,
+V4-owned field drift, legacy env-var decryption under `ENV_SECRET`, domain
+coverage, history counts, and (host-observable only) container↔release and
+route↔domain mapping — `not_measured` otherwise, per ADR 0004. Exposed to
+operators at `GET /api/server/reconcile-v4` and as the "V4 migration" card in
+the Server view. Tests cover the pass case plus unmapped-project, field-drift
+and decryption-failure detection (`api/test/v4-phase25.test.js`).
+
+Remaining for the Phase 2.5 exit gate: a run on the production host where
+Docker and the Caddy routes dir are observable (no orphan containers, no
+unknown routes).
+
 ## Next
 
-Phase 2.5 — migration reconciliation checkpoint (`reconcile-v4-migration.js`
-+ operator report), then Phase 3 — deploy engine on Systems/Environments.
+Phase 3 — deploy engine on Systems/Environments (deployService extraction,
+new deploy routes, Docker labels, preview environments, promote flow).
