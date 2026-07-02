@@ -176,6 +176,8 @@ async function runContainer(projectSlug, imageId, port, envVars = {}, opts = {})
     Labels: {
       managed: 'acronym-deploy',
       project: projectSlug,
+      // V4 Phase 3: systems.* labels for mapped systems (empty when unmapped)
+      ...(opts.extraLabels || {}),
     },
   });
 

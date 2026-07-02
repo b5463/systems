@@ -17,6 +17,7 @@ const { MAX_MULTIPART_BYTES } = require('../util/upload');
 const { tmpZip, tmpDir } = require('../util/tmp');
 const { features } = require('../util/flags');
 const { BuildGate } = require('../util/build');
+const v4sync = require('../services/v4sync');
 
 // In-memory build log buffers keyed by slug
 const buildLogs = new Map();
@@ -124,6 +125,7 @@ async function failBuild({ slug, stage, err, userId, ip, tag = 'deploy' }) {
   } catch (dbErr) {
     console.error(`[${tag}] Failed to update status to error:`, dbErr);
   }
+  v4sync.syncStatus(slug).catch(() => {}); // fail-open V4 mirror
 }
 
 async function findProjectRoot(dirPath) {
@@ -265,7 +267,8 @@ async function runBuildPipeline(slug, zipPath, extractDir, port, userId, ip, env
     appendBuildLog(slug, `[deploy] Starting container — host ${port} → container ${containerPort}...\n`);
     const runtimeProject = await projectRepo.findBySlug(slug);
     const containerId = await dockerService.runContainer(
-      slug, imageId, port, envVars, { ...projectContainerOptions(runtimeProject, { containerPort }), slot: 'blue' }
+      slug, imageId, port, envVars,
+      { ...projectContainerOptions(runtimeProject, { containerPort }), slot: 'blue', extraLabels: await v4sync.labelsForSlug(slug) }
     );
     appendBuildLog(slug, `[deploy] Container started: ${containerId}\n`);
 
@@ -303,6 +306,7 @@ async function runBuildPipeline(slug, zipPath, extractDir, port, userId, ip, env
     await auditRepo.appendAudit({ user_id: userId, action: 'deploy', target: slug, detail: `port:${port} ${visibility}`, ip });
     notify.send({ kind: 'deploy', slug, detail: 'deployed' }).catch(() => {});
     finishBuild(slug, 'done');
+    v4sync.syncReleaseForProject(slug).catch(() => {}); // fail-open V4 mirror
     probeHealthSoon(slug);
   } catch (err) {
     await failBuild({ slug, stage, err, userId, ip, tag: 'deploy' });
@@ -373,7 +377,7 @@ async function runRedeployPipeline(slug, zipPath, extractDir, userId, ip) {
     appendBuildLog(slug, `[redeploy] Starting ${inactiveSlot} container — host ${inactivePort} → container ${containerPort}...\n`);
     const newContainerId = await dockerService.runContainer(
       slug, newImageId, inactivePort, envVars,
-      { ...projectContainerOptions(project, { containerPort }), slot: inactiveSlot }
+      { ...projectContainerOptions(project, { containerPort }), slot: inactiveSlot, extraLabels: await v4sync.labelsForSlug(slug) }
     );
     appendBuildLog(slug, `[redeploy] Container started: ${newContainerId}\n`);
 
@@ -411,6 +415,7 @@ async function runRedeployPipeline(slug, zipPath, extractDir, userId, ip) {
     await auditRepo.appendAudit({ user_id: userId, action: 'redeploy', target: slug, ip });
     notify.send({ kind: 'redeploy', slug, detail: 'redeployed' }).catch(() => {});
     finishBuild(slug, 'done');
+    v4sync.syncReleaseForProject(slug).catch(() => {}); // fail-open V4 mirror
     probeHealthSoon(slug);
   } catch (err) {
     await failBuild({ slug, stage, err, userId, ip, tag: 'redeploy' });
@@ -686,3 +691,4 @@ async function deployRoutes(fastify, options) {
 module.exports = deployRoutes;
 module.exports.beginDeploy = beginDeploy;
 module.exports.beginRedeploy = beginRedeploy;
+module.exports.readUploadToTmp = readUploadToTmp;

@@ -11,6 +11,90 @@ const { confirmMatches } = require('../util/thresholds');
 const { projectContainerOptions } = require('../util/limits');
 const { pub, loadOr404 } = require('../util/project');
 const { DATA_DIR } = require('../util/paths');
+const v4sync = require('../services/v4sync');
+
+// V4 Phase 3: rollback extracted from the route handler so the V4
+// systems/environments deploy routes can reuse it through the mapping layer.
+// Behaviour is unchanged: blue/green start from the previous image on the
+// inactive slot, health gate, zero-downtime route swap, current<->previous
+// swap for repeat rollbacks.
+async function rollbackProject({ slug, userId, ip, log }) {
+  const project = await projectRepo.findBySlug(slug);
+  if (!project) return { ok: false, code: 404, error: 'Project not found' };
+  if (project.status === 'building') return { ok: false, code: 409, error: 'Currently building' };
+  if (!project.previous_image_id) {
+    return { ok: false, code: 400, error: 'No previous deploy to roll back to.' };
+  }
+
+  const currentContainerId = project.container_id;
+  const currentImageId = project.image_id;
+  const targetImageId = project.previous_image_id;
+
+  // Carry over existing env vars (same as redeploy).
+  let envVars = {};
+  if (project.env_vars) {
+    try {
+      const { decryptEnvVars } = require('./env');
+      envVars = decryptEnvVars(project.env_vars);
+    } catch (e) {
+      // start without env vars rather than fail the rollback
+    }
+  }
+
+  // Determine the inactive slot for blue/green zero-downtime rollback.
+  const inactiveSlot = projectRepo.getInactiveSlot(project);
+  const inactivePort = projectRepo.getInactivePort(project);
+
+  // Mark building during the swap so reconciliation (which skips 'building')
+  // can't see the transient state and flip the row to 'error'.
+  await projectRepo.updateStatus(slug, 'building');
+
+  try {
+    // Start from previous image on INACTIVE port (old container still serving).
+    const newContainerId = await dockerService.runContainer(
+      slug, targetImageId, inactivePort, envVars,
+      { ...projectContainerOptions(project), slot: inactiveSlot, extraLabels: await v4sync.labelsForSlug(slug) }
+    );
+
+    // Health-gate the rollback container before switching traffic.
+    try {
+      await health.waitForHealthy(health.targetForPort(inactivePort), project.health_path || '/');
+    } catch (healthErr) {
+      try { await dockerService.stopContainer(newContainerId); } catch {}
+      try { await dockerService.removeContainer(newContainerId, true); } catch {}
+      await projectRepo.updateStatus(slug, 'error');
+      return { ok: false, code: 500, error: `Rollback health check failed: ${healthErr.message}` };
+    }
+
+    // Swap proxy to the new port — zero downtime.
+    await proxy.publishRoute({ slug, port: inactivePort, visibility: project.visibility, basicUser: project.basic_user, basicHash: project.basic_hash, apex: !!project.is_primary });
+    await projectRepo.swapActiveSlot(slug);
+
+    // Stop + remove the old container (no longer serving traffic).
+    if (currentContainerId) {
+      try { await dockerService.stopContainer(currentContainerId); } catch {}
+      try { await dockerService.removeContainer(currentContainerId, true); } catch {}
+    }
+
+    // Swap current <-> previous so a subsequent rollback returns to the
+    // version we just rolled away from.
+    await projectRepo.updateRollback(slug, {
+      containerId: newContainerId,
+      imageId: targetImageId,
+      previousContainerId: currentContainerId || null,
+      previousImageId: currentImageId || null,
+    });
+
+    await auditRepo.appendAudit({ user_id: userId, action: 'rollback', target: slug, ip });
+    v4sync.syncReleaseForProject(slug).catch(() => {}); // fail-open V4 mirror
+
+    return { ok: true, project: pub(await projectRepo.findBySlug(slug)) };
+  } catch (err) {
+    if (log) log.error({ err }, '[projects] Rollback failed');
+    await projectRepo.updateStatus(slug, 'error');
+    return { ok: false, code: 500, error: `Rollback failed: ${err.message}` };
+  }
+}
 
 async function projectsRoutes(fastify, options) {
   // V4 Phase 2 compatibility: with ENABLE_V4_SYSTEMS on, the V4-owned core
@@ -330,78 +414,9 @@ async function projectsRoutes(fastify, options) {
     const { slug } = request.params;
     const project = await loadOr404(reply, slug);
     if (!project) return;
-    if (project.status === 'building') return reply.code(409).send({ error: 'Currently building' });
-    if (!project.previous_image_id) {
-      return reply.code(400).send({ error: 'No previous deploy to roll back to.' });
-    }
-
-    const currentContainerId = project.container_id;
-    const currentImageId = project.image_id;
-    const targetImageId = project.previous_image_id;
-
-    // Carry over existing env vars (same as redeploy).
-    let envVars = {};
-    if (project.env_vars) {
-      try {
-        const { decryptEnvVars } = require('./env');
-        envVars = decryptEnvVars(project.env_vars);
-      } catch (e) {
-        // start without env vars rather than fail the rollback
-      }
-    }
-
-    // Determine the inactive slot for blue/green zero-downtime rollback.
-    const inactiveSlot = projectRepo.getInactiveSlot(project);
-    const inactivePort = projectRepo.getInactivePort(project);
-
-    // Mark building during the swap so reconciliation (which skips 'building')
-    // can't see the transient state and flip the row to 'error'.
-    await projectRepo.updateStatus(slug, 'building');
-
-    try {
-      // Start from previous image on INACTIVE port (old container still serving).
-      const newContainerId = await dockerService.runContainer(
-        slug, targetImageId, inactivePort, envVars,
-        { ...projectContainerOptions(project), slot: inactiveSlot }
-      );
-
-      // Health-gate the rollback container before switching traffic.
-      try {
-        await health.waitForHealthy(health.targetForPort(inactivePort), project.health_path || '/');
-      } catch (healthErr) {
-        try { await dockerService.stopContainer(newContainerId); } catch {}
-        try { await dockerService.removeContainer(newContainerId, true); } catch {}
-        await projectRepo.updateStatus(slug, 'error');
-        return reply.code(500).send({ error: `Rollback health check failed: ${healthErr.message}` });
-      }
-
-      // Swap proxy to the new port — zero downtime.
-      await proxy.publishRoute({ slug, port: inactivePort, visibility: project.visibility, basicUser: project.basic_user, basicHash: project.basic_hash, apex: !!project.is_primary });
-      await projectRepo.swapActiveSlot(slug);
-
-      // Stop + remove the old container (no longer serving traffic).
-      if (currentContainerId) {
-        try { await dockerService.stopContainer(currentContainerId); } catch {}
-        try { await dockerService.removeContainer(currentContainerId, true); } catch {}
-      }
-
-      // Swap current <-> previous so a subsequent rollback returns to the
-      // version we just rolled away from.
-      await projectRepo.updateRollback(slug, {
-        containerId: newContainerId,
-        imageId: targetImageId,
-        previousContainerId: currentContainerId || null,
-        previousImageId: currentImageId || null,
-      });
-
-      await auditRepo.appendAudit({ user_id: request.user.id, action: 'rollback', target: slug, ip: request.ip });
-
-      return { project: pub(await projectRepo.findBySlug(slug)) };
-    } catch (err) {
-      request.log.error({ err }, '[projects] Rollback failed');
-      await projectRepo.updateStatus(slug, 'error');
-      return reply.code(500).send({ error: `Rollback failed: ${err.message}` });
-    }
+    const result = await rollbackProject({ slug, userId: request.user.id, ip: request.ip, log: request.log });
+    if (!result.ok) return reply.code(result.code).send({ error: result.error });
+    return { project: result.project };
   });
 
   // Provision a dedicated Postgres database + least-privilege role for a system
@@ -517,3 +532,4 @@ async function projectsRoutes(fastify, options) {
 }
 
 module.exports = projectsRoutes;
+module.exports.rollbackProject = rollbackProject;

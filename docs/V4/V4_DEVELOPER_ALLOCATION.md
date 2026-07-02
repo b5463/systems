@@ -76,13 +76,13 @@ Tick a phase when its exit gate passes — not when coding is done.
   - [x] `reconcile-v4-migration.js` passes on all test data (verifies mapping completeness, map integrity, field drift, env decryption, domains; catches unmapped/drifted/undecryptable — all test-proven)
   - [x] Operator dashboard report visible (`GET /api/server/reconcile-v4` + "V4 migration" card in Server view)
   - [ ] No orphan containers, no unknown routes, all env secrets decrypt (host run — Docker/Caddy checks report `not_measured` off-host)
-- [ ] **Phase 3** — Move deploy engine to Systems/Environments
-  - [ ] New `/api/systems/:id/environments/:env/deploy|redeploy|rollback|logs|stats` routes live
-  - [ ] `deployService` extracted (detect, extract, build, runContainer, verifyHealth, recordRelease, publishRoute, rollback)
-  - [ ] Docker labels on all containers
-  - [ ] Preview + production environments coexist
-  - [ ] Promote flow with health gate works; retain-previous step is a no-op on first-ever deployment
-  - [ ] Legacy deploy routes still work
+- [ ] **Phase 3** — Move deploy engine to Systems/Environments (see `V4_PHASE3_STATUS.md`; open: Docker-host e2e + final pipeline inversion)
+  - [x] New `/api/systems/:id/environments/:env/deploy|redeploy|rollback|logs|stats` routes live (+ `POST /api/systems/:id/promote`; flag-gated)
+  - [x] `deployService` orchestration layer (resolve/deploy/rollback/promote via the mapping layer; rollback extracted to a shared function; full pipeline-body inversion deferred to a Docker host where e2e can gate it)
+  - [x] Docker labels on all containers (systems.* labels on every container-creation site for mapped systems)
+  - [x] Preview + production environments coexist
+  - [x] Promote flow with health gate works; retain-previous step is a no-op on first-ever deployment (test-proven)
+  - [x] Legacy deploy routes still work (v4sync hooks fail-open; full suite green)
 - [ ] **Phase 4** — Domains, routing, access and maintenance
   - [ ] `domains`, `maintenance_windows`, `route_publication_attempts` tables
   - [ ] Domain-driven `renderRoute()` Caddy service
