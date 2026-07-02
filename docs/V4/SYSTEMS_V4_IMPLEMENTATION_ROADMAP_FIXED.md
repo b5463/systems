@@ -2,6 +2,7 @@
 
 **Document status:** implementation roadmap, reviewed and corrected  
 **Repository baseline:** current `systems-main(3).zip`  
+**Database baseline update (2026-07-02):** the control plane now runs on **PostgreSQL via Prisma** (`api/prisma/schema.prisma`, `prisma migrate deploy`, ledger in `_prisma_migrations` — see `docs/POSTGRES_PRISMA_MIGRATION.md`). Phase 0 and Phase 1 have been revised accordingly: the hand-rolled `schema_migrations` runner is superseded by Prisma Migrate, and Phase 1 is PostgreSQL *hardening*, not introduction. SQLite only survives as a legacy-install migration source.  
 **Roadmap style:** conservative, phased, test-gated, rollback-friendly  
 **Companion documents:**
 
@@ -22,7 +23,7 @@ The current SYSTEMS. repository already has valuable production-grade foundation
 ```text
 Fastify API
 Vue dashboard
-SQLite WAL control database
+PostgreSQL control database (Prisma ORM + Prisma Migrate)
 Docker deployment engine
 Caddy route generation
 health checks
@@ -92,7 +93,7 @@ existing projects must not disappear
 
 A phase is not finished unless there is a documented rollback path.
 
-**Cross-phase rollback rule:** Rolling back across a phase boundary (e.g., reverting Phase 7 after Phase 8 has run) requires restoring a database backup taken immediately before that phase started — schema rollback alone is insufficient because forward migrations may have transformed data irreversibly. Every phase must begin with a labelled backup that includes the schema version marker (`schema_migrations` snapshot). The backup must be verified restorable before any phase migration runs.
+**Cross-phase rollback rule:** Rolling back across a phase boundary (e.g., reverting Phase 7 after Phase 8 has run) requires restoring a database backup taken immediately before that phase started — schema rollback alone is insufficient because forward migrations may have transformed data irreversibly. Every phase must begin with a labelled backup that includes the schema version marker (`_prisma_migrations` snapshot). The backup must be verified restorable before any phase migration runs.
 
 ### 2.4 Feature flags are mandatory
 
@@ -281,16 +282,19 @@ The current repo is already good, but V4 will increase write volume, operational
 - Add global API response shape for errors.
 - Add stricter payload-size defaults for JSON routes.
 - Add pagination defaults and maximums where list endpoints can grow.
-- Add a visible warning when SQLite is used in production mode.
+- Add a visible warning when the API starts without a configured PostgreSQL `DATABASE_URL` (the SQLite-in-production warning is obsolete — the control plane is PostgreSQL-only).
 - Add feature flag helper for all V4 gates.
 
 ### Database
 
-- Keep current SQLite tables unchanged.
-- Add `schema_migrations` table.
-- Add migration runner skeleton.
-- Stop adding new V4 schema through silent `ALTER TABLE` blocks.
-- Add test-only migration reset utility.
+Prisma Migrate already provides what this section originally asked for: the
+`_prisma_migrations` table is the versioned, checksummed migration ledger, and
+`prisma migrate deploy` fails loudly. What remains:
+
+- Keep current PostgreSQL tables unchanged.
+- All new V4 schema ships as hand-written SQL inside Prisma migrations — never runtime `ALTER TABLE` (the legacy silent-ALTER SQLite bootstrap in `api/src/db/index.js` is frozen and unreferenced).
+- Keep the test-only reset utility (`api/test/_dbtest.js` `resetDb()`) covering every new V4 table.
+- CI verifies zero drift between applied migrations and `schema.prisma` (`prisma migrate diff`).
 
 ### Jobs
 
@@ -322,7 +326,7 @@ Add or update tests for:
 CORS allows PATCH
 schema endpoint works
 feature flags return expected values
-migration runner records migration
+Prisma migrations apply cleanly with zero drift against schema.prisma
 job table accepts and locks jobs
 legacy dashboard still loads
 legacy deploy route still inject-tests
@@ -330,7 +334,7 @@ legacy deploy route still inject-tests
 
 ## Do not build yet
 
-- PostgreSQL migration
+- V4 foundational tables (organisations, admin_users — Phase 1)
 - Products UI
 - Portfolio UI
 - Stripe
@@ -428,7 +432,7 @@ Record and commit a baseline report containing:
 npm test result
 lint/typecheck result where available
 current API route list
-current SQLite schema dump
+current PostgreSQL schema dump (pg_dump --schema-only) + _prisma_migrations state
 current Caddy route files inventory
 current Docker containers and labels
 current backup dry run output
@@ -465,85 +469,75 @@ Delete the baseline-only code and test additions. No data rollback should be req
 
 ---
 
-# Phase 1 — PostgreSQL and migration foundation
+# Phase 1 — PostgreSQL foundation hardening
 
 ## Goal
 
-Prepare PostgreSQL as the future V4 control-plane database without forcing the whole app onto it immediately.
+Harden the existing PostgreSQL/Prisma control plane for commerce-grade write
+volume, and land the V4 foundational tables.
+
+> Baseline note: the original Phase 1 ("introduce PostgreSQL beside SQLite,
+> hand-rolled migration runner, `SYSTEMS_DB_ENGINE` dual mode") is complete in
+> a different form — the control plane already runs exclusively on PostgreSQL
+> via Prisma (`DATABASE_URL`; migrations applied with `prisma migrate deploy`,
+> which CI/deploy pipelines run explicitly — the deliberate equivalent of
+> `MIGRATIONS_AUTO_RUN=false`). There is no dual-engine mode to maintain.
 
 ## Why this phase comes before products
 
-Products, orders, subscriptions, entitlements and analytics need reliable transactions. PostgreSQL should exist before commercial objects exist.
+Products, orders, subscriptions, entitlements and analytics need reliable
+transactions *and* connection headroom. Pooling, off-host backups and the
+foundational schema must exist before commercial objects do.
 
 ## Tasks
 
-### Database connection
+### V4 foundational schema
 
-Add:
-
-```text
-api/src/db/postgres.js
-api/src/db/sqlite-legacy.js
-api/src/db/repositories/
-api/src/db/migrate.js
-api/src/db/migrations/
-```
-
-Environment:
-
-```env
-SYSTEMS_DB_ENGINE=sqlite|postgres
-DATABASE_URL=
-MIGRATIONS_AUTO_RUN=false
-```
-
-### Migration tooling
-
-Add scripts:
+Create only foundational tables, as hand-written SQL in Prisma migrations
+(ledger: `_prisma_migrations`):
 
 ```text
-api/scripts/migrate-sqlite-to-postgres.js
+organisations
+admin_users
+admin_sessions
+platform_settings (v4 additions)
+audit_log_v4
+```
+
+(`jobs` already exists from Phase 0.) Do not migrate projects yet.
+
+### Repository facade
+
+Extend the existing repository layer (`api/src/repo/`) with facades for the
+new tables:
+
+```text
+repo/organisations.js
+repo/adminUsers.js
+repo/adminSessions.js
+repo/auditV4.js
+```
+
+Existing routes keep using their current repositories until migrated.
+
+### Migration tooling for legacy installs
+
+Complete the tooling for migrating pre-Prisma (SQLite) installs:
+
+```text
+api/scripts/migrate-sqlite-to-postgres.js   (exists — verify against current schema)
 api/scripts/verify-postgres-migration.js
 scripts/migrate-v4-windows.ps1
 scripts/verify-v4-windows.ps1
 ```
 
-### First PostgreSQL schema
-
-Create only foundational tables:
-
-```text
-schema_migrations
-organisations
-admin_users
-admin_sessions
-platform_settings
-audit_log_v4
-jobs
-```
-
-Do not migrate projects yet.
-
-### Repository facade
-
-Introduce repositories without changing every route immediately:
-
-```text
-repositories/usersRepository
-repositories/settingsRepository
-repositories/auditRepository
-repositories/jobsRepository
-```
-
-Current routes can still use old `db` directly until migrated.
-
 ### Backup/restore
 
-Extend backup scripts to optionally include:
+Extend backup scripts to include:
 
 ```text
 PostgreSQL pg_dump
-schema migration state
+_prisma_migrations state
 job table
 platform settings
 audit tables
@@ -553,12 +547,11 @@ audit tables
 
 ```text
 PostgreSQL connection test
-migration order test
-migration checksum test
-migration failure test
-backup includes PostgreSQL when configured
+migration order + checksum verified via prisma migrate status / diff (zero drift)
+migration failure test (a failing migration aborts deploy loudly)
+backup includes PostgreSQL
 restore dry run detects PostgreSQL dump
-SQLite legacy mode still works
+legacy-install migration script runs repeatedly on test snapshots
 ```
 
 ## Do not build yet
@@ -572,16 +565,16 @@ SQLite legacy mode still works
 ## Exit gate
 
 ```text
-SQLite mode passes all tests
-PostgreSQL mode passes foundation tests
-migration runner is deterministic
-backup/restore scripts understand PostgreSQL
+all tests pass against PostgreSQL
+V4 foundational tables exist with composite indexes
+backup/restore covers Prisma migration state
 no dashboard behaviour changed
 ```
 
 ## Rollback
 
-Turn `SYSTEMS_DB_ENGINE=sqlite`. No production object migration should be required yet.
+Revert the Phase 1 Prisma migrations with the pre-phase labelled backup (the
+foundational tables carry no production data yet, so a restore is cheap).
 
 ---
 
@@ -3029,12 +3022,12 @@ pagination constants
 baseline report generator
 ```
 
-## PR 2 — Migration runner
+## PR 2 — Migration conventions — SUPERSEDED by Prisma Migrate
 
 ```text
-schema_migrations
-migration runner
-migration tests
+_prisma_migrations is the ledger (checksummed, ordered)
+V4 schema ships as hand-written SQL in Prisma migrations
+CI drift check (prisma migrate diff = no difference)
 no V4 product tables yet
 ```
 
@@ -3048,14 +3041,14 @@ job tests
 server UI placeholder
 ```
 
-## PR 4 — PostgreSQL connection
+## PR 4 — PostgreSQL hardening
 
 ```text
-pg pool
-DATABASE_URL validation
+PgBouncer sidecar (all connections via 6432)
+DATABASE_URL validation + startup warning when unset
 PostgreSQL health check
-foundation migration
-backup script extension
+S3 backup destination + restore drill
+backup script extension (_prisma_migrations state included)
 ```
 
 ## PR 5 — Organisations and admin migration

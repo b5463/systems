@@ -2,6 +2,7 @@
 
 **Document status:** implementation plan  
 **Repository inspected:** uploaded `systems-main(2).zip`  
+**Database baseline update (2026-07-02):** the control plane has since moved from SQLite to **PostgreSQL via Prisma** (`api/prisma/schema.prisma`, migrations applied with `prisma migrate deploy`, ledger in `_prisma_migrations` — see `docs/POSTGRES_PRISMA_MIGRATION.md`). Sections referring to SQLite as the current database have been revised; where the original plan said "introduce PostgreSQL", the work is now "harden the existing PostgreSQL foundation".  
 **Target product direction:** SYSTEMS. is Acronym's private control plane for building, deploying, operating, publishing and commercialising digital products.  
 **Companion documents:**
 
@@ -20,7 +21,7 @@ The current SYSTEMS. repository is a strong V2/V3 foundation. It already has the
 ```text
 Vue dashboard
 → Fastify API
-→ SQLite control database
+→ PostgreSQL control database (Prisma)
 → Docker workloads
 → Caddy/nginx routing
 → health, stats, logs, audit, backups, GitHub hooks and hardening
@@ -67,8 +68,8 @@ Current backend stack:
 ```text
 api/
 ├── Fastify 5
-├── better-sqlite3 control DB
-├── optional pg dependency
+├── PostgreSQL control DB (@prisma/client + Prisma Migrate)
+├── pg driver (raw SQL where Prisma is unsuitable)
 ├── dockerode
 ├── @fastify/jwt
 ├── @fastify/cors
@@ -176,11 +177,18 @@ Admin
 
 ### 2.3 Database
 
-Current platform DB is SQLite at:
+Current platform DB is PostgreSQL, accessed through Prisma:
 
 ```text
-DATA_DIR/platform.db
+api/prisma/schema.prisma        # schema of record
+api/prisma/migrations/          # hand-written SQL, applied via prisma migrate deploy
+DATABASE_URL                    # connection string (env)
+api/src/repo/                   # repository layer over @prisma/client
 ```
+
+The old SQLite bootstrap (`api/src/db/index.js`, `DATA_DIR/platform.db`) is
+legacy: unreferenced by `src/` and only relevant to pre-Prisma installs, which
+migrate with `api/scripts/migrate-sqlite-to-postgres.js`.
 
 Current core tables:
 
@@ -193,6 +201,11 @@ ip_bans
 platform_settings
 deploy_history
 stats_history
+secrets
+api_tokens
+nodes
+backup_records
+jobs            (V4 Phase 0)
 ```
 
 The current `projects` table already includes many fields that should move to clearer V4 tables:
@@ -280,8 +293,6 @@ GitHub webhook HMAC verification
 Fix or replace these before orders/subscriptions become authoritative:
 
 ```text
-SQLite as commercial source of truth
-idempotent ALTER TABLE migrations with empty catch blocks
 projects table as overloaded domain object
 implicit route state through generated proxy files
 deploy_history too thin for V4 releases
@@ -290,10 +301,17 @@ no product/customer/order/subscription/entitlement/licence tables
 no portfolio snapshot model
 no versioned public catalog API
 no Stripe webhook idempotency table
-no background job queue
 no official product integration API keys
 no event aggregation layer
-CORS missing PATCH in current app.js allow-list
+```
+
+Already fixed since this plan was written:
+
+```text
+SQLite as commercial source of truth      → PostgreSQL via Prisma is the control-plane DB
+idempotent ALTER TABLE with empty catch   → schema changes go through Prisma migrations only
+no background job queue                   → jobs table + gated in-process runner (V4 Phase 0)
+CORS missing PATCH                        → added (V4 Phase 0)
 ```
 
 ---
@@ -312,9 +330,11 @@ Do not delete `/api/projects` early. Add `/api/systems`, `/api/products`, `/api/
 
 Legacy dashboard screens can temporarily read from new tables through compatibility-shaped responses.
 
-### 3.4 Make PostgreSQL the V4 authority
+### 3.4 PostgreSQL is the V4 authority
 
-SQLite can remain for dev and migration staging, but commercial production V4 should use PostgreSQL.
+Done: PostgreSQL (via Prisma) is already the control-plane database for every
+environment. Legacy SQLite installs are one-way migrated with
+`api/scripts/migrate-sqlite-to-postgres.js`; SQLite has no production role in V4.
 
 ### 3.5 Deployment and commerce must not share failure domains blindly
 
@@ -369,13 +389,11 @@ Create a module layout while keeping existing routes alive.
 api/src/
 ├── app.js
 ├── index.js
-├── db/
-│   ├── index.js                    # temporary compatibility export
-│   ├── postgres.js                 # new PG pool/client
-│   ├── sqlite-legacy.js            # current better-sqlite3 wrapper
-│   ├── migrate.js                  # versioned migration runner
-│   ├── migrations/
-│   └── repositories/
+├── repo/                           # repository layer over @prisma/client (exists)
+│   └── <domain>.js                 # one facade per domain; V4 modules add theirs here
+├── ../prisma/
+│   ├── schema.prisma               # schema of record
+│   └── migrations/                 # hand-written SQL per migration (Prisma Migrate)
 ├── modules/
 │   ├── auth/
 │   ├── organisations/
@@ -437,39 +455,22 @@ dashboard/src/
 
 These should be done first because they affect the reliability of every later phase.
 
-### 6.1 Fix CORS methods
+### 6.1 Fix CORS methods — DONE (V4 Phase 0)
 
-Current `api/src/app.js` allows:
-
-```js
-methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
-```
-
-But the current dashboard already uses `PATCH` endpoints, including:
-
-```text
-PATCH /api/projects/:slug/visibility
-PATCH /api/projects/:slug/limits
-PATCH /api/projects/:slug/repo
-PATCH /api/projects/:slug/primary
-PATCH /api/admin/settings
-```
-
-Change to:
+`api/src/app.js` now allows:
 
 ```js
 methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']
 ```
 
-### 6.2 Stop silent schema migration failures
+### 6.2 Stop silent schema migration failures — DONE (Prisma migration)
 
-The current DB uses many:
-
-```js
-try { db.exec(`ALTER TABLE ...`) } catch {}
-```
-
-For V4, keep existing SQLite compatibility, but add a versioned migration runner for new tables. Migration failure must be visible.
+The old SQLite bootstrap used many `try { db.exec(\`ALTER TABLE ...\`) } catch {}`
+blocks. All schema changes now go through Prisma Migrate: hand-written SQL per
+migration, checksummed and ordered in `_prisma_migrations`, applied with
+`prisma migrate deploy` (which fails loudly). V4 tables must follow the same
+path — no runtime schema mutation, and CI verifies zero drift between the
+applied migrations and `schema.prisma`.
 
 ### 6.3 Add schema health endpoint
 
@@ -483,112 +484,107 @@ Return:
 
 ```json
 {
-  "database": "sqlite|postgres",
-  "schemaVersion": "v4_001",
+  "database": "postgres",
+  "schemaVersion": "20260702090000_v4_phase0_jobs_audit_request_id",
   "pendingMigrations": 0,
   "lastMigrationAt": "..."
 }
 ```
 
-### 6.4 Add platform mode flags
+`schemaVersion` and `pendingMigrations` read from the `_prisma_migrations` table.
 
-Add environment flags:
+### 6.4 Add platform mode flags — DONE (V4 Phase 0)
+
+Implemented in `api/src/util/flags.js` (`SYSTEMS_DB_ENGINE` is obsolete — the
+engine is always PostgreSQL):
 
 ```env
-SYSTEMS_PLATFORM_MODE=legacy|dual|v4
-SYSTEMS_DB_ENGINE=sqlite|postgres
+ENABLE_V4_PLATFORM=false
 ENABLE_V4_PRODUCTS=false
+ENABLE_V4_SYSTEMS=false
 ENABLE_V4_PORTFOLIO=false
 ENABLE_V4_COMMERCE=false
 ENABLE_V4_LICENSING=false
 ENABLE_V4_ANALYTICS=false
+ENABLE_V4_EXTERNAL_INTEGRATIONS=false
+ENABLE_V4_JOBS=false
 ```
 
-### 6.5 Introduce background job table even before queue service
+### 6.5 Introduce background job table even before queue service — DONE (V4 Phase 0)
 
-At minimum:
+Shipped in migration `20260702090000` (shape follows the existing Prisma
+conventions — `SERIAL` id, `TIMESTAMP(3)`, TEXT payload):
 
 ```sql
 CREATE TABLE jobs (
-  id UUID PRIMARY KEY,
-  type TEXT NOT NULL,
-  status TEXT NOT NULL,
-  priority INTEGER NOT NULL DEFAULT 100,
-  payload JSONB NOT NULL DEFAULT '{}',
+  id SERIAL PRIMARY KEY,
+  job_type TEXT NOT NULL,
+  payload TEXT,
+  status TEXT NOT NULL DEFAULT 'pending',
   attempts INTEGER NOT NULL DEFAULT 0,
-  max_attempts INTEGER NOT NULL DEFAULT 5,
-  run_after TIMESTAMPTZ NOT NULL DEFAULT now(),
-  locked_at TIMESTAMPTZ,
+  max_attempts INTEGER NOT NULL DEFAULT 3,
+  next_run_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  locked_at TIMESTAMP(3),
   locked_by TEXT,
   last_error TEXT,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  completed_at TIMESTAMP(3),
+  created_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 ```
 
-Stripe webhooks, portfolio snapshots, media processing, analytics aggregation and health checks should use jobs.
+Claiming is atomic (`FOR UPDATE SKIP LOCKED`), retries back off 30s/5m/30m, and
+jobs dead-letter after `max_attempts`. Stripe webhooks, portfolio snapshots,
+media processing, analytics aggregation and health checks should use jobs.
 
 ---
 
-## 7. PostgreSQL migration plan
+## 7. PostgreSQL foundation status
 
-### 7.1 Why PostgreSQL now
+### 7.1 What is already done
 
-V4 adds concurrent writes from:
-
-```text
-admin dashboard
-Stripe webhooks
-analytics ingestion
-external system heartbeats
-licence validation
-background jobs
-health checks
-portfolio publishing
-```
-
-SQLite WAL is good for the current local control plane. It is not the right long-term authority for commerce, subscriptions, analytics and licences.
-
-### 7.2 Migration stages
-
-```mermaid
-flowchart LR
-    A[SQLite current] --> B[Add PG connection and migrations]
-    B --> C[Dual-read legacy data]
-    C --> D[Migrate users/projects/history/stats/audit]
-    D --> E[Run dashboard on PG-backed repositories]
-    E --> F[Freeze SQLite writes]
-    F --> G[Remove SQLite from production path]
-```
-
-### 7.3 Required scripts
-
-Add:
+The SQLite → PostgreSQL move this section originally planned has been
+completed (see `docs/POSTGRES_PRISMA_MIGRATION.md`):
 
 ```text
-api/scripts/migrate-sqlite-to-postgres.js       # exists as package script target; complete it
-api/scripts/verify-postgres-migration.js
-api/scripts/export-sqlite-snapshot.js
-scripts/migrate-v4-windows.ps1
-scripts/verify-v4-windows.ps1
+PostgreSQL is the control-plane database in every environment
+Prisma is the ORM; api/prisma/schema.prisma is the schema of record
+migrations are hand-written SQL applied via prisma migrate deploy
+_prisma_migrations is the checksummed, ordered migration ledger
+the repository layer (api/src/repo/) wraps @prisma/client
+api/scripts/migrate-sqlite-to-postgres.js migrates legacy SQLite installs
+CI provisions PostgreSQL, applies migrations, and runs the full suite
 ```
 
-### 7.4 Migration validation
+The concurrent-write pressure that motivated the move (Stripe webhooks,
+analytics ingestion, licence validation, background jobs, health checks,
+portfolio publishing) lands on infrastructure that already supports it.
 
-Migration is accepted only when:
+### 7.2 What remains (moved to Phase 1)
+
+```text
+PgBouncer sidecar (transaction pooling, port 6432, pool exhaustion → 503)
+S3-compatible off-host backup destination + clean-host restore drill
+V4 foundational tables (organisations, admin_users, admin_sessions,
+  platform_settings v4, audit_log_v4) as Prisma migrations
+composite indexes shipped in the same migration as each table
+per-type job concurrency limits + dead-letter alerting on the Phase 0 jobs table
+session hardening (crypto.randomBytes(32) tokens, rotation on login, max 5)
+verify-postgres-migration.js + Windows PowerShell equivalents for legacy installs
+```
+
+### 7.3 Validation for legacy-install migrations
+
+`migrate-sqlite-to-postgres.js` runs are accepted only when:
 
 ```text
 users count matches
 sessions count may be dropped intentionally
-projects become systems
-deploy_history becomes releases
-stats_history becomes infrastructure_metrics
 audit chain is preserved or archived
 env metadata is preserved
 encrypted env values remain decryptable
 routes can be regenerated
-current containers reconcile with migrated systems
-dashboard loads from new APIs
+dashboard loads against the migrated database
 backup includes PG dump
 restore works on a clean host
 ```
@@ -2229,7 +2225,7 @@ api/test/v4-jobs.test.js
 Must pass before V4 launch:
 
 ```text
-migrate current SQLite to PostgreSQL
+legacy SQLite installs migrate to PostgreSQL (script, repeatable on snapshots)
 legacy /api/projects still lists systems
 deploy new app to preview
 promote preview to production
@@ -2255,13 +2251,13 @@ backup/restore preserves commerce and portfolio
 ### Phase 0 — Stabilise current repo
 
 ```text
-Fix CORS PATCH
-Add migration runner skeleton
-Add schema health endpoint
-Add platform mode flags
-Add job table
-Add request IDs globally
-Add pagination limits where missing
+Fix CORS PATCH                                  [done]
+Versioned migrations (Prisma Migrate in place)  [done]
+Add schema health endpoint                      (Tomas)
+Add platform mode flags                         [done]
+Add job table + gated in-process runner         [done]
+Add request IDs globally                        [done]
+Add pagination limits where missing             (Tomas)
 ```
 
 Acceptance:
@@ -2272,23 +2268,27 @@ dashboard still works
 deploy/redeploy/rollback still works
 ```
 
-### Phase 1 — PostgreSQL foundation
+### Phase 1 — PostgreSQL foundation hardening
+
+PostgreSQL + Prisma is already the control plane; Phase 1 hardens it for
+commerce-grade load:
 
 ```text
-Add PG pool
-Add versioned migrations
-Add migration scripts
-Migrate users/sessions/settings/audit
-Migrate projects into systems/environments/releases
-Add legacy compatibility repository
+Deploy PgBouncer sidecar; all connections via port 6432
+S3-compatible backup destination + clean-host restore drill
+Add V4 foundational tables (organisations, admin_users, admin_sessions,
+  audit_log_v4) as Prisma migrations with composite indexes
+Per-type job concurrency limits + dead-letter alerting
+Session hardening (token entropy, rotation, concurrent session cap)
+Complete verify-postgres-migration.js for legacy installs
 ```
 
 Acceptance:
 
 ```text
-SQLite-to-PG migration can run repeatedly on test snapshots
-legacy endpoints work against PG-backed data
-backup/restore includes PG
+legacy SQLite-to-PG migration script runs repeatedly on test snapshots
+pool exhaustion returns 503, never a hang
+backup uploads to S3; restore passes on a clean host
 ```
 
 ### Phase 2 — Systems model
@@ -2475,10 +2475,11 @@ api/src/app.js
 - add request ID
 - separate public ingestion rate limits from admin rate limits
 
-api/src/db/index.js
-- split into sqlite-legacy and repository facade
-- remove future silent migrations
-- export PG-backed repositories in V4 mode
+api/prisma/schema.prisma + api/src/repo/
+- V4 tables land as Prisma migrations (hand-written SQL)
+- one repository facade per V4 domain added under api/src/repo/
+- api/src/db/index.js (legacy SQLite bootstrap) stays frozen; delete once
+  no legacy install remains
 
 api/src/routes/deploy.js
 - keep legacy
@@ -2503,9 +2504,7 @@ api/src/services/docker.js
 ### 28.2 Add
 
 ```text
-api/src/db/postgres.js
-api/src/db/migrate.js
-api/src/db/migrations/*.sql
+api/prisma/migrations/*/migration.sql   (one per V4 schema change)
 
 api/src/modules/products/*
 api/src/modules/systems/*
@@ -2556,7 +2555,7 @@ dashboard/src/modules/incidents/*
 | Analytics overloads host | rate limits, batching, aggregation jobs, retention |
 | Feedback/bug email intake is abused or spammed | signed provider webhooks, spam controls, attachment limits, product routing allowlists, quarantine and dead-letter review |
 | Product/user data coupling | API/SDK protocol, no shared app DB |
-| SQLite migration loses data | dry-run migration, verification script, backup first |
+| Legacy SQLite install migration loses data | dry-run migration, verification script, backup first |
 | Dashboard becomes too complex | split Products, Systems, Portfolio and Commerce modules |
 | Stripe events arrive out of order | webhook event store plus reconciliation jobs |
 

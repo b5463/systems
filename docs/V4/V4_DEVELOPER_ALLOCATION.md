@@ -2,7 +2,8 @@
 
 **Status:** Active  
 **Branch:** `claude/v4-roadmap-allocation-jxue3e`  
-**Updated:** 2026-06-27  
+**Updated:** 2026-07-02  
+**Database baseline:** the control plane runs on PostgreSQL via Prisma (`prisma migrate deploy`, ledger `_prisma_migrations`). Migration-runner tasks below map to Prisma Migrate; Phase 1 is PostgreSQL hardening, not introduction. See `docs/V4/V4_PHASE0_STATUS.md`.  
 **Source documents:**
 
 - `docs/V4/V4_PROPOSAL.md` — definitive product and architecture proposal
@@ -40,8 +41,8 @@ Tick a phase when its exit gate passes — not when coding is done.
 
 ### Milestone A — Safe Base
 - [ ] **Phase 0** — Stabilise current repository
-  - [ ] CORS, request IDs, feature flag helper, schema_migrations runner, ALTER TABLE stop, test reset, jobs table, host invariants (Alex)
-  - [ ] Schema/features endpoints, error response shape, pagination defaults, SQLite-in-production warning, job UI placeholder, pagination controls (Tomas)
+  - [x] CORS PATCH, request IDs (+audit stamping), feature flag helper, versioned migrations (Prisma Migrate), no-silent-ALTER, test reset, jobs table + gated runner, host invariants (Alex — see `V4_PHASE0_STATUS.md`)
+  - [ ] Schema/features endpoints, error response shape, pagination defaults, missing-DATABASE_URL warning, job UI placeholder, pagination controls (Tomas)
   - [ ] All Phase 0 tests pass; legacy dashboard and deploy flow unaffected
   - [ ] Staging environment allocated and deploying (separate PostgreSQL, Stripe test account, Caddy, staging domains)
   - [ ] Email provider chosen and smoke-tested (SEND_EMAIL_PROVIDER env var set; test email sends on staging startup)
@@ -50,14 +51,12 @@ Tick a phase when its exit gate passes — not when coding is done.
   - [ ] Baseline report committed (tests, lint, routes, schema dump, Caddy inventory, Docker labels, backup dry run, feature flags)
   - [ ] Namespace boundary tests pass
   - [ ] Deprecation header helper in place
-- [ ] **Phase 1** — PostgreSQL and migration foundation
-  - [ ] `postgres.js`, `sqlite-legacy.js`, `repositories/`, `migrate.js`, `migrations/`
-  - [ ] `SYSTEMS_DB_ENGINE`, `DATABASE_URL`, `MIGRATIONS_AUTO_RUN` env vars
-  - [ ] Migration scripts (JS + PowerShell)
-  - [ ] Foundational schema: `schema_migrations`, `organisations`, `admin_users`, `admin_sessions`, `platform_settings`, `audit_log_v4`, `jobs`
-  - [ ] Repository facades: users, settings, audit, jobs
-  - [ ] Backup/restore extended for PostgreSQL
-  - [ ] SQLite legacy mode still passes all tests
+- [ ] **Phase 1** — PostgreSQL foundation hardening (PostgreSQL via Prisma is already the control plane)
+  - [ ] Foundational schema via Prisma migrations: `organisations`, `admin_users`, `admin_sessions`, `platform_settings` (v4), `audit_log_v4` (`jobs` shipped in Phase 0)
+  - [ ] Repository facades under `api/src/repo/`: organisations, admin users/sessions, audit v4 (jobs shipped in Phase 0)
+  - [ ] Legacy-install migration scripts (`migrate-sqlite-to-postgres.js` verify + `verify-postgres-migration.js` + PowerShell)
+  - [ ] Backup/restore extended: pg_dump + `_prisma_migrations` state + jobs + settings + audit
+  - [ ] Legacy-install migration script runs repeatedly on test snapshots
   - [ ] PgBouncer deployed as sidecar; all code connects via port 6432
   - [ ] Backup destination set to S3-compatible remote; restore from S3 tested on clean host
   - [ ] Composite indexes defined in same migration as each table
@@ -244,11 +243,11 @@ Tick a phase when its exit gate passes — not when coding is done.
 | Global API error response shape | Tomas |
 | Stricter JSON payload-size defaults | Alex |
 | Pagination defaults and maximums | Tomas |
-| SQLite-in-production warning | Tomas |
+| Missing-`DATABASE_URL` startup warning (replaces the obsolete SQLite-in-production warning) | Tomas |
 | Feature flag helper for V4 gates | Alex |
-| `schema_migrations` table + migration runner skeleton | Alex |
-| Stop using silent `ALTER TABLE` blocks for new schema | Alex |
-| Test-only migration reset utility | Alex |
+| Versioned migrations — done via Prisma Migrate (`_prisma_migrations` ledger; hand-written SQL per migration; CI drift check) | Alex |
+| Stop using silent `ALTER TABLE` blocks for new schema (legacy SQLite bootstrap frozen; all schema via Prisma migrations) | Alex |
+| Test-only migration reset utility (`api/test/_dbtest.js` covers every new V4 table) | Alex |
 | `jobs` table, in-process runner (disabled by default), lock/unlock, retry/backoff | Alex |
 | Confirm host-protection invariants (concurrency caps, disk admission, upload limits, cache headers, container limits) | Alex |
 | Tests: CORS PATCH, feature flags, migration runner, job table | Alex |
@@ -264,25 +263,25 @@ Tick a phase when its exit gate passes — not when coding is done.
 
 | Task | Owner |
 |------|-------|
-| Commit baseline report (tests, lint, API route list, SQLite schema dump, Caddy inventory, Docker labels, backup dry run, feature flags) | Tomas |
+| Commit baseline report (tests, lint, API route list, PostgreSQL schema dump + `_prisma_migrations` state, Caddy inventory, Docker labels, backup dry run, feature flags) | Tomas |
 | Namespace boundary tests (`/api/public/*`, `/api/ingest/*`, `/api/webhooks/*`, admin routes) | Tomas |
 | Document namespace strategy | Tomas |
 | Deprecation header helper (ready to apply once V4 replacements exist) | Tomas |
 
-### Phase 1 — PostgreSQL and migration foundation
+### Phase 1 — PostgreSQL foundation hardening
+
+PostgreSQL via Prisma is already the control plane (`api/prisma/schema.prisma`,
+`api/src/repo/`, `DATABASE_URL`). Phase 1 hardens it and lands the V4
+foundational schema:
 
 | Task | Owner |
 |------|-------|
-| `api/src/db/postgres.js` and `sqlite-legacy.js` | Alex |
-| `api/src/db/repositories/` structure | Alex |
-| `api/src/db/migrate.js` runner | Alex |
-| `api/src/db/migrations/` directory with first foundational tables (`schema_migrations`, `organisations`, `admin_users`, `admin_sessions`, `platform_settings`, `audit_log_v4`, `jobs`) | Alex |
-| Environment vars: `SYSTEMS_DB_ENGINE`, `DATABASE_URL`, `MIGRATIONS_AUTO_RUN` | Alex |
-| Migration scripts: `migrate-sqlite-to-postgres.js`, `verify-postgres-migration.js`, Windows PowerShell equivalents | Alex |
-| Repository facades: `usersRepository`, `settingsRepository`, `auditRepository`, `jobsRepository` | Alex |
-| Extend backup/restore scripts to include PostgreSQL `pg_dump`, migration state, job table, platform settings, audit | Alex |
-| Tests: connection, migration order, checksum, failure, backup includes PG, restore dry run | Alex |
-| Verify SQLite legacy mode: all pre-V4 tests and Phase 0.5 namespace boundary tests still pass after Phase 1 migration; regression check included in Phase 1 exit gate | Tomas |
+| Foundational tables as Prisma migrations (`organisations`, `admin_users`, `admin_sessions`, `platform_settings` v4, `audit_log_v4`) — `jobs` shipped in Phase 0 | Alex |
+| Repository facades under `api/src/repo/` for the new tables (jobs repo shipped in Phase 0) | Alex |
+| Legacy-install migration scripts: verify `migrate-sqlite-to-postgres.js` against current schema, add `verify-postgres-migration.js`, Windows PowerShell equivalents | Alex |
+| Extend backup/restore scripts to include PostgreSQL `pg_dump`, `_prisma_migrations` state, job table, platform settings, audit | Alex |
+| Tests: connection, migration drift (prisma migrate diff), failing migration aborts loudly, backup includes PG, restore dry run | Alex |
+| Verify pre-V4 regression: all existing tests and Phase 0.5 namespace boundary tests still pass after Phase 1 migrations; regression check included in Phase 1 exit gate | Tomas |
 | Deploy PgBouncer as sidecar; configure pool_mode=transaction, max_db_connections=20, default_pool_size=5; all code connects via port 6432; pool exhaustion returns 503 | Alex |
 | Configure S3-compatible backup destination (bucket, encryption key, retention policy); backup uploads to S3; restore drill on clean host with zero local files | Alex |
 | Define composite indexes for all Phase 1 tables in same migration file (audit_log_v4, jobs, admin_sessions) | Alex |
@@ -561,9 +560,9 @@ Tick a phase when its exit gate passes — not when coding is done.
 
 | Phase | Primary Alex | Primary Tomas |
 |-------|--------------|--------------|
-| 0 | Backend hardening (CORS, request IDs, migration runner, jobs, host invariants) | Schema/features endpoints, error shape, pagination, SQLite warning, job UI, pagination UI |
+| 0 | Backend hardening (CORS, request IDs, Prisma migration conventions, jobs, host invariants) | Schema/features endpoints, error shape, pagination, DATABASE_URL warning, job UI, pagination UI |
 | 0.5 | — | Baseline report, namespace tests, deprecation helper |
-| 1 | PostgreSQL foundation, all migration tooling, PgBouncer, S3 | SQLite legacy mode regression verification |
+| 1 | PostgreSQL hardening (foundational tables, legacy-install tooling, PgBouncer, S3) | Pre-V4 regression verification |
 | 2 | DB tables, migration bridge, write APIs, org-scoping | Read APIs, legacy compatibility layer, Systems/Products dashboard |
 | 2.5 | — | Reconciliation script, operator report |
 | 3 | Deploy engine (deployService, new routes, promotion, Docker labels) | Legacy route wiring through mapping layer |
