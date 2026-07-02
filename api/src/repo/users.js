@@ -134,11 +134,27 @@ async function touchSession(jti) {
   });
 }
 
+// V4 Phase 1: cap concurrent sessions per user — keep the newest `max`,
+// revoke the rest (oldest first). Returns how many were revoked.
+async function enforceSessionLimit(userId, max = Number(process.env.MAX_SESSIONS_PER_USER) || 5) {
+  const excess = await prisma.session.findMany({
+    where: { userId },
+    orderBy: { createdAt: 'desc' },
+    skip: max,
+    select: { id: true },
+  });
+  if (!excess.length) return 0;
+  const { count } = await prisma.session.deleteMany({
+    where: { id: { in: excess.map((s) => s.id) } },
+  });
+  return count;
+}
+
 module.exports = {
   findByUsername, findById, countUsers, createUser, deleteUser,
   updatePassword, bumpTokenVersion, listUsers,
   setupTotp, enableTotp, disableTotp,
   createSession, findSessionByJti, findSessionById,
   deleteSessionById, deleteSessionByJti, deleteUserSessions,
-  listUserSessions, touchSession,
+  listUserSessions, touchSession, enforceSessionLimit,
 };

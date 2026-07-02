@@ -1,7 +1,7 @@
 'use strict';
 
 const bcrypt = require('bcrypt');
-const { v4: uuidv4 } = require('uuid');
+const crypto = require('crypto');
 const { userRepo, auditRepo } = require('../repo');
 const totp = require('../util/totp');
 const lockout = require('../util/lockout');
@@ -50,11 +50,15 @@ function signToken(fastify, user, jti) {
   );
 }
 
-// Record a new session row and return a token bound to it.
+// Record a new session row and return a token bound to it. Session ids use
+// 256 bits from the CSPRNG (V4 Phase 1 — never Math.random/UUID), a fresh id
+// is minted on every login (fixation prevention), and each user is capped at
+// N concurrent sessions — opening one past the cap revokes the oldest.
 async function createSession(fastify, user, request, reply) {
-  const jti = uuidv4();
+  const jti = crypto.randomBytes(32).toString('hex');
   const ua = ((request.headers && request.headers['user-agent']) || '').slice(0, 300);
   await userRepo.createSession(user.id, jti, ua || null, request.ip || null);
+  await userRepo.enforceSessionLimit(user.id);
   setSessionCookie(reply, signToken(fastify, user, jti));
   return csrfToken(jti);
 }

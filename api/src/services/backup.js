@@ -55,11 +55,28 @@ async function runBackup() {
       } catch { /* best-effort */ }
     }
 
+    // Schema version marker (V4 Phase 1): every backup records the Prisma
+    // migration state it was taken at, so cross-phase rollbacks can verify
+    // they are restoring a matching schema (roadmap §2.3).
+    let schemaVersion = null;
+    let migrationsApplied = null;
+    try {
+      const { prisma } = require('../repo');
+      const rows = await prisma.$queryRaw`
+        SELECT migration_name FROM _prisma_migrations
+        WHERE finished_at IS NOT NULL
+        ORDER BY migration_name`;
+      migrationsApplied = rows.length;
+      schemaVersion = rows.length ? rows[rows.length - 1].migration_name : null;
+    } catch { /* pre-migration database — marker stays null */ }
+
     const manifest = {
       created_at: new Date().toISOString(),
       platform_db: true,
       caddy_routes: caddyCopied,
       systems_version: '2.0.0-rc.1',
+      schema_version: schemaVersion,
+      migrations_applied: migrationsApplied,
     };
     await fsp.writeFile(path.join(dest, 'manifest.json'), JSON.stringify(manifest, null, 2));
 

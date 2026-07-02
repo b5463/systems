@@ -24,6 +24,9 @@ services:
       - ./data:/app/data
     environment:
       - NODE_ENV=production
+      # Point at PgBouncer (127.0.0.1:6432 / acronym-pgbouncer:6432) when the
+      # pgbouncer profile is enabled; direct PostgreSQL otherwise.
+      - DATABASE_URL=${DATABASE_URL}
       - JWT_SECRET=${JWT_SECRET}
       - CSRF_SECRET=${CSRF_SECRET:-}
       - SESSION_IDLE_MINUTES=${SESSION_IDLE_MINUTES:-720}
@@ -38,6 +41,32 @@ services:
       - "host.docker.internal:host-gateway"
     depends_on:
       - acronym-nginx
+
+  # V4 Phase 1: PgBouncer sidecar (opt-in via `--profile pgbouncer`).
+  # All application code connects through the pooler, never directly to
+  # PostgreSQL: transaction pooling, 20 server connections, pool size 5.
+  # Point PGBOUNCER_UPSTREAM_DATABASE_URL at the real PostgreSQL and set
+  # DATABASE_URL=postgresql://user:pass@acronym-pgbouncer:6432/dbname
+  # (or 127.0.0.1:6432 from the host).
+  acronym-pgbouncer:
+    image: edoburu/pgbouncer:latest
+    container_name: acronym-pgbouncer
+    restart: unless-stopped
+    profiles:
+      - pgbouncer
+    environment:
+      - DATABASE_URL=${PGBOUNCER_UPSTREAM_DATABASE_URL}
+      - LISTEN_PORT=6432
+      - POOL_MODE=transaction
+      - MAX_DB_CONNECTIONS=20
+      - DEFAULT_POOL_SIZE=5
+      - RESERVE_POOL_SIZE=1
+      - SERVER_IDLE_TIMEOUT=300
+      - AUTH_TYPE=scram-sha-256
+    ports:
+      - "127.0.0.1:6432:6432"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   acronym-certbot:
     image: certbot/certbot

@@ -41,13 +41,37 @@ function hashEntry(prevHash, entry) {
     .digest('hex');
 }
 
+// V4 audit rows (audit_log_v4) are org-scoped and entity-addressed, so their
+// canonical differs from the legacy one. Same array-form rule: key ordering
+// can never change the bytes we hash.
+function canonicalV4(entry) {
+  return JSON.stringify([
+    entry.id ?? null,
+    entry.organisation_id ?? null,
+    entry.admin_user_id ?? null,
+    entry.action ?? null,
+    entry.entity_type ?? null,
+    entry.entity_id ?? null,
+    entry.detail ?? null,
+    entry.ip ?? null,
+    entry.created_at ?? null,
+  ]);
+}
+
+function hashEntryV4(prevHash, entry) {
+  return crypto
+    .createHash('sha256')
+    .update(String(prevHash) + '|' + canonicalV4(entry))
+    .digest('hex');
+}
+
 /**
  * Verify a hash-chained audit log.
  * @param {Array<object>} rows  audit rows, each with id, hash, prev_hash and the
  *                              immutable fields. Order does not matter; sorted by id here.
  * @returns {{ok: boolean, total: number, verified: number, brokenAtId: number|null, reason: string|null}}
  */
-function verifyChain(rows) {
+function verifyChain(rows, hashFn = hashEntry) {
   const sorted = [...rows].sort((a, b) => a.id - b.id);
 
   // Legacy rows written before hashing have no hash; skip them and verify from
@@ -72,7 +96,7 @@ function verifyChain(rows) {
     }
 
     // Content integrity: recompute and compare.
-    if (hashEntry(row.prev_hash, row) !== row.hash) {
+    if (hashFn(row.prev_hash, row) !== row.hash) {
       return { ok: false, total: sorted.length, verified, brokenAtId: row.id, reason: 'content modified' };
     }
 
@@ -83,4 +107,4 @@ function verifyChain(rows) {
   return { ok: true, total: sorted.length, verified, brokenAtId: null, reason: null };
 }
 
-module.exports = { GENESIS, canonical, hashEntry, verifyChain };
+module.exports = { GENESIS, canonical, hashEntry, canonicalV4, hashEntryV4, verifyChain };

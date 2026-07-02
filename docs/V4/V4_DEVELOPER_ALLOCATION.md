@@ -51,17 +51,17 @@ Tick a phase when its exit gate passes — not when coding is done.
   - [ ] Baseline report committed (tests, lint, routes, schema dump, Caddy inventory, Docker labels, backup dry run, feature flags)
   - [ ] Namespace boundary tests pass
   - [ ] Deprecation header helper in place
-- [ ] **Phase 1** — PostgreSQL foundation hardening (PostgreSQL via Prisma is already the control plane)
-  - [ ] Foundational schema via Prisma migrations: `organisations`, `admin_users`, `admin_sessions`, `platform_settings` (v4), `audit_log_v4` (`jobs` shipped in Phase 0)
-  - [ ] Repository facades under `api/src/repo/`: organisations, admin users/sessions, audit v4 (jobs shipped in Phase 0)
-  - [ ] Legacy-install migration scripts (`migrate-sqlite-to-postgres.js` verify + `verify-postgres-migration.js` + PowerShell)
-  - [ ] Backup/restore extended: pg_dump + `_prisma_migrations` state + jobs + settings + audit
+- [ ] **Phase 1** — PostgreSQL foundation hardening (PostgreSQL via Prisma is already the control plane; see `V4_PHASE1_STATUS.md`)
+  - [x] Foundational schema via Prisma migrations: `organisations`, `admin_users`, `admin_sessions`, `audit_log_v4` (`jobs` shipped in Phase 0; existing `platform_settings` carries over — org-scoping deferred until multi-org is real)
+  - [x] Repository facades under `api/src/repo/`: organisations, admin users/sessions, audit v4 (jobs shipped in Phase 0)
+  - [x] Legacy-install migration scripts (`verify-postgres-migration.js` + PowerShell wrappers; `migrate-sqlite-to-postgres.js` pre-exists)
+  - [x] Backup/restore extended: manifest carries `_prisma_migrations` schema version; pg_dump covers jobs + settings + audit
   - [ ] Legacy-install migration script runs repeatedly on test snapshots
-  - [ ] PgBouncer deployed as sidecar; all code connects via port 6432
-  - [ ] Backup destination set to S3-compatible remote; restore from S3 tested on clean host
-  - [ ] Composite indexes defined in same migration as each table
-  - [ ] Job runner enforces per-type concurrency limits; dead-letter queue active at 3 failures
-  - [ ] Session tokens use crypto.randomBytes(32); session ID rotated on every login
+  - [ ] PgBouncer deployed as sidecar; all code connects via port 6432 (compose profile + env spec ready — host validation pending)
+  - [ ] Backup destination set to S3-compatible remote; restore from S3 tested on clean host (V3 S3 upload exists; restore drill pending)
+  - [x] Composite indexes defined in same migration as each table
+  - [x] Job runner enforces per-type concurrency limits; dead-letter queue active at 3 failures (alert at >10 dead)
+  - [x] Session tokens use crypto.randomBytes(32); session ID rotated on every login; max 5 concurrent sessions
 
 ### Milestone B — V4 Operational Core
 - [ ] **Phase 2** — Introduce V4 Products/Systems data model

@@ -1,5 +1,6 @@
 'use strict';
 
+const { Prisma } = require('@prisma/client');
 const { prisma } = require('./client');
 const { afterFailure } = require('../util/jobs');
 
@@ -19,7 +20,13 @@ async function enqueue({ jobType, payload = null, maxAttempts = 3, runAt = null 
   });
 }
 
-async function claimNext(lockedBy) {
+// excludePrefixes: type families currently at their concurrency cap (first
+// dot segment, e.g. 'build'); the claim skips them so a saturated family
+// never starves the others.
+async function claimNext(lockedBy, excludePrefixes = []) {
+  const excludeSql = excludePrefixes.length
+    ? Prisma.sql`AND split_part(job_type, '.', 1) NOT IN (${Prisma.join(excludePrefixes)})`
+    : Prisma.empty;
   const rows = await prisma.$queryRaw`
     UPDATE jobs SET
       status = 'running',
@@ -30,6 +37,7 @@ async function claimNext(lockedBy) {
     WHERE id = (
       SELECT id FROM jobs
       WHERE status = 'pending' AND next_run_at <= CURRENT_TIMESTAMP
+      ${excludeSql}
       ORDER BY next_run_at, id
       LIMIT 1
       FOR UPDATE SKIP LOCKED

@@ -103,7 +103,7 @@ if (!hasDb) {
     assert.ok(body.migrations.applied >= 4, 'all repo migrations must be applied');
     assert.equal(body.migrations.pending, 0);
     assert.deepEqual(body.migrations.pendingNames, []);
-    assert.match(body.migrations.lastApplied, /v4_phase0/);
+    assert.match(body.migrations.lastApplied, /^20\d{12}_/, 'timestamped migration name');
     assert.ok(body.migrations.lastAppliedAt);
   });
 

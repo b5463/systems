@@ -26,4 +26,27 @@ function afterFailure(job) {
   return { status: 'pending', retryInMs: backoffMs(attempts) };
 }
 
-module.exports = { BACKOFF_MS, backoffMs, afterFailure };
+// Per-type concurrency (V4 Phase 1). Job types are namespaced by their first
+// dot segment ('build.image' → 'build'); each family has a hard cap from the
+// roadmap. Unknown families get a conservative default.
+const TYPE_CONCURRENCY = Object.freeze({
+  build: 1,       // expand only after headroom measurement
+  stripe: 3,      // reconciliation jobs
+  email: 10,      // fulfilment
+  analytics: 5,   // aggregation
+  webhook: 20,    // retries
+});
+const DEFAULT_TYPE_CONCURRENCY = 5;
+
+function typePrefix(jobType) {
+  return String(jobType || '').split('.')[0];
+}
+
+function concurrencyFor(jobType) {
+  return TYPE_CONCURRENCY[typePrefix(jobType)] ?? DEFAULT_TYPE_CONCURRENCY;
+}
+
+module.exports = {
+  BACKOFF_MS, backoffMs, afterFailure,
+  TYPE_CONCURRENCY, DEFAULT_TYPE_CONCURRENCY, typePrefix, concurrencyFor,
+};
