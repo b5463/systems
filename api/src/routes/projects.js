@@ -13,19 +13,27 @@ const { pub, loadOr404 } = require('../util/project');
 const { DATA_DIR } = require('../util/paths');
 
 async function projectsRoutes(fastify, options) {
+  // V4 Phase 2 compatibility: with ENABLE_V4_SYSTEMS on, the V4-owned core
+  // fields of these reads come from the V4 tables (via legacy_project_map);
+  // the response contract is unchanged. Flag off → pure legacy, as before.
+  const { features } = require('../util/flags');
+  const { overlayProjects, overlayProject } = require('../util/v4compat');
+
   fastify.get('/api/projects', {
     preHandler: [fastify.authenticate],
   }, async () => {
-    const projects = (await projectRepo.listAll()).map(pub);
-    return { projects };
+    let rows = await projectRepo.listAll();
+    if (features().v4Systems) rows = await overlayProjects(rows);
+    return { projects: rows.map(pub) };
   });
 
   fastify.get('/api/projects/:slug', {
     preHandler: [fastify.authenticate],
   }, async (request, reply) => {
     const { slug } = request.params;
-    const project = await loadOr404(reply, slug);
+    let project = await loadOr404(reply, slug);
     if (!project) return;
+    if (features().v4Systems) project = await overlayProject(project);
     return { project: pub(project) };
   });
 

@@ -308,6 +308,181 @@ model AuditLogV4 {
   @@map("audit_log_v4")
 }
 
+// ── V4 Phase 2 — Products/Systems data model ────────────────────────────────
+// The V4 domain model, created beside the legacy `projects` world. The bridge
+// (api/scripts/migrate-projects-to-v4.js) copies projects in; `projects`
+// remains the operational source of truth until Phase 3 moves the deploy
+// engine. Every table is org-scoped; repository methods must filter on it.
+
+model Product {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organisationId String   @map("organisation_id") @db.Uuid
+  name           String
+  slug           String
+  status         String   @default("draft")
+  description    String?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at")
+
+  systems System[]
+
+  @@unique([organisationId, slug])
+  @@index([organisationId, status])
+  @@map("products")
+}
+
+model System {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organisationId String   @map("organisation_id") @db.Uuid
+  productId      String?  @map("product_id") @db.Uuid
+  name           String
+  slug           String
+  systemType     String?  @map("system_type")
+  currentStatus  String   @default("unknown") @map("current_status")
+  repo           String?
+  deployBranch   String   @default("main") @map("deploy_branch")
+  isPrimaryRoot  Boolean  @default(false) @map("is_primary_root")
+  runtime        String?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at")
+
+  product      Product?            @relation(fields: [productId], references: [id], onDelete: SetNull)
+  environments SystemEnvironment[]
+  releases     Release[]
+
+  @@unique([organisationId, slug])
+  @@index([organisationId, currentStatus])
+  @@index([productId])
+  @@map("systems")
+}
+
+model SystemEnvironment {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organisationId   String   @map("organisation_id") @db.Uuid
+  systemId         String   @map("system_id") @db.Uuid
+  name             String   @default("production")
+  accessPolicy     String   @default("public") @map("access_policy")
+  healthPath       String   @default("/") @map("health_path")
+  routePublished   Boolean  @default(false) @map("route_published")
+  basicUser        String?  @map("basic_user")
+  basicHash        String?  @map("basic_hash")
+  // Current release pointer — plain column, no relation, to avoid an FK cycle
+  // with releases.environment_id. Phase 4 replaces route_published with the
+  // route_status enum.
+  currentReleaseId String?  @map("current_release_id") @db.Uuid
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @default(now()) @updatedAt @map("updated_at")
+
+  system   System              @relation(fields: [systemId], references: [id], onDelete: Cascade)
+  releases Release[]
+  secrets  EnvironmentSecret[]
+
+  @@unique([systemId, name])
+  @@index([organisationId])
+  @@map("system_environments")
+}
+
+model Release {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organisationId String   @map("organisation_id") @db.Uuid
+  systemId       String   @map("system_id") @db.Uuid
+  environmentId  String   @map("environment_id") @db.Uuid
+  containerId    String?  @map("container_id")
+  imageId        String?  @map("image_id")
+  port           Int?
+  status         String   @default("active")
+  deployedAt     DateTime @default(now()) @map("deployed_at")
+  metadata       String?
+
+  system      System            @relation(fields: [systemId], references: [id], onDelete: Cascade)
+  environment SystemEnvironment @relation(fields: [environmentId], references: [id], onDelete: Cascade)
+
+  @@index([environmentId, deployedAt(sort: Desc)])
+  @@index([systemId, deployedAt(sort: Desc)])
+  @@index([organisationId])
+  @@map("releases")
+}
+
+model Domain {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organisationId String   @map("organisation_id") @db.Uuid
+  hostname       String   @unique
+  systemId       String?  @map("system_id") @db.Uuid
+  environmentId  String?  @map("environment_id") @db.Uuid
+  isCustom       Boolean  @default(false) @map("is_custom")
+  verified       Boolean  @default(false)
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([organisationId])
+  @@index([systemId])
+  @@map("domains")
+}
+
+model EnvironmentSecret {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organisationId String   @map("organisation_id") @db.Uuid
+  environmentId  String   @map("environment_id") @db.Uuid
+  key            String
+  value          String
+  version        Int      @default(1)
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at")
+
+  environment SystemEnvironment @relation(fields: [environmentId], references: [id], onDelete: Cascade)
+
+  @@unique([environmentId, key])
+  @@index([organisationId])
+  @@map("environment_secrets")
+}
+
+model InfrastructureMetric {
+  id             Int      @id @default(autoincrement())
+  organisationId String   @map("organisation_id") @db.Uuid
+  systemId       String   @map("system_id") @db.Uuid
+  environmentId  String?  @map("environment_id") @db.Uuid
+  cpuPercent     Float?   @map("cpu_percent")
+  memoryMb       Float?   @map("memory_mb")
+  memoryLimitMb  Float?   @map("memory_limit_mb")
+  rxBytes        BigInt?  @map("rx_bytes")
+  txBytes        BigInt?  @map("tx_bytes")
+  recordedAt     DateTime @default(now()) @map("recorded_at")
+
+  @@index([systemId, recordedAt(sort: Desc)])
+  @@index([organisationId])
+  @@map("infrastructure_metrics")
+}
+
+model HealthSnapshot {
+  id             Int      @id @default(autoincrement())
+  organisationId String   @map("organisation_id") @db.Uuid
+  systemId       String   @map("system_id") @db.Uuid
+  environmentId  String?  @map("environment_id") @db.Uuid
+  state          String?
+  statusCode     Int?     @map("status_code")
+  responseMs     Int?     @map("response_ms")
+  checkedAt      DateTime @default(now()) @map("checked_at")
+
+  @@index([systemId, checkedAt(sort: Desc)])
+  @@index([organisationId])
+  @@map("health_snapshots")
+}
+
+model LegacyProjectMap {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organisationId String   @map("organisation_id") @db.Uuid
+  projectId      Int      @unique @map("project_id")
+  systemId       String   @map("system_id") @db.Uuid
+  environmentId  String   @map("environment_id") @db.Uuid
+  releaseId      String?  @map("release_id") @db.Uuid
+  domainId       String?  @map("domain_id") @db.Uuid
+  migratedAt     DateTime @default(now()) @map("migrated_at")
+  notes          String?
+
+  @@index([organisationId])
+  @@index([systemId])
+  @@map("legacy_project_map")
+}
+
 // V4 Phase 0 — minimal job queue. The in-process runner is OFF by default
 // (ENABLE_V4_JOBS); Phase 1 adds per-type concurrency limits and dead-letter
 // alerting on top of these fields.

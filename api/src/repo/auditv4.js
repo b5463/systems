@@ -27,6 +27,7 @@ async function append({
   return prisma.$transaction(async (tx) => {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(3)`;
 
+    // org-scope-exempt: the hash chain is a single platform-wide sequence; rows carry their org
     const prev = await tx.auditLogV4.findFirst({
       orderBy: { id: 'desc' },
       select: { hash: true },
@@ -59,12 +60,14 @@ async function append({
       created_at: formatForHash(row.createdAt),
     });
 
+    // org-scope-exempt: sealing the hash of the row created just above, by PK
     await tx.auditLogV4.update({ where: { id: row.id }, data: { hash } });
     return row.id;
   });
 }
 
 async function verify() {
+  // org-scope-exempt: chain verification must walk every row across orgs
   const rows = await prisma.auditLogV4.findMany({ orderBy: { id: 'asc' } });
   const mapped = rows.map((r) => ({
     id: r.id,

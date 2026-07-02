@@ -13,14 +13,17 @@ async function create({ organisationId, username, passwordHash, role = 'admin' }
 }
 
 async function findByUsername(username) {
+  // org-scope-exempt: login-time lookup — usernames are globally unique by design
   return prisma.adminUser.findUnique({ where: { username } });
 }
 
 async function findById(id) {
+  // org-scope-exempt: lookup by UUID PK from a verified session
   return prisma.adminUser.findUnique({ where: { id } });
 }
 
 async function bumpTokenVersion(id) {
+  // org-scope-exempt: revocation by UUID PK from a verified session
   return prisma.adminUser.update({
     where: { id },
     data: { tokenVersion: { increment: 1 } },

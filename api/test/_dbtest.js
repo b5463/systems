@@ -16,7 +16,8 @@ const hasDb = !!process.env.DATABASE_URL;
 
 // @@map names from prisma/schema.prisma. CASCADE clears FK-linked rows; RESTART
 // IDENTITY keeps autoincrement ids predictable across runs.
-const TABLES = 'projects, users, sessions, audit_log, ip_bans, platform_settings, deploy_history, stats_history, jobs, organisations, admin_users, admin_sessions, audit_log_v4';
+const TABLES = 'projects, users, sessions, audit_log, ip_bans, platform_settings, deploy_history, stats_history, jobs, organisations, admin_users, admin_sessions, audit_log_v4, '
+  + 'products, systems, system_environments, releases, domains, environment_secrets, infrastructure_metrics, health_snapshots, legacy_project_map';
 
 async function resetDb() {
   await prisma.$executeRawUnsafe(`TRUNCATE TABLE ${TABLES} RESTART IDENTITY CASCADE`);

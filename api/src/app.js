@@ -235,6 +235,7 @@ async function buildApp(opts = {}) {
   await fastify.register(require('./routes/nodes'));
   await fastify.register(require('./routes/preview'));
   await fastify.register(require('./routes/buildpipeline'));
+  await fastify.register(require('./routes/systems')); // V4 Phase 2 (flag-gated)
 
   return fastify;
 }

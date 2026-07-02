@@ -64,14 +64,14 @@ Tick a phase when its exit gate passes — not when coding is done.
   - [x] Session tokens use crypto.randomBytes(32); session ID rotated on every login; max 5 concurrent sessions
 
 ### Milestone B — V4 Operational Core
-- [ ] **Phase 2** — Introduce V4 Products/Systems data model
-  - [ ] Tables: `products`, `systems`, `system_environments`, `releases`, `domains`, `environment_secrets`, `infrastructure_metrics`, `health_snapshots`, `legacy_project_map`
-  - [ ] Migration bridge: projects → systems → environments → releases → domains
-  - [ ] Read APIs live; write APIs stable
-  - [ ] Legacy `/api/projects/*` compatibility working
-  - [ ] Org-scoping enforced in every repository method; CI lint rule rejects unscoped queries
-  - [ ] Acceptance test: org A admin cannot read org B systems by ID
-  - [ ] Systems page renders V4-backed data (Tomas)
+- [ ] **Phase 2** — Introduce V4 Products/Systems data model (see `V4_PHASE2_STATUS.md`; open: bridge run against production data)
+  - [x] Tables: `products`, `systems`, `system_environments`, `releases`, `domains`, `environment_secrets`, `infrastructure_metrics`, `health_snapshots`, `legacy_project_map`
+  - [x] Migration bridge: projects → systems → environments → releases → domains (`migrate-projects-to-v4.js`, idempotent + non-destructive)
+  - [x] Read APIs live; write APIs stable (flag-gated: `ENABLE_V4_SYSTEMS` / `ENABLE_V4_PRODUCTS`)
+  - [x] Legacy `/api/projects/*` compatibility working (byte-identical parity test, flag on vs off)
+  - [x] Org-scoping enforced in every repository method; CI lint rule rejects unscoped queries (`lint-org-scoping.js` in `npm run lint`)
+  - [x] Acceptance test: org A admin cannot read org B systems by ID
+  - [x] Systems page renders V4-backed data (Tomas — via the parity-tested compat layer; hidden `/products` test page added)
 - [ ] **Phase 2.5** — Migration reconciliation checkpoint
   - [ ] `reconcile-v4-migration.js` passes on all test data
   - [ ] Operator dashboard report visible

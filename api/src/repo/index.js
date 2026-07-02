@@ -19,4 +19,7 @@ module.exports = {
   adminUserRepo: require('./adminusers'),
   adminSessionRepo: require('./adminsessions'),
   auditV4Repo: require('./auditv4'),
+  // V4 Phase 2 Products/Systems model (org-scoped)
+  productRepo: require('./products'),
+  systemRepo: require('./systems'),
 };
