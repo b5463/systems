@@ -2,6 +2,7 @@
 
 const { prisma } = require('./client');
 const { GENESIS, hashEntry, verifyChain } = require('../util/audit');
+const { currentRequestId } = require('../util/requestcontext');
 
 function formatForHash(date) {
   if (date instanceof Date) {
@@ -10,7 +11,13 @@ function formatForHash(date) {
   return date;
 }
 
-async function appendAudit({ user_id = null, action, target = null, detail = null, ip = null }) {
+async function appendAudit({ user_id = null, action, target = null, detail = null, ip = null, request_id = null }) {
+  // Request correlation (V4 Phase 0): stamp the current request's ID onto the
+  // entry. Read from AsyncLocalStorage so 50+ call sites need no change. The
+  // request ID is metadata only — it is NOT part of the hash-chain canonical
+  // fields (util/audit.js), so pre-existing chains remain verifiable.
+  const requestId = request_id ?? currentRequestId();
+
   return prisma.$transaction(async (tx) => {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(2)`;
 
@@ -21,7 +28,7 @@ async function appendAudit({ user_id = null, action, target = null, detail = nul
     const prevHash = prev?.hash || GENESIS;
 
     const row = await tx.auditLog.create({
-      data: { userId: user_id, action, target, detail, ip, prevHash },
+      data: { userId: user_id, action, target, detail, ip, requestId, prevHash },
     });
 
     const hashRow = {

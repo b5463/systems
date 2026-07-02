@@ -13,4 +13,5 @@ module.exports = {
   tokenRepo: require('./tokens'),
   nodeRepo: require('./nodes'),
   backupRepo: require('./backups'),
+  jobRepo: require('./jobs'),
 };

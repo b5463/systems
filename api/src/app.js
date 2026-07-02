@@ -9,9 +9,26 @@ async function buildApp(opts = {}) {
     ? false
     : (process.env.TRUST_PROXY ? process.env.TRUST_PROXY === 'true' : false);
 
+  const { requestIdFrom, runWithRequestId } = require('./util/requestcontext');
+
+  // Stricter JSON payload default (V4 Phase 0). Fastify's default is 1 MiB;
+  // JSON bodies on this API are small (env var text is the largest realistic
+  // payload). File uploads go through @fastify/multipart with its own limit.
+  const bodyLimit = Number(process.env.API_JSON_BODY_LIMIT_BYTES) || 512 * 1024;
+
   const fastify = Fastify({
     trustProxy,
+    bodyLimit,
+    genReqId: (req) => requestIdFrom(req.headers['x-request-id']),
     ...(opts.fastify || { logger: false }),
+  });
+
+  // Bind the request ID into AsyncLocalStorage for the rest of the request's
+  // lifecycle so audit entries (and any deep call site) can read it without
+  // signature changes, and echo it so clients/proxies can correlate.
+  fastify.addHook('onRequest', (request, reply, done) => {
+    reply.header('X-Request-Id', request.id);
+    runWithRequestId(request.id, done);
   });
 
   const { sessionToken, validCsrf, clearSessionCookie } = require('./util/session');
@@ -42,7 +59,7 @@ async function buildApp(opts = {}) {
   }
   await fastify.register(require('@fastify/cors'), {
     origin: corsOrigins,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'X-CSRF-Token'],
     credentials: true,
   });
@@ -68,6 +85,9 @@ async function buildApp(opts = {}) {
   // only in production, where traffic is TLS-terminated at Caddy/nginx.
   const isProd = process.env.NODE_ENV === 'production';
   fastify.addHook('onSend', async (request, reply, payload) => {
+    // Admin/control-plane responses must never be cached by intermediaries.
+    // Routes that need different caching (none today) can override in-handler.
+    if (!reply.getHeader('Cache-Control')) reply.header('Cache-Control', 'no-store');
     reply.header('X-Content-Type-Options', 'nosniff');
     reply.header('X-Frame-Options', 'DENY');
     reply.header('Referrer-Policy', 'no-referrer');

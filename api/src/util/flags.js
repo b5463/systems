@@ -27,6 +27,18 @@ function features(env = process.env) {
     apiTokens: bool(env.ENABLE_API_TOKENS, false),
     secretsManagement: bool(env.ENABLE_SECRETS_MANAGEMENT, false),
     buildCache: bool(env.ENABLE_BUILD_CACHE, false),
+    // v4 feature flags — every new V4 surface starts behind a gate (see
+    // docs/V4/SYSTEMS_V4_IMPLEMENTATION_ROADMAP_FIXED.md §2.4). All default OFF.
+    v4Platform: bool(env.ENABLE_V4_PLATFORM, false),
+    v4Products: bool(env.ENABLE_V4_PRODUCTS, false),
+    v4Systems: bool(env.ENABLE_V4_SYSTEMS, false),
+    v4Portfolio: bool(env.ENABLE_V4_PORTFOLIO, false),
+    v4Commerce: bool(env.ENABLE_V4_COMMERCE, false),
+    v4Licensing: bool(env.ENABLE_V4_LICENSING, false),
+    v4Analytics: bool(env.ENABLE_V4_ANALYTICS, false),
+    v4ExternalIntegrations: bool(env.ENABLE_V4_EXTERNAL_INTEGRATIONS, false),
+    // In-process V4 job runner (Phase 0 skeleton) — disabled by default.
+    v4Jobs: bool(env.ENABLE_V4_JOBS, false),
   };
 }
 

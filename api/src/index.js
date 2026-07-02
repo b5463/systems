@@ -66,6 +66,10 @@ async function main() {
   scheduler.start();
   previewcleanup.start();
 
+  // V4 Phase 0: in-process job runner, no-op unless ENABLE_V4_JOBS=true.
+  const jobrunner = require('./services/jobrunner');
+  jobrunner.start();
+
   const auditDays = Number(process.env.AUDIT_RETENTION_DAYS) || 0;
   if (auditDays > 0) {
     try {

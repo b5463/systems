@@ -104,6 +104,7 @@ model AuditLog {
   target    String?
   detail    String?
   ip        String?
+  requestId String?  @map("request_id")
   createdAt DateTime @default(now()) @map("created_at")
   prevHash  String?  @map("prev_hash")
   hash      String?
@@ -231,6 +232,29 @@ model Node {
   projects     Project[]
 
   @@map("nodes")
+}
+
+// V4 Phase 0 — minimal job queue. The in-process runner is OFF by default
+// (ENABLE_V4_JOBS); Phase 1 adds per-type concurrency limits and dead-letter
+// alerting on top of these fields.
+model Job {
+  id          Int       @id @default(autoincrement())
+  jobType     String    @map("job_type")
+  payload     String?
+  status      String    @default("pending")
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(3) @map("max_attempts")
+  nextRunAt   DateTime  @default(now()) @map("next_run_at")
+  lockedAt    DateTime? @map("locked_at")
+  lockedBy    String?   @map("locked_by")
+  lastError   String?   @map("last_error")
+  completedAt DateTime? @map("completed_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  @@index([status, jobType, createdAt])
+  @@index([status, nextRunAt])
+  @@map("jobs")
 }
 
 model BackupRecord {
