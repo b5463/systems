@@ -47,10 +47,10 @@ Tick a phase when its exit gate passes — not when coding is done.
   - [ ] Staging environment allocated and deploying (separate PostgreSQL, Stripe test account, Caddy, staging domains)
   - [ ] Email provider chosen and smoke-tested (SEND_EMAIL_PROVIDER env var set; test email sends on staging startup)
   - [ ] Monitoring stack chosen; alert thresholds defined; on-call rotation assigned
-- [ ] **Phase 0.5** — Baseline snapshot and namespace lock
-  - [ ] Baseline report committed (tests, lint, routes, schema dump, Caddy inventory, Docker labels, backup dry run, feature flags)
-  - [ ] Namespace boundary tests pass
-  - [ ] Deprecation header helper in place
+- [x] **Phase 0.5** — Baseline snapshot and namespace lock
+  - [x] Baseline report committed (`docs/V4/baseline/` — tests, lint, routes, schema dump, migration state, Caddy/Docker/backup honestly marked; regenerate with `api/scripts/generate-baseline-report.js`)
+  - [x] Namespace boundary tests pass (`api/test/namespaces.test.js`; strategy locked in `docs/V4/NAMESPACES.md`)
+  - [x] Deprecation header helper in place (`api/src/util/deprecation.js` — apply only once V4 replacements exist)
 - [ ] **Phase 1** — PostgreSQL foundation hardening (PostgreSQL via Prisma is already the control plane; see `V4_PHASE1_STATUS.md`)
   - [x] Foundational schema via Prisma migrations: `organisations`, `admin_users`, `admin_sessions`, `audit_log_v4` (`jobs` shipped in Phase 0; existing `platform_settings` carries over — org-scoping deferred until multi-org is real)
   - [x] Repository facades under `api/src/repo/`: organisations, admin users/sessions, audit v4 (jobs shipped in Phase 0)
