@@ -101,6 +101,26 @@ async function buildApp(opts = {}) {
     return payload;
   });
 
+  // Canonical error envelope (V4 Phase 0). Route handlers keep sending their
+  // own `{ error }` payloads; this shapes everything the framework generates
+  // (404s, validation errors, body-limit 413s, rate-limit 429s, uncaught
+  // throws) so every error response carries the same fields:
+  //   { error, code, statusCode, requestId }
+  const errorEnvelope = (statusCode, message, code, requestId) =>
+    ({ error: message, code, statusCode, requestId });
+
+  fastify.setNotFoundHandler((request, reply) => {
+    reply.code(404).send(errorEnvelope(404, 'Not found', 'NOT_FOUND', request.id));
+  });
+
+  fastify.setErrorHandler((err, request, reply) => {
+    const statusCode = Number(err.statusCode) >= 400 ? Number(err.statusCode) : 500;
+    // Never leak internal error details on 5xx — log them instead.
+    const message = statusCode >= 500 ? 'Internal server error' : (err.message || 'Request failed');
+    if (statusCode >= 500 && request.log) request.log.error({ err }, 'unhandled request error');
+    reply.code(statusCode).send(errorEnvelope(statusCode, message, err.code || 'INTERNAL_ERROR', request.id));
+  });
+
   // Decorate authenticate on the ROOT instance so every (encapsulated) route
   // plugin can use it as a preHandler. Enforces JWT validity AND token_version
   // (a stale token after a password change / revoke / deleted user is rejected).

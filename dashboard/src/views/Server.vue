@@ -97,6 +97,14 @@ async function loadCleanup() {
   } catch { /* best-effort */ }
 }
 
+// V4 Phase 0: background-jobs placeholder (runner ships disabled by default).
+const jobsInfo = ref(null)
+async function loadJobs() {
+  try {
+    jobsInfo.value = await api.get('/server/jobs')
+  } catch { /* endpoint is best-effort until V4 jobs are enabled */ }
+}
+
 async function doCleanup() {
   cleanupMsg.value = ''
   cleaningUp.value = true
@@ -280,7 +288,7 @@ const criticals = computed(() => {
   return alerts
 })
 
-onMounted(() => { load(); loadCleanup(); })
+onMounted(() => { load(); loadCleanup(); loadJobs(); })
 </script>
 
 <template>
@@ -500,6 +508,17 @@ onMounted(() => { load(); loadCleanup(); })
         </span>
       </div>
       <div class="hint">These are wired but off by default; enable each in <span class="mono">.env</span> after validating on the Windows host. Pulling external code (GitHub deploys), running container shells, and provisioning databases are the higher-risk ones.</div>
+    </div>
+
+    <!-- V4: background jobs placeholder -->
+    <h2 v-if="jobsInfo" class="section-label">Background jobs</h2>
+    <div v-if="jobsInfo" class="card" style="margin-bottom: 22px">
+      <div class="kv"><span class="k">Runner</span><span class="v">{{ jobsInfo.enabled ? 'Enabled' : 'Disabled' }}</span></div>
+      <div class="kv"><span class="k">Pending</span><span class="v mono">{{ jobsInfo.counts.pending }}</span></div>
+      <div class="kv"><span class="k">Running</span><span class="v mono">{{ jobsInfo.counts.running }}</span></div>
+      <div class="kv"><span class="k">Completed</span><span class="v mono">{{ jobsInfo.counts.completed }}</span></div>
+      <div class="kv"><span class="k">Dead-lettered</span><span class="v mono">{{ jobsInfo.counts.dead }}</span></div>
+      <div class="hint">V4 job queue (Phase 0 placeholder). The in-process runner ships disabled; enable with <span class="mono">ENABLE_V4_JOBS</span> once V4 phases start queueing work. Dead-lettered jobs need operator investigation.</div>
     </div>
 
     <!-- Notifications -->

@@ -241,6 +241,68 @@ async function serverRoutes(fastify, options) {
     }
     return { ok: true };
   });
+
+  // ── V4 Phase 0 ────────────────────────────────────────────────────────────
+
+  // Schema health: engine + migration state, read from the Prisma Migrate
+  // ledger (_prisma_migrations) and the migrations directory on disk. Pending
+  // means a migration folder exists that the database has not applied.
+  fastify.get('/api/server/schema', {
+    preHandler: [fastify.authenticate],
+  }, async () => {
+    const { prisma } = require('../repo');
+    const migrationsDir = path.join(__dirname, '..', '..', 'prisma', 'migrations');
+
+    let onDisk = [];
+    try {
+      onDisk = (await fsp.readdir(migrationsDir, { withFileTypes: true }))
+        .filter((d) => d.isDirectory())
+        .map((d) => d.name)
+        .sort();
+    } catch { /* missing dir → report all applied state from the DB only */ }
+
+    let applied = [];
+    let ledger = 'ok';
+    try {
+      applied = await prisma.$queryRaw`
+        SELECT migration_name, finished_at FROM _prisma_migrations
+        WHERE finished_at IS NOT NULL
+        ORDER BY migration_name`;
+    } catch {
+      ledger = 'missing'; // migrations never ran against this database
+    }
+
+    const appliedNames = new Set(applied.map((m) => m.migration_name));
+    const pending = onDisk.filter((name) => !appliedNames.has(name));
+    const last = applied[applied.length - 1] || null;
+
+    return {
+      database: 'postgres',
+      ledger,
+      migrations: {
+        applied: applied.length,
+        pending: pending.length,
+        pendingNames: pending,
+        lastApplied: last ? last.migration_name : null,
+        lastAppliedAt: last ? last.finished_at : null,
+      },
+    };
+  });
+
+  // Feature flags as their own endpoint (V2/V3/V4 gates, all resolved).
+  fastify.get('/api/server/features', {
+    preHandler: [fastify.authenticate],
+  }, async () => ({ features: features() }));
+
+  // Background jobs status — backs the job dashboard placeholder. Counts are
+  // cheap (indexed groupBy); `enabled` reflects the ENABLE_V4_JOBS gate.
+  fastify.get('/api/server/jobs', {
+    preHandler: [fastify.authenticate],
+  }, async () => {
+    const { jobRepo } = require('../repo');
+    const counts = await jobRepo.counts();
+    return { enabled: features().v4Jobs, counts };
+  });
 }
 
 module.exports = serverRoutes;

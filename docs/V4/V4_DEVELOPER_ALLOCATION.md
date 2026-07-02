@@ -42,8 +42,8 @@ Tick a phase when its exit gate passes — not when coding is done.
 ### Milestone A — Safe Base
 - [ ] **Phase 0** — Stabilise current repository
   - [x] CORS PATCH, request IDs (+audit stamping), feature flag helper, versioned migrations (Prisma Migrate), no-silent-ALTER, test reset, jobs table + gated runner, host invariants (Alex — see `V4_PHASE0_STATUS.md`)
-  - [ ] Schema/features endpoints, error response shape, pagination defaults, missing-DATABASE_URL warning, job UI placeholder, pagination controls (Tomas)
-  - [ ] All Phase 0 tests pass; legacy dashboard and deploy flow unaffected
+  - [x] Schema/features endpoints, error response shape, pagination defaults, missing-DATABASE_URL warning, job UI placeholder, pagination controls (Tomas — see `V4_PHASE0_STATUS.md`)
+  - [x] All Phase 0 tests pass; legacy dashboard and deploy flow unaffected
   - [ ] Staging environment allocated and deploying (separate PostgreSQL, Stripe test account, Caddy, staging domains)
   - [ ] Email provider chosen and smoke-tested (SEND_EMAIL_PROVIDER env var set; test email sends on staging startup)
   - [ ] Monitoring stack chosen; alert thresholds defined; on-call rotation assigned

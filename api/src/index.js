@@ -45,6 +45,11 @@ async function initDefaultUsers() {
 }
 
 async function main() {
+  // The control plane is PostgreSQL-only. A missing DATABASE_URL fails at
+  // connect time anyway; warn first so the failure is diagnosable at a glance.
+  if (!process.env.DATABASE_URL) {
+    console.warn('[startup] WARNING: DATABASE_URL is not set. The control plane requires PostgreSQL; startup will fail.');
+  }
   await prisma.$connect();
 
   const fastify = await buildApp({ fastify: { logger: true } });

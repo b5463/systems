@@ -1,7 +1,7 @@
-# SYSTEMS. V4 — Phase 0 status (Alex / Infrastructure)
+# SYSTEMS. V4 — Phase 0 status
 
 **Branch:** `claude/v4-roadmap-alexes-tasks-yhg4qi`
-**Scope:** Alex's Phase 0 tasks from `V4_DEVELOPER_ALLOCATION.md` ("Stabilise current repository").
+**Scope:** Phase 0 engineering tasks from `V4_DEVELOPER_ALLOCATION.md` ("Stabilise current repository") — both Alex's and Tomas's.
 **Updated:** 2026-07-02
 
 ---
@@ -20,6 +20,14 @@
 | Admin API cache headers | `Cache-Control: no-store` on every API response (`onSend` hook) |
 | Confirm host-protection invariants | `api/test/hostprotection.test.js` pins container limits, build caps + concurrency gate, upload caps, disk admission margin |
 | Tests: CORS PATCH, feature flags, job table, request IDs | `api/test/v4-phase0.test.js` (21 tests; DB-backed ones gate-skip without `DATABASE_URL`, same as the existing suites) |
+| `GET /api/server/schema` endpoint | Engine + Prisma migration state read from `_prisma_migrations` and the migrations dir (applied/pending counts, last applied) |
+| `GET /api/server/features` endpoint | Resolved V2/V3/V4 flags as their own endpoint |
+| Global API error response shape | `setNotFoundHandler`/`setErrorHandler` in `app.js`: every framework-generated error (404, validation, 413, 429, uncaught 500) returns `{ error, code, statusCode, requestId }`; 5xx details are logged, never leaked |
+| Pagination defaults and maximums | `api/src/util/pagination.js` (default 50, hard max 200, shared envelope `{ entries, total, limit, offset }`); applied to `/api/audit` (historical default 100 kept) |
+| Missing-`DATABASE_URL` startup warning | `api/src/index.js` warns before connect (control plane is PostgreSQL-only) |
+| Job dashboard placeholder under Server | `GET /api/server/jobs` (runner gate + queue counts) + "Background jobs" card in `dashboard/src/views/Server.vue` |
+| Pagination controls on existing list views | Events (audit) view already ships full page controls backed by the audit endpoint; other list views (Systems) are bounded sets |
+| Tests: schema endpoint, features endpoint, error shape contract, pagination envelope | `api/test/v4-phase0-endpoints.test.js` (9 tests) |
 
 ## Adaptations from the roadmap text (and why)
 
@@ -43,9 +51,9 @@ since moved its control plane to **PostgreSQL via Prisma**
    by `src/`; new schema goes through migrations only. Test reset lives in
    `api/test/_dbtest.js` (`resetDb()`), now including the `jobs` table.
 
-Tomas's Phase 0 items (schema/features endpoints, error response shape,
-pagination envelope, SQLite-in-production warning, job dashboard placeholder)
-are **not** part of this changeset.
+Tomas's Phase 0 items are implemented on this branch as well (see the table
+above). The obsolete SQLite-in-production warning became a missing-
+`DATABASE_URL` warning.
 
 ## Open pre-flight decisions (human, non-engineering — blockers if unresolved)
 
@@ -66,11 +74,12 @@ Per the roadmap, these must be locked before the Phase 0 exit gate:
 
 ## Phase 0 exit-gate checklist (current state)
 
-- [x] All existing tests pass (161 pass / 0 fail, incl. new Phase 0 suites)
-- [x] New Phase 0 tests pass
-- [x] Current dashboard and deploy flow untouched by this changeset (no route or service behaviour changed apart from headers/CORS/body limit)
+- [x] All existing tests pass (170 pass / 0 fail, incl. new Phase 0 suites)
+- [x] New Phase 0 tests pass (30 across `v4-phase0`, `v4-phase0-endpoints`, `hostprotection`)
+- [x] Current dashboard and deploy flow untouched (no route behaviour changed apart from headers/CORS/body limit/error envelope; dashboard builds clean)
 - [x] Backup script unaffected
+- [x] Schema endpoint reports current schema
+- [x] Tomas's Phase 0 items (schema/features/jobs endpoints, error shape, pagination, DATABASE_URL warning, job UI placeholder)
 - [ ] Staging environment allocated and deploying
 - [ ] Email provider chosen and smoke-tested
 - [ ] Monitoring stack chosen; thresholds defined; on-call assigned
-- [ ] Tomas's Phase 0 items (schema/features endpoints, error shape, pagination, SQLite warning, job UI placeholder)

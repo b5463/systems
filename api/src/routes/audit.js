@@ -1,6 +1,7 @@
 'use strict';
 
 const { auditRepo } = require('../repo');
+const { parsePagination, envelope } = require('../util/pagination');
 
 async function auditRoutes(fastify, options) {
   // Verify the tamper-evident audit-log hash chain. Returns ok=false plus the
@@ -17,12 +18,8 @@ async function auditRoutes(fastify, options) {
   }, async (request) => {
     const { action, actions, target, username, from, to } = request.query || {};
 
-    let limit = Number(request.query && request.query.limit);
-    if (!Number.isFinite(limit) || limit <= 0) limit = 100;
-    if (limit > 200) limit = 200;
-
-    let offset = Number(request.query && request.query.offset);
-    if (!Number.isFinite(offset) || offset < 0) offset = 0;
+    // Shared V4 pagination policy; audit keeps its historical default of 100.
+    const { limit, offset } = parsePagination(request.query, { defaultLimit: 100 });
 
     // `actions` (comma-separated) takes precedence over a single `action` — it
     // backs the category and severity filters, which map to a set of actions.
@@ -30,7 +27,7 @@ async function auditRoutes(fastify, options) {
       ? String(actions).split(',').map((s) => s.trim()).filter(Boolean).slice(0, 50)
       : [];
 
-    return auditRepo.query({
+    const { entries, total } = await auditRepo.query({
       action: actionList.length ? undefined : action,
       actions: actionList.length ? actionList : undefined,
       target,
@@ -40,6 +37,7 @@ async function auditRoutes(fastify, options) {
       limit,
       offset,
     });
+    return envelope(entries, total, { limit, offset });
   });
 }
 
