@@ -85,9 +85,15 @@ async function reconcileV4({ prisma }) {
       brokenMaps.push(p.slug);
       continue;
     }
+    const isProduction = environment.name === 'production';
     const fields = [];
-    for (const [projField, pick] of FIELD_MAP) {
-      if ((p[projField] ?? null) !== (pick(system) ?? null)) fields.push(projField);
+    // System-level fields (name/slug/status/repo/…) belong to the PRODUCTION
+    // project. A preview environment maps its own suffixed project to the
+    // same system, so those comparisons only apply to production maps.
+    if (isProduction) {
+      for (const [projField, pick] of FIELD_MAP) {
+        if ((p[projField] ?? null) !== (pick(system) ?? null)) fields.push(projField);
+      }
     }
     for (const [projField, pick] of ENV_FIELD_MAP) {
       if ((p[projField] ?? null) !== (pick(environment) ?? null)) fields.push(projField);
@@ -96,7 +102,8 @@ async function reconcileV4({ prisma }) {
     if (p.containerId && (!release || release.containerId !== p.containerId)) fields.push('containerId');
     if (fields.length) drift.push({ slug: p.slug, fields });
 
-    if (!domains.some((d) => d.systemId === map.systemId)) missingDomains.push(p.slug);
+    // Default domains exist for production environments only.
+    if (isProduction && !domains.some((d) => d.systemId === map.systemId)) missingDomains.push(p.slug);
   }
   report.brokenMaps = brokenMaps;
   report.drift = drift;

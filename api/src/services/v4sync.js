@@ -92,11 +92,15 @@ async function syncReleaseForProject(slug) {
         });
       }
 
-      // org-scope-exempt: PK from the org-scoped map row
-      await tx.system.update({
-        where: { id: map.systemId },
-        data: { currentStatus: project.status },
-      });
+      // Only the production environment's project drives the system status —
+      // a preview deploy must not overwrite it.
+      if (environment.name === 'production') {
+        // org-scope-exempt: PK from the org-scoped map row
+        await tx.system.update({
+          where: { id: map.systemId },
+          data: { currentStatus: project.status },
+        });
+      }
       return release;
     });
   } catch (e) {
@@ -110,6 +114,9 @@ async function syncStatus(slug) {
   try {
     const hit = await mapForSlug(slug);
     if (!hit) return;
+    // org-scope-exempt: PK from the org-scoped map row
+    const environment = await prisma.systemEnvironment.findUnique({ where: { id: hit.map.environmentId } });
+    if (!environment || environment.name !== 'production') return; // preview never drives system status
     // org-scope-exempt: PK from the org-scoped map row
     await prisma.system.update({
       where: { id: hit.map.systemId },

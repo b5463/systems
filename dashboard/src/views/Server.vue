@@ -98,18 +98,25 @@ async function loadCleanup() {
 }
 
 // V4 Phase 0: background-jobs placeholder (runner ships disabled by default).
+// Shape-checked before rendering: a surprise payload must hide the card, never
+// break the whole page.
 const jobsInfo = ref(null)
 async function loadJobs() {
   try {
-    jobsInfo.value = await api.get('/server/jobs')
+    const data = await api.get('/server/jobs')
+    if (data && data.counts && typeof data.counts.pending === 'number') jobsInfo.value = data
   } catch { /* endpoint is best-effort until V4 jobs are enabled */ }
 }
 
-// V4 Phase 2.5: migration reconciliation report (operator view).
+// V4 Phase 2.5: migration reconciliation report (operator view). Same rule:
+// only render when the payload has the expected shape.
 const reconcile = ref(null)
 async function loadReconcile() {
   try {
-    reconcile.value = await api.get('/server/reconcile-v4')
+    const data = await api.get('/server/reconcile-v4')
+    if (data && data.projects && Array.isArray(data.failures) && data.envSecrets && data.docker && data.caddy) {
+      reconcile.value = data
+    }
   } catch { /* best-effort; only meaningful once V4 migration work starts */ }
 }
 

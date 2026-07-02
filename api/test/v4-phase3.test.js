@@ -99,8 +99,38 @@ test('deploy: V4-native system creates + maps a legacy project through the pipel
   assert.ok(map, 'system is mapped after its first deploy');
   assert.equal(map.environmentId, production.id);
 
+  const domain = await prisma.domain.findFirst({ where: { systemId: system.id } });
+  assert.equal(domain.hostname, 'native-app.acronym.sk', 'first production deploy records the default domain');
+
   const audit = await prisma.auditLogV4.findFirst({ where: { entityId: production.id } });
   assert.equal(audit.action, 'environment_deploy');
+});
+
+test('deploy: preview environment of a deployed system gets its own suffixed project', async () => {
+  const system = await systemRepo.findBySlug(org.id, 'native-app');
+  const preview = system.environments.find((e) => e.name === 'preview');
+
+  const calls = [];
+  deployservice.setDeps({
+    beginDeploy: async (args) => {
+      calls.push([args.slug, args.name]);
+      const project = await prisma.project.create({
+        data: { name: args.name, slug: args.slug, status: 'building', isPreview: true },
+      });
+      return { ok: true, project: { id: project.id, slug: args.slug } };
+    },
+    beginRedeploy: async () => { throw new Error('preview env is unmapped — must not redeploy'); },
+  });
+
+  const result = await deployservice.deployToEnvironment({
+    organisationId: org.id, systemId: system.id, envName: 'preview',
+    zipPath: '/tmp/fake.zip', userId: 1, ip: '127.0.0.1',
+  });
+  assert.equal(result.ok, true);
+  assert.deepEqual(calls, [['native-app-preview', 'native-app (preview)']],
+    'preview project slug is suffixed so it cannot collide with production');
+  const map = await prisma.legacyProjectMap.findFirst({ where: { environmentId: preview.id } });
+  assert.ok(map, 'preview environment mapped to its own project');
 });
 
 test('deploy: mapped system redeploys its legacy project', async () => {

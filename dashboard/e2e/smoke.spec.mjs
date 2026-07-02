@@ -42,6 +42,25 @@ async function mockApi(page, { authed }) {
     if (p === '/api/projects') return json(route, { projects: systems })
     if (p === '/api/server/info') return json(route, serverInfo)
     if (p === '/api/server/cleanup/preview') return json(route, cleanup)
+    // V4 surfaces on the Server page (Phase 0 jobs card, Phase 2.5 reconciliation card).
+    if (p === '/api/server/jobs') return json(route, {
+      enabled: false,
+      counts: { pending: 0, running: 0, completed: 0, dead: 0 },
+    })
+    if (p === '/api/server/reconcile-v4') return json(route, {
+      ok: true,
+      failures: [],
+      projects: { total: 1, active: 1, mapped: 1, unmapped: [] },
+      v4NativeSystems: [],
+      brokenMaps: [],
+      drift: [],
+      missingDomains: [],
+      envSecrets: { checked: 0, failures: [] },
+      history: { deployHistoryRows: 0, releases: 0, statsHistoryRows: 0, infrastructureMetrics: 0 },
+      docker: { status: 'not_measured' },
+      caddy: { status: 'not_measured' },
+      backup: { coverage: 'pg_dump covers legacy and V4 tables', schemaMarker: true },
+    })
     if (p === '/api/admin/settings') return json(route, { settings: [] })
     if (p === '/api/admin/sessions') return json(route, { sessions: [] })
     if (p === '/api/admin/users') return json(route, { users: [{ id: 1, username: 'admin', created_at: new Date().toISOString() }] })

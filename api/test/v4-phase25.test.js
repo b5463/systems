@@ -127,6 +127,30 @@ test('reconcile: detects env vars that no longer decrypt', async () => {
   assert.equal((await reconcileV4({ prisma })).ok, true);
 });
 
+test('reconcile: suffixed preview projects do not count as drift', async () => {
+  // A preview environment maps its own `<slug>-preview` project (Phase 3);
+  // system-level fields belong to the production project only.
+  const shop = await prisma.project.findUnique({ where: { slug: 'shop' } });
+  const map = await prisma.legacyProjectMap.findUnique({ where: { projectId: shop.id } });
+  const previewEnv = await prisma.systemEnvironment.create({
+    data: { organisationId: org.id, systemId: map.systemId, name: 'preview' },
+  });
+  const previewProject = await prisma.project.create({
+    data: { name: 'Shop (preview)', slug: 'shop-preview', status: 'building', isPreview: true },
+  });
+  await prisma.legacyProjectMap.create({
+    data: {
+      organisationId: org.id, projectId: previewProject.id,
+      systemId: map.systemId, environmentId: previewEnv.id,
+    },
+  });
+
+  const report = await reconcileV4({ prisma });
+  assert.equal(report.ok, true, JSON.stringify(report.failures));
+  assert.deepEqual(report.drift, [], 'preview slug/name/status differences are by design');
+  assert.deepEqual(report.missingDomains, [], 'preview environments need no default domain');
+});
+
 test('reconcile: operator endpoint serves the report to admins only', async () => {
   const anon = await app.inject({ method: 'GET', url: '/api/server/reconcile-v4' });
   assert.equal(anon.statusCode, 401);
@@ -135,6 +159,6 @@ test('reconcile: operator endpoint serves the report to admins only', async () =
   assert.equal(res.statusCode, 200);
   const report = res.json();
   assert.equal(report.ok, true);
-  assert.equal(report.projects.mapped, 3);
+  assert.equal(report.projects.mapped, 4, '3 bridged + 1 preview project');
   assert.equal(report.backup.schemaMarker, true);
 });

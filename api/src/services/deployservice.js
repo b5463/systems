@@ -63,15 +63,19 @@ async function deployToEnvironment({ organisationId, systemId, envName, zipPath,
   if (project) {
     result = await d.beginRedeploy({ slug: project.slug, zipPath, userId, ip });
   } else {
+    // Legacy projects are slug-unique, and preview runs as its own project in
+    // the legacy world — suffix so a preview deploy can never collide with
+    // the production project of the same system.
+    const projectSlug = envName === 'preview' ? `${system.slug}-preview` : system.slug;
     result = await d.beginDeploy({
-      name: system.name,
-      slug: system.slug,
+      name: envName === 'preview' ? `${system.name} (preview)` : system.name,
+      slug: projectSlug,
       visibility: environment.accessPolicy === 'private' ? 'private' : 'public',
       zipPath, userId, ip,
     });
     if (result.ok) {
       // org-scope-exempt: creation carries organisationId in its data payload
-      const created = await prisma.project.findUnique({ where: { slug: system.slug } });
+      const created = await prisma.project.findUnique({ where: { slug: projectSlug } });
       await prisma.legacyProjectMap.create({
         data: {
           organisationId,
@@ -80,6 +84,19 @@ async function deployToEnvironment({ organisationId, systemId, envName, zipPath,
           environmentId: environment.id,
         },
       });
+      // First deploy of a production environment also gets its default
+      // subdomain record (mirrors the Phase 2 bridge behaviour).
+      if (envName === 'production') {
+        const hostname = `${system.slug}.${process.env.BASE_DOMAIN || 'acronym.sk'}`;
+        await prisma.domain.upsert({
+          where: { hostname },
+          update: { systemId: system.id, environmentId: environment.id },
+          create: {
+            organisationId, hostname, systemId: system.id,
+            environmentId: environment.id, isCustom: false, verified: true,
+          },
+        });
+      }
     }
   }
 

@@ -20,7 +20,7 @@ async function load() {
   error.value = ''
   try {
     const data = await api.get('/products')
-    products.value = data.products
+    products.value = Array.isArray(data && data.products) ? data.products : []
     enabled.value = true
   } catch (e) {
     if (e.status === 404) { enabled.value = false; products.value = [] }
