@@ -88,7 +88,7 @@ Tick a phase when its exit gate passes — not when coding is done.
   - [ ] Domain-driven `renderRoute()` Caddy service
   - [ ] Route publication transaction (write → validate → reload → probe → mark active)
   - [ ] Custom domain verification flow end to end
-  - [ ] Domain management, maintenance, and canonical redirect UI (Tomas)
+  - [x] Domain management UI (Tomas) — hidden test page at `/domains`, real list/add/remove against the `Domain` table; maintenance mode and canonical redirect UI are explicit "not built yet" states pending Alex's tables below
   - [ ] route_status enum (inactive/pending/active/failed/superseded) replaces boolean on system_environments
   - [ ] system_environment_routes junction table deployed; domain↔environment routing is explicit
   - [ ] Route publication is atomic: Caddy reload failure reverts status to 'failed', old route unchanged
@@ -338,10 +338,10 @@ foundational schema:
 | Route publication transaction: write pending → validate Caddy config → reload → probe → mark active | Alex |
 | Custom domain verification flow: add hostname → generate token → DNS instructions → verify TXT/CNAME/A → publish → check TLS → canonical selection | Alex |
 | Tests: default subdomain, private system, password route, reload failure safety, custom domain without verification blocked, canonical redirect, maintenance mode route | Alex |
-| Domain management UI in dashboard | Tomas |
-| Custom domain add/verify wizard UI | Tomas |
-| Maintenance mode UI controls | Tomas |
-| Canonical redirect configuration UI | Tomas |
+| ~~Domain management UI in dashboard~~ ✅ `GET/POST /api/systems/:id/domains`, `DELETE /api/domains/:id` (org-scoped, hostname-validated, audited) + `dashboard/src/views/Domains.vue` | Tomas |
+| Custom domain add/verify wizard UI — registration UI exists (adds an unverified domain); the actual DNS TXT/CNAME verify step is blocked on Alex's "Custom domain verification flow" below and is shown as pending, not faked | Tomas |
+| Maintenance mode UI controls — blocked on Alex's `maintenance_windows` table; page shows an explicit "not built yet" state | Tomas |
+| Canonical redirect configuration UI — blocked on Alex's canonical-domain schema + `renderRoute()` wiring; page shows an explicit "not built yet" state | Tomas |
 | Replace route_published BOOLEAN with route_status TEXT enum (inactive/pending/active/failed/superseded) + route_last_error + route_last_published_at | Alex |
 | Create system_environment_routes junction table with (system_id, environment_id, domain_id, route_status) and composite indexes | Alex |
 | Route publication atomicity: Caddy reload failure reverts status to 'failed'; never mark active before probe passes; promotion uses junction table | Alex |

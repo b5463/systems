@@ -9,6 +9,7 @@ import SystemDetail from '../views/SystemDetail.vue'
 import Systems from '../views/Systems.vue'
 import Products from '../views/Products.vue'
 import Portfolio from '../views/Portfolio.vue'
+import Domains from '../views/Domains.vue'
 
 // SYSTEMS. V1.1 — five operational surfaces + system detail.
 // Legacy paths (/deploy, /activity, /account, /projects/:slug) redirect to the
@@ -28,6 +29,8 @@ const routes = [
   { path: '/products', name: 'products', component: Products },
   // V4 Phase 5: hidden admin/test page — no nav entry until the public Portfolio ships.
   { path: '/portfolio', name: 'portfolio', component: Portfolio },
+  // V4 Phase 4: hidden admin/test page — no nav entry until domain verification ships.
+  { path: '/domains', name: 'domains', component: Domains },
   { path: '/admin', name: 'admin', component: Admin },
   {
     path: '/systems/:slug',
