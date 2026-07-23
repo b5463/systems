@@ -8,6 +8,7 @@ import Ship from '../views/Ship.vue'
 import SystemDetail from '../views/SystemDetail.vue'
 import Systems from '../views/Systems.vue'
 import Products from '../views/Products.vue'
+import Portfolio from '../views/Portfolio.vue'
 
 // SYSTEMS. V1.1 — five operational surfaces + system detail.
 // Legacy paths (/deploy, /activity, /account, /projects/:slug) redirect to the
@@ -25,6 +26,8 @@ const routes = [
   { path: '/server', name: 'server', component: Server },
   // V4 Phase 2: hidden admin/test page — no nav entry until V4 products ship.
   { path: '/products', name: 'products', component: Products },
+  // V4 Phase 5: hidden admin/test page — no nav entry until the public Portfolio ships.
+  { path: '/portfolio', name: 'portfolio', component: Portfolio },
   { path: '/admin', name: 'admin', component: Admin },
   {
     path: '/systems/:slug',

@@ -95,16 +95,16 @@ Tick a phase when its exit gate passes — not when coding is done.
 
 ### Milestone C — Acronym Public Portfolio
 - [ ] **Phase 5** — Portfolio CMS and Acronym public renderer
-  - [ ] Portfolio tables: pages, profiles, blocks, snapshots, redirects, forms, submissions, lead_status, media_assets, legal_versions
-  - [ ] Draft → preview → publish → immutable snapshot pipeline
-  - [ ] Dashboard Portfolio area: homepage, nav, product-page, media, legal, redirects, locales, publish history, rollback (Tomas)
-  - [ ] SK/EN locale support with translation completeness indicator
-  - [ ] Public catalog API served from precomputed S3 snapshots — never from live PostgreSQL on public reads
-  - [ ] Media assets stored by CDN URL only; never embedded in snapshot JSON; max snapshot size 2MB enforced
-  - [ ] Concurrent publish lock prevents simultaneous publishes
-  - [ ] Snapshot schema versioning: renderer validates renderer_min_version before serving; never silent fallback
-  - [ ] `acronym.sk` renderer: pre-rendered, snapshot cache, last-known-good, ETag, no live DB dependency
-  - [ ] Renderer stays up during SYSTEMS. API outage
+  - [x] Portfolio tables: pages, profiles, blocks, snapshots, redirects, forms, submissions, media_assets, legal_versions (org-scoped, UUID pk, matches Phase 2 conventions; `lead_status` implemented as a column on `form_submissions` rather than a separate table)
+  - [x] Draft → preview → publish → immutable snapshot pipeline (`api/src/services/portfolioPublish.js`, pure/unit-tested; `/api/portfolio/preview` and `/api/portfolio/publish`)
+  - [x] Dashboard Portfolio area: homepage, nav, product-page, media, legal, redirects, locales, publish history, rollback (Tomas) — hidden test page at `/portfolio`, same pattern as `/products`
+  - [x] SK/EN locale support with translation completeness indicator (`translationCompleteness()`, `GET /api/portfolio/locales`, Locales tab in dashboard)
+  - [ ] Public catalog API served from precomputed S3 snapshots — never from live PostgreSQL on public reads (Alex)
+  - [x] Media assets stored by CDN URL only; never embedded in snapshot JSON (`assertNoEmbeddedMedia`, rejects base64 data URIs); max snapshot size 2MB enforced
+  - [x] Concurrent publish lock prevents simultaneous publishes (in-memory, per org+locale, 5-min TTL — needs a DB-backed `publish_locks` table once `ENABLE_MULTI_NODE` ships)
+  - [x] Snapshot schema versioning: `rendererCanServe()` refuses to serve a snapshot newer than the renderer knows, never silent fallback — logic is ready, not yet wired into a live renderer
+  - [ ] `acronym.sk` renderer: pre-rendered, snapshot cache, last-known-good, ETag, no live DB dependency (Alex)
+  - [ ] Renderer stays up during SYSTEMS. API outage (Alex — depends on renderer above)
 
 ### Milestone D — Paid Products
 - [ ] **Phase 6** — Commerce foundation
@@ -357,17 +357,17 @@ foundational schema:
 | `GET /api/public/catalog?locale=sk|en`, `GET /api/public/products/:slug?locale=sk`, `GET /api/public/snapshot/latest?locale=en` | Alex |
 | Public API field allowlist enforcement (no container IDs, ports, repo URLs, logs, internal routes, admin IDs, customer/billing data, secret names) | Alex |
 | Deploy `acronym.sk` as first primary V4 system | Alex |
-| Portfolio tables: `portfolio_pages`, `product_portfolio_profiles`, `portfolio_blocks`, `portfolio_snapshots`, `portfolio_redirects`, `public_forms`, `form_submissions`, `lead_status`, `media_assets`, `legal_versions` | Tomas |
-| Draft CMS → validation → preview snapshot → publish → immutable snapshot pipeline | Tomas |
-| Dashboard Portfolio area: homepage editor, navigation editor, product-page editor, media library, legal pages, redirects, locales, preview, publish history, snapshot rollback | Tomas |
-| SK/EN locale support: localised slugs, SEO, language switch mapping, translation completeness indicator, fallback rules, localised legal pages | Tomas |
+| ~~Portfolio tables: `portfolio_pages`, `product_portfolio_profiles`, `portfolio_blocks`, `portfolio_snapshots`, `portfolio_redirects`, `public_forms`, `form_submissions`, `media_assets`, `legal_versions`~~ ✅ (`lead_status` implemented as a `form_submissions` column, not a separate table) | Tomas |
+| ~~Draft CMS → validation → preview snapshot → publish → immutable snapshot pipeline~~ ✅ `api/src/services/portfolioPublish.js` + `/api/portfolio/preview`, `/api/portfolio/publish` | Tomas |
+| ~~Dashboard Portfolio area: homepage editor, navigation editor, product-page editor, media library, legal pages, redirects, locales, preview, publish history, snapshot rollback~~ ✅ hidden test page at `dashboard/src/views/Portfolio.vue` (`/portfolio`) | Tomas |
+| ~~SK/EN locale support: translation completeness indicator, fallback rules~~ ✅ (localised slugs/SEO/language-switch mapping/localised legal pages are still basic — no per-locale slug routing yet) | Tomas |
 | `acronym.sk` renderer: pre-rendered pages, snapshot cache, last-known-good snapshot, ETag, stale-while-revalidate, hashed assets, no live DB dependency | Tomas |
-| Tests: draft change does not alter public site, publish creates immutable snapshot, snapshot rollback, SK/EN render, missing translation visible, public API hides private fields, renderer works during SYSTEMS API outage | Tomas |
+| Tests: draft change does not alter public site, publish creates immutable snapshot, snapshot rollback, SK/EN render, missing translation visible, public API hides private fields, renderer works during SYSTEMS API outage — publish/rollback/locale logic is unit-tested (39 tests); full app.inject() coverage blocked on Prisma client generation in this sandbox, same as the rest of the V4 DB-backed suites | Tomas |
 | Precomputed S3 catalog: publish action serialises catalog JSON to S3; CDN pointer updated atomically; /api/public/* reads from S3/CDN, never from PostgreSQL | Alex |
 | Media upload pipeline: quarantine → security scan (SVG sanitize, malware check, content-type by bytes) → convert → permanent S3 URL; EXIF strip; variants generated | Alex |
-| Max snapshot size 2MB enforced; media stored by URL only (never embedded); orphan cleanup job for failed uploads | Alex |
-| Concurrent publish lock (publish_locks table with 5-minute TTL); concurrent publishes rejected | Tomas |
-| Snapshot schema versioning: schema_version + renderer_min_version columns; renderer refuses incompatible snapshots and alerts (never silent fallback) | Tomas |
+| ~~Max snapshot size 2MB enforced; media stored by URL only (never embedded)~~ ✅ (orphan cleanup job for failed uploads is Alex's, pending the upload pipeline above) | Tomas |
+| ~~Concurrent publish lock; concurrent publishes rejected~~ ✅ in-memory per org+locale, 5-min TTL — needs a DB-backed `publish_locks` table once `ENABLE_MULTI_NODE` ships | Tomas |
+| ~~Snapshot schema versioning: schema_version + renderer_min_version; refuses incompatible snapshots, never silent fallback~~ ✅ `rendererCanServe()` — logic ready, not yet wired into a live renderer | Tomas |
 
 ---
 

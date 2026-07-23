@@ -22,4 +22,6 @@ module.exports = {
   // V4 Phase 2 Products/Systems model (org-scoped)
   productRepo: require('./products'),
   systemRepo: require('./systems'),
+  // V4 Phase 5 Portfolio CMS (org-scoped)
+  portfolioRepo: require('./portfolio'),
 };

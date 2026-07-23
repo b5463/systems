@@ -519,3 +519,159 @@ model BackupRecord {
   @@index([createdAt])
   @@map("backup_records")
 }
+
+// ── V4 Phase 5 — Portfolio CMS (Tomas) ───────────────────────────────────────
+// Draft content for the Acronym public portfolio. Gated by ENABLE_V4_PORTFOLIO
+// (already reserved in util/flags.js). Nothing here is served to the public
+// directly — the acronym.sk renderer and /api/public/* (Alex, Phase 5) read
+// only from PortfolioSnapshot, an immutable versioned blob produced by the
+// publish pipeline (api/src/services/portfolioPublish.js). Org-scoped like
+// every V4 Phase 2+ table — see api/scripts/lint-org-scoping.js.
+
+model PortfolioPage {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organisationId String   @map("organisation_id") @db.Uuid
+  locale         String
+  pageType       String   @map("page_type")
+  slug           String
+  title          String
+  seoTitle       String?  @map("seo_title")
+  seoDescription String?  @map("seo_description")
+  content        String?
+  status         String   @default("draft")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@unique([organisationId, locale, slug])
+  @@index([organisationId, locale, status])
+  @@map("portfolio_pages")
+}
+
+model ProductPortfolioProfile {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organisationId    String   @map("organisation_id") @db.Uuid
+  productId         String   @map("product_id") @db.Uuid
+  locale            String
+  title             String
+  tagline           String?
+  shortDescription  String?  @map("short_description")
+  fullDescription   String?  @map("full_description")
+  seoTitle          String?  @map("seo_title")
+  seoDescription    String?  @map("seo_description")
+  coverMediaId      String?  @map("cover_media_id") @db.Uuid
+  status            String   @default("draft")
+  completenessScore Int      @default(0) @map("completeness_score")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@unique([productId, locale])
+  @@index([organisationId, locale])
+  @@map("product_portfolio_profiles")
+}
+
+model PortfolioBlock {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organisationId String   @map("organisation_id") @db.Uuid
+  ownerType      String   @map("owner_type")
+  ownerId        String   @map("owner_id") @db.Uuid
+  locale         String
+  blockType      String   @map("block_type")
+  position       Int
+  data           String
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@index([organisationId, ownerType, ownerId, locale])
+  @@map("portfolio_blocks")
+}
+
+model PortfolioSnapshot {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organisationId String   @map("organisation_id") @db.Uuid
+  version        Int
+  locale         String
+  content        String
+  contentHash    String   @map("content_hash")
+  schemaVersion  String   @map("schema_version")
+  publishedBy    String?  @map("published_by") @db.Uuid
+  publishedAt    DateTime @default(now()) @map("published_at")
+
+  @@unique([organisationId, locale, version])
+  @@index([organisationId, locale, publishedAt(sort: Desc)])
+  @@map("portfolio_snapshots")
+}
+
+model PortfolioRedirect {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organisationId String   @map("organisation_id") @db.Uuid
+  locale         String
+  fromPath       String   @map("from_path")
+  toPath         String   @map("to_path")
+  statusCode     Int      @default(301) @map("status_code")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@unique([organisationId, locale, fromPath])
+  @@map("portfolio_redirects")
+}
+
+model PublicForm {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organisationId String   @map("organisation_id") @db.Uuid
+  slug           String
+  name           String
+  fields         String
+  status         String   @default("active")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  submissions FormSubmission[]
+
+  @@unique([organisationId, slug])
+  @@map("public_forms")
+}
+
+model FormSubmission {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  formId     String   @map("form_id") @db.Uuid
+  data       String
+  leadStatus String   @default("new") @map("lead_status")
+  sourceIp   String?  @map("source_ip")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  form PublicForm @relation(fields: [formId], references: [id], onDelete: Cascade)
+
+  @@index([formId, createdAt])
+  @@map("form_submissions")
+}
+
+model MediaAsset {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organisationId String   @map("organisation_id") @db.Uuid
+  uploadedBy     String?  @map("uploaded_by") @db.Uuid
+  storageKey     String   @map("storage_key")
+  publicUrl      String?  @map("public_url")
+  mediaType      String   @map("media_type")
+  mimeType       String   @map("mime_type")
+  sizeBytes      BigInt   @map("size_bytes")
+  width          Int?
+  height         Int?
+  status         String   @default("quarantined")
+  altText        String?  @map("alt_text")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([organisationId, status])
+  @@map("media_assets")
+}
+
+model LegalVersion {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organisationId String   @map("organisation_id") @db.Uuid
+  locale         String
+  docType        String   @map("doc_type")
+  version        String
+  content        String
+  effectiveAt    DateTime @map("effective_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@unique([organisationId, locale, docType, version])
+  @@map("legal_versions")
+}
