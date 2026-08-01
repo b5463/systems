@@ -76,6 +76,11 @@ jobs:
       - run: npm ci
       - run: npx prisma generate
       - run: npx prisma migrate deploy
+      # Fail if schema.prisma has models/columns that no migration creates
+      # (introspects the migrated DB and diffs it against the datamodel). This
+      # catches a schema change committed without its migration.
+      - name: Prisma schema drift check
+        run: npx prisma migrate diff --from-schema-datasource prisma/schema.prisma --to-schema-datamodel prisma/schema.prisma --exit-code
       - run: npm run lint
       - run: npm test
       # Enforce a coverage floor on the unit-tested core (util/*). Routes and
@@ -86,6 +91,39 @@ jobs:
       # plugin upgrades have landed, so this is back to blocking; only sub-high
       # advisories remain.)
       - run: npm audit --omit=dev --audit-level=high
+
+  infra:
+    name: Infra — PowerShell syntax + compose config
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # Parse every PowerShell script so a syntax error (e.g. an `if` used in
+      # expression context) fails CI instead of only surfacing on a Windows host
+      # mid-backup. pwsh is preinstalled on the GitHub ubuntu runner.
+      - name: PowerShell syntax check
+        shell: pwsh
+        run: |
+          $failed = $false
+          Get-ChildItem scripts -Filter *.ps1 | ForEach-Object {
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$null, [ref]$errors) | Out-Null
+            if ($errors) {
+              $failed = $true
+              Write-Host "::error file=$($_.FullName)::$($errors | ForEach-Object { $_.Message })"
+            } else {
+              Write-Host "ok $($_.Name)"
+            }
+          }
+          if ($failed) { exit 1 }
+      # Validate the compose files parse and interpolate (external network is not
+      # required to exist for `config`).
+      - name: docker compose config
+        run: |
+          docker compose -f docker-compose.yml config -q
+          SYSTEMS_MAC_DATA_DIR=/tmp/d SYSTEMS_MAC_NGINX_CONF_DIR=/tmp/c \
+            POSTGRES_PASSWORD=x JWT_SECRET=x ENV_SECRET=x ADMIN_USERS=a:passwordpassword \
+            SYSTEMS_ATTESTATION_SECRET=x \
+            docker compose -f docker-compose.macos.yml config -q
 
   dashboard:
     name: Dashboard — lint + build + audit

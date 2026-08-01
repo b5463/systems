@@ -1,8 +1,6 @@
-version: "3.9"
-
 services:
   acronym-nginx:
-    image: nginx:alpine
+    image: nginx:1.27-alpine
     container_name: acronym-nginx
     restart: unless-stopped
     ports:
@@ -14,6 +12,14 @@ services:
       - ./dashboard/dist:/usr/share/nginx/html:ro
       - ./certbot/conf:/etc/letsencrypt:ro
       - ./certbot/www:/var/www/certbot:ro
+    # Platform containers run on the same host as every tenant workload — cap
+    # them so a runaway proxy/API can't starve the box (tenant containers get
+    # their own limits from the deploy pipeline).
+    mem_limit: 256m
+    cpus: 0.5
+    pids_limit: 200
+    networks:
+      - systems
 
   acronym-api:
     build: ./api
@@ -22,10 +28,13 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./data:/app/data
+      # Per-project nginx route files: the API writes them here and the nginx
+      # container reads the same host dir at /etc/nginx/conf.d.
+      - ./nginx/conf.d:/app/nginx-conf
     environment:
       - NODE_ENV=production
-      # Point at PgBouncer (127.0.0.1:6432 / acronym-pgbouncer:6432) when the
-      # pgbouncer profile is enabled; direct PostgreSQL otherwise.
+      # Point at PgBouncer (acronym-pgbouncer:6432) when the pgbouncer profile
+      # is enabled; direct PostgreSQL (systems-postgres:5432) otherwise.
       - DATABASE_URL=${DATABASE_URL}
       - JWT_SECRET=${JWT_SECRET}
       - CSRF_SECRET=${CSRF_SECRET:-}
@@ -37,19 +46,23 @@ services:
       - CORS_ORIGIN=${CORS_ORIGIN:-https://systems.acronym.sk}
       - SYSTEMS_API_INTERNAL_UPSTREAM=${SYSTEMS_API_INTERNAL_UPSTREAM:-acronym-api:3000}
       - SYSTEMS_ATTESTATION_SECRET=${SYSTEMS_ATTESTATION_SECRET:-}
+      - REVERSE_PROXY=${REVERSE_PROXY:-nginx}
+      - NGINX_CONF_DIR=/app/nginx-conf
+    mem_limit: 512m
+    cpus: 1.0
+    pids_limit: 512
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    depends_on:
-      - acronym-nginx
+    networks:
+      - systems
 
   # V4 Phase 1: PgBouncer sidecar (opt-in via `--profile pgbouncer`).
   # All application code connects through the pooler, never directly to
   # PostgreSQL: transaction pooling, 20 server connections, pool size 5.
   # Point PGBOUNCER_UPSTREAM_DATABASE_URL at the real PostgreSQL and set
-  # DATABASE_URL=postgresql://user:pass@acronym-pgbouncer:6432/dbname
-  # (or 127.0.0.1:6432 from the host).
+  # DATABASE_URL=postgresql://user:pass@acronym-pgbouncer:6432/dbname.
   acronym-pgbouncer:
-    image: edoburu/pgbouncer:latest
+    image: edoburu/pgbouncer:1.23.1
     container_name: acronym-pgbouncer
     restart: unless-stopped
     profiles:
@@ -63,23 +76,46 @@ services:
       - RESERVE_POOL_SIZE=1
       - SERVER_IDLE_TIMEOUT=300
       - AUTH_TYPE=scram-sha-256
+    mem_limit: 128m
+    cpus: 0.5
+    pids_limit: 100
     ports:
       - "127.0.0.1:6432:6432"
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    networks:
+      - systems
 
+  # First issuance: `docker compose --profile certbot run --rm acronym-certbot`.
+  # Then this service runs as a renewal loop (renew every 12h; certbot no-ops
+  # until a cert is within 30 days of expiry). Reload nginx out of band after a
+  # renewal (e.g. a host cron: `docker exec acronym-nginx nginx -s reload`).
   acronym-certbot:
     image: certbot/certbot
     container_name: acronym-certbot
+    restart: unless-stopped
     volumes:
       - ./certbot/conf:/etc/letsencrypt
       - ./certbot/www:/var/www/certbot
     profiles:
       - certbot
-    entrypoint: >
-      certbot certonly --webroot
-      --webroot-path=/var/www/certbot
-      --email ${CERTBOT_EMAIL:-admin@acronym.sk}
-      --agree-tos
-      --no-eff-email
-      -d project.acronym.sk
+    entrypoint: /bin/sh
+    command: >-
+      -c 'certbot certonly --webroot --webroot-path=/var/www/certbot
+      --email ${CERTBOT_EMAIL:-admin@acronym.sk} --agree-tos --no-eff-email
+      -d ${CERT_DOMAIN:-systems.acronym.sk} --keep-until-expiring;
+      trap exit TERM;
+      while :; do certbot renew --webroot --webroot-path=/var/www/certbot;
+      sleep 12h & wait $${!}; done'
+    networks:
+      - systems
+
+# The control-plane PostgreSQL (systems-postgres) is created outside compose by
+# scripts/setup-postgres-windows.ps1 on the `systems` Docker network. Join it as
+# an external network so `systems-postgres` resolves by name from these
+# containers — without this the API can't reach the database and startup
+# `prisma migrate deploy` fails.
+networks:
+  systems:
+    external: true
+    name: ${DOCKER_NETWORK:-systems}
