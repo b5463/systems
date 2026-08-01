@@ -50,13 +50,19 @@ Write-SystemsStatus "backup target: $dest"
 Write-SystemsStatus 'backing up database'
 $pgContainer = $null
 if (Get-Command docker -ErrorAction SilentlyContinue) {
-    $pgContainer = (& docker ps --filter 'name=postgres' --format '{{.Names}}' 2>$null | Select-Object -First 1)
+    # Anchor the name so this matches ONLY the control-plane container, never a
+    # tenant app's own Postgres container (the platform provisions those).
+    $pgContainer = (& docker ps --filter 'name=^systems-postgres$' --format '{{.Names}}' 2>$null | Select-Object -First 1)
 }
 if ($pgContainer) {
     $db   = Get-ConfigValue $cfg 'POSTGRES_DB' 'systems'
     $user = Get-ConfigValue $cfg 'POSTGRES_USER' 'systems'
-    $out  = Join-Path $dest 'systems-db.sql'
-    & docker exec $pgContainer pg_dump -U $user $db | Out-File -FilePath $out -Encoding utf8
+    $out  = Join-Path $dest 'systems-db.dump'
+    # Custom-format dump (matches the Node backup service) restored with
+    # pg_restore. Redirect through cmd /c so the raw binary bytes land in the
+    # file unchanged — PowerShell's Out-File/`>` would add a UTF-8 BOM and
+    # re-encode, corrupting the dump.
+    & cmd /c "docker exec $pgContainer pg_dump -U $user -Fc $db > `"$out`""
     if ($LASTEXITCODE -eq 0) { Write-SystemsOk "pg_dump -> $out" }
     else { Write-SystemsError 'pg_dump failed — aborting backup'; exit 1 }
 } else {
@@ -101,7 +107,7 @@ if ($incUploads -and (Test-Path $paths.Uploads)) {
     created_at      = (Get-Date).ToString('o')
     includes_logs   = [bool]$incLogs
     includes_uploads= [bool]$incUploads
-    database        = (if ($pgContainer) { 'postgres' } else { 'sqlite' })
+    database        = $(if ($pgContainer) { 'postgres' } else { 'sqlite' })
 } | ConvertTo-Json | Out-File (Join-Path $dest 'manifest.json') -Encoding utf8
 
 # ---- retention -----------------------------------------------------------

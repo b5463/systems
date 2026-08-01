@@ -90,7 +90,9 @@ test('Docker E2E: zip â†’ deploy â†’ HTTP 200 â†’ redeploy â†�
     RECONCILE_INTERVAL_SEC: '0',
   });
 
-  const { db, initDefaultUsers } = require('../src/db');
+  // Seed the admin user from ADMIN_USERS via the live Prisma path (the legacy
+  // SQLite bootstrap is gone).
+  const { initDefaultUsers } = require('../src/index');
   await initDefaultUsers();
   const { buildApp } = require('../src/app');
   const app = await buildApp({ logger: false });
@@ -137,7 +139,6 @@ test('Docker E2E: zip â†’ deploy â†’ HTTP 200 â†’ redeploy â†�
       }).catch(() => {});
     }
     await app.close().catch(() => {});
-    db.close();
     await fs.rm(dataDir, { recursive: true, force: true });
   });
 

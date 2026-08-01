@@ -45,7 +45,7 @@ if ($DryRun) {
     Write-SystemsOk 'complete (dry-run)'
     return
 }
-if (-not (Confirm-Typed 'This cannot be undone.' 'RESTORE')) {
+if (-not (Confirm-SystemsAction -Expected 'RESTORE' -Message 'This cannot be undone.')) {
     Write-SystemsWarn 'aborted — no changes made.'
     exit 1
 }
@@ -54,15 +54,27 @@ if (-not (Confirm-Typed 'This cannot be undone.' 'RESTORE')) {
 Write-SystemsStatus 'restoring database'
 $pgContainer = $null
 if (Get-Command docker -ErrorAction SilentlyContinue) {
-    $pgContainer = (& docker ps --filter 'name=postgres' --format '{{.Names}}' 2>$null | Select-Object -First 1)
+    # Match ONLY the control-plane container, never a tenant's own Postgres.
+    $pgContainer = (& docker ps --filter 'name=^systems-postgres$' --format '{{.Names}}' 2>$null | Select-Object -First 1)
 }
-$sql = Join-Path $BackupPath 'systems-db.sql'
-if ($pgContainer -and (Test-Path $sql)) {
+$dump = Join-Path $BackupPath 'systems-db.dump'   # custom-format (pg_restore)
+$sql  = Join-Path $BackupPath 'systems-db.sql'    # legacy plain-SQL (psql)
+if ($pgContainer -and (Test-Path $dump)) {
     $db   = Get-ConfigValue $cfg 'POSTGRES_DB' 'systems'
     $user = Get-ConfigValue $cfg 'POSTGRES_USER' 'systems'
-    Get-Content $sql -Raw | & docker exec -i $pgContainer psql -U $user -d $db
-    if ($LASTEXITCODE -eq 0) { Write-SystemsOk 'database restored (postgres)' }
-    else { Write-SystemsError 'psql restore failed' }
+    # --clean --if-exists drops existing objects first so restoring into a
+    # non-empty live DB doesn't error on every CREATE; --exit-on-error makes a
+    # partial failure fail loudly instead of "restored" over broken state.
+    & cmd /c "docker exec -i $pgContainer pg_restore -U $user -d $db --clean --if-exists --no-owner --exit-on-error < `"$dump`""
+    if ($LASTEXITCODE -eq 0) { Write-SystemsOk 'database restored (postgres, pg_restore)' }
+    else { Write-SystemsError 'pg_restore failed — database left unchanged where possible'; exit 1 }
+} elseif ($pgContainer -and (Test-Path $sql)) {
+    $db   = Get-ConfigValue $cfg 'POSTGRES_DB' 'systems'
+    $user = Get-ConfigValue $cfg 'POSTGRES_USER' 'systems'
+    # Legacy plain-SQL dump: stop on the first error rather than plough through.
+    & cmd /c "docker exec -i $pgContainer psql -U $user -d $db -v ON_ERROR_STOP=1 < `"$sql`""
+    if ($LASTEXITCODE -eq 0) { Write-SystemsOk 'database restored (postgres, psql)' }
+    else { Write-SystemsError 'psql restore failed'; exit 1 }
 } elseif (Test-Path (Join-Path $BackupPath 'platform.db')) {
     Copy-Item (Join-Path $BackupPath 'platform.db*') $paths.Data -Force
     Write-SystemsOk 'database restored (sqlite)'

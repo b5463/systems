@@ -39,6 +39,10 @@ trap 'rm -f -- "${tmp_env:-}"' EXIT
   printf 'JWT_SECRET=%s\n' "$(openssl rand -hex 48)"
   printf 'ENV_SECRET=%s\n' "$(openssl rand -hex 32)"
   printf 'SYSTEMS_ATTESTATION_SECRET=%s\n' "$(openssl rand -hex 32)"
+  # Required by docker-compose.macos.yml (systems-postgres has no default) —
+  # without it the Postgres container refuses to start and the API never comes
+  # up (it depends on Postgres being healthy).
+  printf 'POSTGRES_PASSWORD=%s\n' "$(openssl rand -hex 32)"
   printf 'ADMIN_USERS=admin:%s\n' "$admin_password"
   printf 'RECONCILE_INTERVAL_SEC=30\n'
 } >"$tmp_env"

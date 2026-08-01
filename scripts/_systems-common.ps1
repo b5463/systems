@@ -116,33 +116,75 @@ function Get-SystemsPaths {
 
     $root = Get-RepoRoot
 
+    # Prefer the canonical .env.example names (LOGS_DIR / DEPLOYMENTS_DIR /
+    # UPLOADS_DIR / BACKUP_DIR / CADDY_*), keeping the older SYSTEMS_*_DIR names
+    # as a fallback so existing installs don't break.
     $data = Resolve-SystemsPath `
         (Get-ConfigValue $Config 'SYSTEMS_DATA_DIR' '') `
         (Join-Path $root '.systems-data')
 
     $logs = Resolve-SystemsPath `
-        (Get-ConfigValue $Config 'SYSTEMS_LOG_DIR' '') `
+        (Get-ConfigValue $Config 'LOGS_DIR' (Get-ConfigValue $Config 'SYSTEMS_LOG_DIR' '')) `
         (Join-Path $data 'logs')
 
     $releases = Resolve-SystemsPath `
-        (Get-ConfigValue $Config 'SYSTEMS_RELEASES_DIR' '') `
+        (Get-ConfigValue $Config 'DEPLOYMENTS_DIR' (Get-ConfigValue $Config 'SYSTEMS_RELEASES_DIR' '')) `
         (Join-Path $data 'releases')
 
+    $uploads = Resolve-SystemsPath `
+        (Get-ConfigValue $Config 'UPLOADS_DIR' (Get-ConfigValue $Config 'SYSTEMS_UPLOADS_DIR' '')) `
+        (Join-Path $data 'uploads')
+
     $backups = Resolve-SystemsPath `
-        (Get-ConfigValue $Config 'SYSTEMS_BACKUP_DIR' '') `
+        (Get-ConfigValue $Config 'BACKUP_DIR' (Get-ConfigValue $Config 'SYSTEMS_BACKUP_DIR' '')) `
         (Join-Path $data 'backups')
 
-    $caddy = Resolve-SystemsPath `
-        (Get-ConfigValue $Config 'CADDY_SYSTEMS_DIR' '') `
-        (Join-Path $data 'caddy')
+    $caddyDir = Resolve-SystemsPath `
+        (Get-ConfigValue $Config 'CADDY_SYSTEMS_DIR' (Get-ConfigValue $Config 'CADDY_ROUTES_DIR' '')) `
+        (Join-Path $data 'caddy\systems.d')
+
+    $caddyFile = Resolve-SystemsPath `
+        (Get-ConfigValue $Config 'CADDY_CONFIG_PATH' '') `
+        (Join-Path $data 'caddy\Caddyfile')
 
     return [PSCustomObject]@{
-        Root     = $root
-        Data     = $data
-        Logs     = $logs
-        Releases = $releases
-        Backups  = $backups
-        Caddy    = $caddy
+        Root      = $root
+        Data      = $data
+        Logs      = $logs
+        Releases  = $releases
+        Uploads   = $uploads
+        Backups   = $backups
+        # Caddy = the systems.d route dir; kept under both names for back-compat.
+        Caddy     = $caddyDir
+        CaddyDir  = $caddyDir
+        CaddyFile = $caddyFile
+    }
+}
+
+# TCP reachability probe used by the hardening/firewall checks. Returns $true if
+# a TCP connection to host:port succeeds within the timeout. Defined here so the
+# security scripts don't silently treat an undefined command as "not reachable"
+# (which reported exposed ports as safe).
+function Test-TcpPort {
+    param(
+        [string]$ComputerName = '127.0.0.1',
+        [Parameter(Mandatory = $true)][int]$Port,
+        [int]$TimeoutMs = 1500
+    )
+
+    $client = New-Object System.Net.Sockets.TcpClient
+    try {
+        $async = $client.BeginConnect($ComputerName, $Port, $null, $null)
+        $connected = $async.AsyncWaitHandle.WaitOne($TimeoutMs)
+        if ($connected -and $client.Connected) {
+            $client.EndConnect($async)
+            return $true
+        }
+        return $false
+    } catch {
+        return $false
+    } finally {
+        $client.Close()
     }
 }
 

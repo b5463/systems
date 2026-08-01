@@ -92,7 +92,12 @@ async function main() {
   fastify.log.info(`SYSTEMS. deployment engine API running on 0.0.0.0:${port}`);
 }
 
-main().catch((err) => {
-  console.error('Fatal startup error:', err);
-  process.exit(1);
-});
+// Only auto-start when run as the entrypoint; tests import initDefaultUsers.
+if (require.main === module) {
+  main().catch((err) => {
+    console.error('Fatal startup error:', err);
+    process.exit(1);
+  });
+}
+
+module.exports = { main, initDefaultUsers };

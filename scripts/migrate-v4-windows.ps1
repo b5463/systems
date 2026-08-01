@@ -7,8 +7,12 @@
 # Usage:
 #   $env:DATABASE_URL = "postgresql://user:pass@localhost:5432/systems"
 #   # optional, only for legacy installs:
-#   $env:SQLITE_DB_PATH = "C:\systems\data\platform.db"
+#   $env:CONTROL_PLANE_SQLITE_PATH = "C:\systems\data\platform.db"
 #   .\scripts\migrate-v4-windows.ps1
+#
+# Legacy data is imported into the CONTROL_PLANE_POSTGRES_SCHEMA staging schema
+# (default systems_import), NOT the live tables — promotion is a deliberate,
+# separate step. See the import manifest written under data/migration-backups.
 
 $ErrorActionPreference = "Stop"
 
@@ -17,6 +21,13 @@ if (-not $env:DATABASE_URL) {
     exit 1
 }
 
+# Accept the older SQLITE_DB_PATH name as an alias for the variable the Node
+# script actually reads (CONTROL_PLANE_SQLITE_PATH).
+if (-not $env:CONTROL_PLANE_SQLITE_PATH -and $env:SQLITE_DB_PATH) {
+    $env:CONTROL_PLANE_SQLITE_PATH = $env:SQLITE_DB_PATH
+}
+$sqlitePath = $env:CONTROL_PLANE_SQLITE_PATH
+
 $apiDir = Join-Path $PSScriptRoot "..\api"
 Push-Location $apiDir
 try {
@@ -24,12 +35,15 @@ try {
     npx prisma migrate deploy
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-    if ($env:SQLITE_DB_PATH -and (Test-Path $env:SQLITE_DB_PATH)) {
-        Write-Host "==> Migrating legacy SQLite data from $($env:SQLITE_DB_PATH)"
+    if ($sqlitePath -and (Test-Path $sqlitePath)) {
+        Write-Host "==> Migrating legacy SQLite data from $sqlitePath into the staging schema"
+        # The Node importer requires CONTROL_PLANE_POSTGRES_URL as its target;
+        # it's the same database as DATABASE_URL.
+        if (-not $env:CONTROL_PLANE_POSTGRES_URL) { $env:CONTROL_PLANE_POSTGRES_URL = $env:DATABASE_URL }
         node scripts/migrate-sqlite-to-postgres.js
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     } else {
-        Write-Host "==> No legacy SQLite database configured (SQLITE_DB_PATH); skipping data migration"
+        Write-Host "==> No legacy SQLite database configured (CONTROL_PLANE_SQLITE_PATH); skipping data migration"
     }
 
     Write-Host "==> Verifying"

@@ -2,8 +2,22 @@
 
 const path = require('path');
 const fs = require('fs/promises');
-const Database = require('better-sqlite3');
 const { TABLES, quoteIdent, createTableSql, insertSql } = require('../src/util/controlplane-migration');
+
+// better-sqlite3 is an optional dependency: only legacy (pre-Prisma) installs
+// migrating off SQLite need it, and it carries native bindings we don't want in
+// every install. Load it lazily with an actionable message instead of a cryptic
+// MODULE_NOT_FOUND at require time.
+function loadSqlite() {
+  try {
+    return require('better-sqlite3');
+  } catch {
+    throw new Error(
+      'Legacy SQLite migration needs the optional dependency better-sqlite3. '
+      + 'Install it in api/ first:  npm install better-sqlite3',
+    );
+  }
+}
 
 const args = new Set(process.argv.slice(2));
 const dryRun = args.has('--dry-run');
@@ -21,6 +35,7 @@ async function main() {
     throw new Error('CONTROL_PLANE_POSTGRES_URL is required (or use --dry-run).');
   }
 
+  const Database = loadSqlite();
   const source = new Database(sqlitePath, { readonly: true });
   const backupDir = path.join(dataDir, 'migration-backups');
   await fs.mkdir(backupDir, { recursive: true });
