@@ -105,6 +105,7 @@ async function projectsRoutes(fastify, options) {
 
   fastify.get('/api/projects', {
     preHandler: [fastify.authenticate],
+    config: { tokenScope: 'read' },
   }, async () => {
     let rows = await projectRepo.listAll();
     if (features().v4Systems) rows = await overlayProjects(rows);
@@ -113,6 +114,7 @@ async function projectsRoutes(fastify, options) {
 
   fastify.get('/api/projects/:slug', {
     preHandler: [fastify.authenticate],
+    config: { tokenScope: 'read' },
   }, async (request, reply) => {
     const { slug } = request.params;
     let project = await loadOr404(reply, slug);
@@ -410,6 +412,7 @@ async function projectsRoutes(fastify, options) {
   // Roll back to the previously deployed image.
   fastify.post('/api/projects/:slug/rollback', {
     preHandler: [fastify.authenticate],
+    config: { tokenScope: 'deploy' },
   }, async (request, reply) => {
     const { slug } = request.params;
     const project = await loadOr404(reply, slug);

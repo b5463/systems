@@ -10,7 +10,7 @@ async function adminRoutes(fastify, options) {
   fastify.get('/api/admin/users', {
     preHandler: [fastify.authenticate],
   }, async () => {
-    const users = await userRepo.listUsers();
+    const users = await userRepo.listUsersPublic();
     return { users };
   });
 
@@ -53,7 +53,7 @@ async function adminRoutes(fastify, options) {
 
     await auditRepo.appendAudit({ user_id: request.user.id, action: 'user_create', target: username, ip: request.ip });
 
-    const user = await userRepo.findById(info.lastInsertRowid);
+    const user = await userRepo.findByIdPublic(info.lastInsertRowid);
     return reply.code(201).send({ user });
   });
 

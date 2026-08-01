@@ -31,6 +31,7 @@ function decrypt(encryptedJson) {
 async function secretsRoutes(fastify) {
   fastify.get('/api/projects/:slug/secrets', {
     preHandler: [fastify.authenticate],
+    config: { tokenScope: 'secrets' },
   }, async (request, reply) => {
     if (!features().secretsManagement) return reply.code(404).send({ error: 'Secrets management is not enabled.' });
     const project = await loadOr404(reply, request.params.slug);
@@ -46,6 +47,7 @@ async function secretsRoutes(fastify) {
 
   fastify.put('/api/projects/:slug/secrets', {
     preHandler: [fastify.authenticate],
+    config: { tokenScope: 'secrets' },
     schema: {
       body: {
         type: 'object', required: ['key', 'value'],
@@ -71,6 +73,7 @@ async function secretsRoutes(fastify) {
 
   fastify.post('/api/projects/:slug/secrets/:key/rotate', {
     preHandler: [fastify.authenticate],
+    config: { tokenScope: 'secrets' },
     schema: {
       body: {
         type: 'object', required: ['value'],
@@ -95,6 +98,7 @@ async function secretsRoutes(fastify) {
 
   fastify.delete('/api/projects/:slug/secrets/:key', {
     preHandler: [fastify.authenticate],
+    config: { tokenScope: 'secrets' },
   }, async (request, reply) => {
     if (!features().secretsManagement) return reply.code(404).send({ error: 'Secrets management is not enabled.' });
     const project = await loadOr404(reply, request.params.slug);

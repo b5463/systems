@@ -2,7 +2,7 @@
 
 const bcrypt = require('bcrypt');
 const crypto = require('crypto');
-const { userRepo, auditRepo } = require('../repo');
+const { userRepo, auditRepo, tokenRepo } = require('../repo');
 const totp = require('../util/totp');
 const lockout = require('../util/lockout');
 const { setSessionCookie, clearSessionCookie, csrfToken } = require('../util/session');
@@ -238,6 +238,10 @@ async function authRoutes(fastify, options) {
 
     const password_hash = await bcrypt.hash(newPassword, 12);
     await userRepo.updatePassword(user.id, password_hash);
+    // Credential rotation is break-glass: also drop long-lived API tokens so a
+    // leaked token can't outlive a password change made in response to a
+    // suspected compromise.
+    await tokenRepo.deleteByUser(user.id);
 
     await auditRepo.appendAudit({ user_id: user.id, action: 'password_change', target: user.username, ip: request.ip });
     // Re-issue a fresh token so the current session stays signed in; other
@@ -252,6 +256,8 @@ async function authRoutes(fastify, options) {
     preHandler: [fastify.authenticate],
   }, async (request, reply) => {
     await userRepo.bumpTokenVersion(request.user.id);
+    // Sign-out-everywhere is the account break-glass — revoke API tokens too.
+    await tokenRepo.deleteByUser(request.user.id);
     await auditRepo.appendAudit({ user_id: request.user.id, action: 'sessions_revoked', ip: request.ip });
     const updated = await userRepo.findById(request.user.id);
     return { message: 'Other sessions signed out.', csrfToken: await rotateSoleSession(fastify, updated, request, reply) };

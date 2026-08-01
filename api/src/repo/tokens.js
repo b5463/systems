@@ -57,6 +57,14 @@ async function deleteExpired() {
   });
 }
 
+// Break-glass: drop every API token a user holds. Called when the account's
+// credentials are rotated/revoked (password change, revoke-all-sessions, admin
+// reset) so a leaked token cannot outlive the response to a compromise.
+async function deleteByUser(userId) {
+  const { count } = await prisma.apiToken.deleteMany({ where: { userId } });
+  return count;
+}
+
 module.exports = {
-  create, findByHash, listByUser, deleteById, touchLastUsed, deleteExpired,
+  create, findByHash, listByUser, deleteById, touchLastUsed, deleteExpired, deleteByUser,
 };

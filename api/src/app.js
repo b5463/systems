@@ -5,9 +5,21 @@ const Fastify = require('fastify');
 // Build (but do not start) the configured Fastify app. Extracted from index.js
 // so tests can use app.inject() without binding a port or touching Docker.
 async function buildApp(opts = {}) {
-  const trustProxy = process.env.TRUST_PROXY === 'false'
-    ? false
-    : (process.env.TRUST_PROXY ? process.env.TRUST_PROXY === 'true' : false);
+  // The documented deployment terminates TLS at a single reverse proxy
+  // (Caddy/nginx) in front of the API. If proxy headers aren't trusted there,
+  // `request.ip` is the proxy's address for every request and the per-IP
+  // rate limit, login lockout, and IP denylist all collapse onto one bucket.
+  // So default to trusting exactly one hop in production; dev has no proxy and
+  // trusts none. Explicit TRUST_PROXY still wins: true/false, a hop count, or a
+  // comma-separated IP/CIDR allow-list.
+  const trustProxy = (() => {
+    const v = process.env.TRUST_PROXY;
+    if (v === undefined || v === '') return process.env.NODE_ENV === 'production' ? 1 : false;
+    if (v === 'true') return true;
+    if (v === 'false') return false;
+    if (/^\d+$/.test(v.trim())) return Number(v.trim());
+    return v.split(',').map((s) => s.trim()).filter(Boolean);
+  })();
 
   const { requestIdFrom, runWithRequestId } = require('./util/requestcontext');
 
@@ -169,7 +181,24 @@ async function buildApp(opts = {}) {
   }
 
   fastify.decorate('authenticate', async function (request, reply) {
-    if (await tryApiTokenAuth(request)) return;
+    if (await tryApiTokenAuth(request)) {
+      // Scope enforcement (default-deny). A route must opt API tokens in via
+      // `config.tokenScope`; untagged routes are session-only, so a token can
+      // never reach admin/control-plane surfaces it was not granted. 'admin' is
+      // the one superscope and satisfies any requirement.
+      const required = request.routeOptions && request.routeOptions.config
+        && request.routeOptions.config.tokenScope;
+      const held = (request.apiToken && request.apiToken.scopes) || [];
+      const ok = required && (held.includes('admin') || held.includes(required));
+      if (!ok) {
+        return reply.code(403).send({
+          error: required
+            ? 'API token lacks the required scope for this route.'
+            : 'API tokens cannot access this route; use an interactive session.',
+        });
+      }
+      return;
+    }
 
     try {
       await request.jwtVerify();

@@ -15,6 +15,19 @@ function toSnake(row) {
   };
 }
 
+// Public projection for anything returned to clients. Never carries the bcrypt
+// hash or the raw TOTP seed — only the internal auth paths (login, TOTP verify)
+// read those, via the full `toSnake` row.
+function toPublic(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    username: row.username,
+    created_at: row.createdAt instanceof Date ? row.createdAt.toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, '') : row.createdAt,
+    totp_enabled: row.totpEnabled ? 1 : 0,
+  };
+}
+
 function sessionToSnake(row) {
   if (!row) return null;
   return {
@@ -68,6 +81,18 @@ async function bumpTokenVersion(id) {
 async function listUsers() {
   const rows = await prisma.user.findMany({ orderBy: { createdAt: 'asc' } });
   return rows.map(toSnake);
+}
+
+// Client-safe user list — never includes password_hash / totp_secret.
+async function listUsersPublic() {
+  const rows = await prisma.user.findMany({ orderBy: { createdAt: 'asc' } });
+  return rows.map(toPublic);
+}
+
+// Client-safe single user — never includes password_hash / totp_secret.
+async function findByIdPublic(id) {
+  const row = await prisma.user.findUnique({ where: { id } });
+  return toPublic(row);
 }
 
 async function setupTotp(id, secret) {
@@ -152,7 +177,7 @@ async function enforceSessionLimit(userId, max = Number(process.env.MAX_SESSIONS
 
 module.exports = {
   findByUsername, findById, countUsers, createUser, deleteUser,
-  updatePassword, bumpTokenVersion, listUsers,
+  updatePassword, bumpTokenVersion, listUsers, listUsersPublic, findByIdPublic,
   setupTotp, enableTotp, disableTotp,
   createSession, findSessionByJti, findSessionById,
   deleteSessionById, deleteSessionByJti, deleteUserSessions,

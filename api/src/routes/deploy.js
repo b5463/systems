@@ -578,6 +578,7 @@ async function deployRoutes(fastify, options) {
   fastify.post('/api/deploy', {
     preHandler: [fastify.authenticate],
     config: {
+      tokenScope: 'deploy',
       rateLimit: { max: 5, timeWindow: '1 minute' },
     },
   }, async (request, reply) => {
@@ -614,6 +615,7 @@ async function deployRoutes(fastify, options) {
   fastify.post('/api/deploy/:slug/redeploy', {
     preHandler: [fastify.authenticate],
     config: {
+      tokenScope: 'deploy',
       rateLimit: { max: 5, timeWindow: '1 minute' },
     },
   }, async (request, reply) => {
