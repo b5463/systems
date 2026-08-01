@@ -24,6 +24,8 @@ module.exports = {
   systemRepo: require('./systems'),
   // V4 Phase 5 Portfolio CMS (org-scoped)
   portfolioRepo: require('./portfolio'),
-  // V4 Phase 4 domains (org-scoped, read/write only — see repo/domains.js)
+  // V4 Phase 4 domains, routing and maintenance (org-scoped)
   domainRepo: require('./domains'),
+  maintenanceRepo: require('./maintenance'),
+  routeRepo: require('./routes'),
 };

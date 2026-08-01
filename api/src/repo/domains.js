@@ -2,16 +2,9 @@
 
 const { prisma } = require('./client');
 
-// V4 Phase 4 domains (partial — read/write on the Domain table Alex's Phase 2
-// bridge already creates). ORG-SCOPING RULE: every method takes
-// organisationId as its first argument and filters on it — no exceptions.
-//
-// What this does NOT do yet (Alex's remaining Phase 4 work):
-//   - DNS TXT/CNAME/A verification (verified stays false until that lands)
-//   - route_status enum / system_environment_routes junction table
-//   - Caddy renderRoute() wiring — adding a domain here does not publish a route
-//   - maintenance_windows — no maintenance-mode table exists
-//   - canonical redirect selection — no canonical column exists
+// V4 Phase 4 domains. ORG-SCOPING RULE: every method takes organisationId as
+// its first argument and filters on it — no exceptions (hostname lookups are
+// the one documented cross-org exception, since hostnames are platform-unique).
 
 async function listBySystem(organisationId, systemId) {
   return prisma.domain.findMany({
@@ -43,4 +36,45 @@ async function remove(organisationId, id) {
   return count > 0;
 }
 
-module.exports = { listBySystem, findById, findByHostname, createCustom, remove };
+// Store a freshly-issued verification token + its expiry on the domain (resets
+// any prior verified state — re-verification starts clean).
+async function setVerification(organisationId, id, { token, method, expiresAt }) {
+  const { count } = await prisma.domain.updateMany({
+    where: { id, organisationId },
+    data: {
+      verificationToken: token, verificationMethod: method,
+      verificationExpiresAt: expiresAt, verified: false, verifiedAt: null, lastError: null,
+    },
+  });
+  return count > 0;
+}
+
+async function markVerified(organisationId, id, now = new Date()) {
+  const { count } = await prisma.domain.updateMany({
+    where: { id, organisationId },
+    data: { verified: true, verifiedAt: now, verificationToken: null, verificationExpiresAt: null, lastError: null },
+  });
+  return count > 0;
+}
+
+async function markVerificationFailed(organisationId, id, reason) {
+  await prisma.domain.updateMany({
+    where: { id, organisationId },
+    data: { lastError: reason },
+  });
+}
+
+// Designate a single canonical hostname for a system (clears the flag on the
+// system's other domains in the same transaction).
+async function setCanonical(organisationId, systemId, id) {
+  return prisma.$transaction(async (tx) => {
+    await tx.domain.updateMany({ where: { organisationId, systemId }, data: { isCanonical: false } });
+    const { count } = await tx.domain.updateMany({ where: { id, organisationId, systemId }, data: { isCanonical: true } });
+    return count > 0;
+  });
+}
+
+module.exports = {
+  listBySystem, findById, findByHostname, createCustom, remove,
+  setVerification, markVerified, markVerificationFailed, setCanonical,
+};

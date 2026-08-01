@@ -364,11 +364,16 @@ model SystemEnvironment {
   accessPolicy     String   @default("public") @map("access_policy")
   healthPath       String   @default("/") @map("health_path")
   routePublished   Boolean  @default(false) @map("route_published")
+  // V4 Phase 4 — route publication state machine. route_status is authoritative
+  // (inactive/pending/active/failed/superseded); route_published is kept as a
+  // legacy mirror (true iff route_status = 'active') for the compat layer.
+  routeStatus      String   @default("inactive") @map("route_status")
+  routeLastError   String?  @map("route_last_error")
+  routeLastPublishedAt DateTime? @map("route_last_published_at")
   basicUser        String?  @map("basic_user")
   basicHash        String?  @map("basic_hash")
   // Current release pointer — plain column, no relation, to avoid an FK cycle
-  // with releases.environment_id. Phase 4 replaces route_published with the
-  // route_status enum.
+  // with releases.environment_id.
   currentReleaseId String?  @map("current_release_id") @db.Uuid
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @default(now()) @updatedAt @map("updated_at")
@@ -411,11 +416,75 @@ model Domain {
   environmentId  String?  @map("environment_id") @db.Uuid
   isCustom       Boolean  @default(false) @map("is_custom")
   verified       Boolean  @default(false)
+  // V4 Phase 4 — custom-domain verification flow.
+  verificationToken     String?   @map("verification_token")
+  verificationMethod    String?   @map("verification_method")
+  verificationExpiresAt DateTime? @map("verification_expires_at")
+  verifiedAt            DateTime? @map("verified_at")
+  isCanonical           Boolean   @default(false) @map("is_canonical")
+  tlsStatus             String?   @map("tls_status")
+  lastError             String?   @map("last_error")
   createdAt      DateTime @default(now()) @map("created_at")
 
   @@index([organisationId])
   @@index([systemId])
   @@map("domains")
+}
+
+// V4 Phase 4 — explicit domain↔environment routing (junction). One row per
+// (environment, domain) pair carrying that route's publication status, so a
+// system's environments and custom domains map to routes explicitly rather than
+// via the single route_published boolean.
+model SystemEnvironmentRoute {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organisationId String   @map("organisation_id") @db.Uuid
+  systemId       String   @map("system_id") @db.Uuid
+  environmentId  String   @map("environment_id") @db.Uuid
+  domainId       String   @map("domain_id") @db.Uuid
+  routeStatus    String   @default("inactive") @map("route_status")
+  lastError      String?  @map("last_error")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@unique([environmentId, domainId])
+  @@index([organisationId, systemId])
+  @@index([organisationId, routeStatus])
+  @@map("system_environment_routes")
+}
+
+// V4 Phase 4 — audit trail of every route publication attempt, so a failed
+// Caddy reload/probe is recorded rather than lost.
+model RoutePublicationAttempt {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organisationId String   @map("organisation_id") @db.Uuid
+  systemId       String   @map("system_id") @db.Uuid
+  environmentId  String   @map("environment_id") @db.Uuid
+  domainId       String?  @map("domain_id") @db.Uuid
+  status         String
+  error          String?
+  attemptedAt    DateTime @default(now()) @map("attempted_at")
+
+  @@index([organisationId, systemId, attemptedAt(sort: Desc)])
+  @@map("route_publication_attempts")
+}
+
+// V4 Phase 4 — maintenance windows. While an active window covers now(), the
+// renderer serves a maintenance response for the environment's routes.
+model MaintenanceWindow {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organisationId String   @map("organisation_id") @db.Uuid
+  systemId       String   @map("system_id") @db.Uuid
+  environmentId  String?  @map("environment_id") @db.Uuid
+  message        String   @default("This service is temporarily unavailable for maintenance.")
+  startsAt       DateTime @map("starts_at")
+  endsAt         DateTime @map("ends_at")
+  active         Boolean  @default(true)
+  createdBy      String?  @map("created_by") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([organisationId, systemId])
+  @@index([organisationId, active, startsAt, endsAt])
+  @@map("maintenance_windows")
 }
 
 model EnvironmentSecret {

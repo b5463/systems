@@ -83,15 +83,15 @@ Tick a phase when its exit gate passes — not when coding is done.
   - [x] Preview + production environments coexist
   - [x] Promote flow with health gate works; retain-previous step is a no-op on first-ever deployment (test-proven)
   - [x] Legacy deploy routes still work (v4sync hooks fail-open; full suite green)
-- [ ] **Phase 4** — Domains, routing, access and maintenance
-  - [ ] `domains`, `maintenance_windows`, `route_publication_attempts` tables
-  - [ ] Domain-driven `renderRoute()` Caddy service
-  - [ ] Route publication transaction (write → validate → reload → probe → mark active)
-  - [ ] Custom domain verification flow end to end
+- [ ] **Phase 4** — Domains, routing, access and maintenance (see `V4_PHASE4_STATUS.md`; open: live Caddy wiring of maintenance/canonical + TLS/DNS-A/CNAME on a host)
+  - [x] `maintenance_windows`, `route_publication_attempts`, `system_environment_routes` tables (`domains` pre-existed from Phase 2; migration `20260702170000_v4_phase4_domains_routing`)
+  - [x] Domain-driven `renderRoute()` Caddy service — maintenance-mode 503 + canonical-redirect rendering added (`services/caddy.js`)
+  - [x] Route publication transaction (pending → write → validate → reload → probe → active; `services/routepublish.js`, unit-tested with injected Caddy/probe)
+  - [x] Custom domain verification flow — token (256-bit, 48h) → DNS TXT instructions → `POST .../verify` → canonical selection (`services/domainrouting.js`, `routes/domains.js`); live TLS check + A/CNAME methods still host-pending
   - [x] Domain management UI (Tomas) — hidden test page at `/domains`, real list/add/remove against the `Domain` table; maintenance mode and canonical redirect UI are explicit "not built yet" states pending Alex's tables below
-  - [ ] route_status enum (inactive/pending/active/failed/superseded) replaces boolean on system_environments
-  - [ ] system_environment_routes junction table deployed; domain↔environment routing is explicit
-  - [ ] Route publication is atomic: Caddy reload failure reverts status to 'failed', old route unchanged
+  - [x] route_status enum (inactive/pending/active/failed/superseded) on system_environments (added alongside `route_published`, which is now a legacy mirror of `route_status = 'active'`)
+  - [x] system_environment_routes junction table deployed; domain↔environment routing is explicit
+  - [x] Route publication is atomic: reload/probe failure reverts status to 'failed', previous route file untouched (test-proven)
 
 ### Milestone C — Acronym Public Portfolio
 - [ ] **Phase 5** — Portfolio CMS and Acronym public renderer

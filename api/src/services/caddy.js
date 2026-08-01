@@ -48,11 +48,25 @@ function routeFile(slug) {
  *   apex: also serve this system at the bare base domain (e.g. acronym.sk),
  *   in addition to {slug}.base — used for the designated primary system.
  */
-function renderRoute({ slug, port = 3000, visibility = 'public', basicUser, basicHash, apex = false }) {
+function renderRoute({ slug, port = 3000, visibility = 'public', basicUser, basicHash, apex = false, maintenance = null }) {
   if (!isValidSlug(slug)) throw new Error('invalid slug');
   const hosts = [`${slug}.${baseDomain()}`];
   if (apex) hosts.push(baseDomain());
   const host = hosts.join(', ');
+
+  // V4 Phase 4 — maintenance mode. While a window is in effect the route serves
+  // a 503 for all traffic instead of proxying to the (possibly stopped) app.
+  if (maintenance) {
+    const msg = String(maintenance.message || 'This service is temporarily unavailable for maintenance.')
+      .replace(/["\\]/g, '\\$&').replace(/[\r\n]+/g, ' ');
+    return `# managed by SYSTEMS. — ${slug} (maintenance)
+${host} {
+\thandle {
+\t\trespond "${msg}" 503
+\t}
+}
+`;
+  }
   const target = `${appUpstreamHost()}:${port}`;
   const tag = `${visibility === 'password' ? 'password' : 'public'}${apex ? ', apex' : ''}`;
   const upstream = attestation.internalUpstream();
@@ -78,6 +92,22 @@ ${host} {
 \thandle {
 ${auth}\t\treverse_proxy ${target}
 \t}
+}
+`;
+}
+
+/**
+ * V4 Phase 4 — render a canonical-redirect block. Non-canonical hostnames issue
+ * a permanent redirect to the canonical host, preserving the path/query.
+ * @param {string[]} fromHosts - hostnames to redirect
+ * @param {string} canonicalHost - the canonical hostname to redirect to
+ */
+function renderCanonicalRedirect(fromHosts, canonicalHost) {
+  const hosts = (fromHosts || []).filter((h) => h && h !== canonicalHost);
+  if (!hosts.length || !canonicalHost) return '';
+  return `# managed by SYSTEMS. — canonical redirect -> ${canonicalHost}
+${hosts.join(', ')} {
+\tredir https://${canonicalHost}{uri} permanent
 }
 `;
 }
@@ -155,5 +185,5 @@ async function reload() {
 
 module.exports = {
   systemsDir, caddyfilePath, baseDomain, appUpstreamHost, routeFile,
-  renderRoute, writeRoute, removeRoute, validate, reload,
+  renderRoute, renderCanonicalRedirect, writeRoute, removeRoute, validate, reload,
 };
