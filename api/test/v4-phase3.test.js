@@ -199,25 +199,45 @@ test('promote: requires a preview release; health gate blocks unhealthy promotio
   assert.equal(production.currentReleaseId, null, 'failed promotion recorded nothing');
 });
 
-test('promote: first promotion succeeds with no previous release; repeat supersedes', async () => {
+test('promote: production gets its own container; first promotion no-ops retain, repeat supersedes + reaps old container', async () => {
   const system = await systemRepo.findBySlug(org.id, 'promote-app');
+  // Give production a mapped legacy project so route publication has a target.
+  const productionEnv = system.environments.find((e) => e.name === 'production');
+  const prodProject = await prisma.project.create({ data: { name: 'promote-app', slug: 'promote-app', status: 'running' } });
+  await prisma.legacyProjectMap.create({
+    data: { organisationId: org.id, projectId: prodProject.id, systemId: system.id, environmentId: productionEnv.id },
+  });
   const routes = [];
+  const removed = [];
+  let containerSeq = 0;
   deployservice.setDeps({
     health: { targetForPort: (p) => ({ port: p }), waitForHealthy: async () => {} },
-    proxy: { publishRoute: async (o) => { routes.push(o.slug); return { published: true }; } },
+    proxy: { publishRoute: async (o) => { routes.push({ slug: o.slug, port: o.port }); return { published: true }; } },
+    // Production runs its OWN container from the promoted image, never the
+    // preview's — return a distinct id + port on each promotion.
+    startProductionContainer: async ({ imageId }) => {
+      containerSeq += 1;
+      return { containerId: `c-prod-${containerSeq}`, port: 40000 + containerSeq, imageId };
+    },
+    docker: { stopContainer: async () => {}, removeContainer: async (id) => { removed.push(id); } },
   });
 
   const first = await deployservice.promote({ organisationId: org.id, systemId: system.id, userId: 1, ip: '::1' });
   assert.equal(first.ok, true, JSON.stringify(first));
-  assert.equal(first.release.imageId, 'img-preview');
+  assert.equal(first.release.imageId, 'img-preview', 'the promoted image is recorded');
+  assert.equal(first.release.containerId, 'c-prod-1', 'production runs its own container, not the preview one');
+  assert.notEqual(first.release.containerId, 'c-preview');
+  assert.equal(first.release.port, 40001, 'production route uses its own container port');
   assert.equal(first.release.metadata.includes('promote'), true);
+  assert.deepEqual(routes[0], { slug: 'promote-app', port: 40001 }, 'route switched to the new production port');
 
   const supersededCount = await prisma.release.count({
     where: { systemId: system.id, status: 'superseded' },
   });
   assert.equal(supersededCount, 0, 'first-ever promotion has nothing to retain (no-op, not a failure)');
+  assert.equal(removed.length, 0, 'no previous container to reap on the first promotion');
 
-  // Second promotion supersedes the first production release.
+  // Second promotion supersedes the first production release and reaps its container.
   const preview = (await systemRepo.findBySlug(org.id, 'promote-app')).environments.find((e) => e.name === 'preview');
   const nextPreview = await prisma.release.create({
     data: {
@@ -230,9 +250,55 @@ test('promote: first promotion succeeds with no previous release; repeat superse
   const second = await deployservice.promote({ organisationId: org.id, systemId: system.id, userId: 1, ip: '::1' });
   assert.equal(second.ok, true);
   assert.equal(second.release.imageId, 'img-preview-2');
+  assert.equal(second.release.containerId, 'c-prod-2');
   assert.equal(await prisma.release.count({
     where: { environmentId: (await systemRepo.findBySlug(org.id, 'promote-app')).environments.find((e) => e.name === 'production').id, status: 'superseded' },
   }), 1, 'previous production release retained as superseded');
+  assert.ok(removed.includes('c-prod-1'), 'previous production container reaped after the route switch');
+});
+
+test('deploy + promote preserve a password access policy (never silently public)', async () => {
+  const system = await systemRepo.create(org.id, { name: 'gated', slug: 'gated' });
+  const production = system.environments[0];
+  await prisma.systemEnvironment.update({ where: { id: production.id }, data: { accessPolicy: 'password' } });
+
+  const seen = [];
+  deployservice.setDeps({
+    beginDeploy: async (args) => {
+      seen.push(['deploy', args.visibility]);
+      const p = await prisma.project.create({ data: { name: args.name, slug: args.slug, status: 'running', visibility: args.visibility } });
+      return { ok: true, project: { id: p.id, slug: args.slug } };
+    },
+    beginRedeploy: async () => { throw new Error('unmapped'); },
+  });
+  await deployservice.deployToEnvironment({
+    organisationId: org.id, systemId: system.id, envName: 'production',
+    zipPath: '/tmp/fake.zip', userId: 1, ip: '127.0.0.1',
+  });
+  assert.deepEqual(seen, [['deploy', 'password']], 'password policy maps to password visibility, not public');
+
+  // Promote a preview release and assert the route keeps the password visibility.
+  const preview = await prisma.systemEnvironment.create({
+    data: { organisationId: org.id, systemId: system.id, name: 'preview', accessPolicy: 'password' },
+  });
+  const rel = await prisma.release.create({
+    data: {
+      organisationId: org.id, systemId: system.id, environmentId: preview.id,
+      containerId: 'c-prev', imageId: 'img-prev', port: 34567, status: 'active',
+    },
+  });
+  await prisma.systemEnvironment.update({ where: { id: preview.id }, data: { currentReleaseId: rel.id } });
+
+  const published = [];
+  deployservice.setDeps({
+    health: { targetForPort: (p) => ({ port: p }), waitForHealthy: async () => {} },
+    startProductionContainer: async () => ({ containerId: 'c-prod', port: 41000 }),
+    proxy: { publishRoute: async (o) => { published.push(o.visibility); return { published: true }; } },
+    docker: { stopContainer: async () => {}, removeContainer: async () => {} },
+  });
+  const promoted = await deployservice.promote({ organisationId: org.id, systemId: system.id, userId: 1, ip: '::1' });
+  assert.equal(promoted.ok, true, JSON.stringify(promoted));
+  assert.deepEqual(published, ['password'], 'promotion publishes with password visibility, preserving basic auth');
 });
 
 test('v4sync: labels for mapped systems; release sync supersedes and is idempotent', async () => {

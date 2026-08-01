@@ -13,6 +13,7 @@
 const { prisma } = require('../repo/client');
 const systemRepo = require('../repo/systems');
 const auditV4Repo = require('../repo/auditv4');
+const v4sync = require('./v4sync');
 
 let deps = null;
 function realDeps() {
@@ -25,11 +26,46 @@ function realDeps() {
     health: require('./health'),
     proxy: require('./proxy'),
     docker: require('./docker'),
+    // Promotion runs the promoted image as a NEW production-owned container
+    // (its own id + host port) so a later preview redeploy/cleanup can never
+    // tear down what production is serving. The Docker work lives here; the
+    // orchestration around it is unit-tested with an injected fake, and the
+    // real container path is validated on a Docker host (Phase 3 e2e).
+    startProductionContainer: async ({ prodSlug, imageId, envVars, extraLabels }) => {
+      const docker = require('./docker');
+      const port = await docker.findFreePort();
+      const containerPort = (await docker.imageExposedPort(imageId)) || 3000;
+      const containerId = await docker.runContainer(
+        prodSlug, imageId, port, envVars || {}, { containerPort, extraLabels: extraLabels || {} },
+      );
+      return { containerId, port };
+    },
   };
 }
 function getDeps() { return deps || (deps = realDeps()); }
 // test hook — pass null to restore the real modules
 function setDeps(overrides) { deps = overrides ? { ...realDeps(), ...overrides } : null; }
+
+// Map an environment access policy to the legacy pipeline's visibility value.
+// 'password' MUST survive: Caddy only emits the basic_auth block when
+// visibility === 'password', so collapsing it to 'public' silently unprotects a
+// password-gated site the moment its route is (re)published.
+function visibilityForPolicy(accessPolicy) {
+  if (accessPolicy === 'private') return 'private';
+  if (accessPolicy === 'password') return 'password';
+  return 'public';
+}
+
+// Best-effort decrypt of a legacy project's stored env for a runtime container.
+// Mirrors the redeploy pipeline: on failure, run without env rather than throw.
+function decryptProjectEnv(project) {
+  if (!project || !project.env_vars) return {};
+  try {
+    return require('../routes/env').decryptEnvVars(project.env_vars);
+  } catch {
+    return {};
+  }
+}
 
 // Resolve a system + environment (+ mapped legacy project, when one exists)
 // within the caller's organisation. Environment name comes from the URL.
@@ -70,7 +106,7 @@ async function deployToEnvironment({ organisationId, systemId, envName, zipPath,
     result = await d.beginDeploy({
       name: envName === 'preview' ? `${system.name} (preview)` : system.name,
       slug: projectSlug,
-      visibility: environment.accessPolicy === 'private' ? 'private' : 'public',
+      visibility: visibilityForPolicy(environment.accessPolicy),
       zipPath, userId, ip,
     });
     if (result.ok) {
@@ -88,14 +124,29 @@ async function deployToEnvironment({ organisationId, systemId, envName, zipPath,
       // subdomain record (mirrors the Phase 2 bridge behaviour).
       if (envName === 'production') {
         const hostname = `${system.slug}.${process.env.BASE_DOMAIN || 'acronym.sk'}`;
-        await prisma.domain.upsert({
-          where: { hostname },
-          update: { systemId: system.id, environmentId: environment.id },
-          create: {
-            organisationId, hostname, systemId: system.id,
-            environmentId: environment.id, isCustom: false, verified: true,
-          },
-        });
+        // hostname is globally unique. Never repoint a row owned by another
+        // organisation — a same-slug system in org B must not hijack org A's
+        // subdomain. Only claim the hostname when it's unowned or already ours.
+        const existing = await prisma.domain.findUnique({ where: { hostname } });
+        if (existing && existing.organisationId !== organisationId) {
+          await auditV4Repo.append({
+            organisation_id: organisationId, action: 'domain_conflict_skipped',
+            entity_type: 'system', entity_id: system.id,
+            detail: `hostname ${hostname} owned by another organisation`, ip,
+          });
+        } else if (existing) {
+          await prisma.domain.update({
+            where: { hostname },
+            data: { systemId: system.id, environmentId: environment.id },
+          });
+        } else {
+          await prisma.domain.create({
+            data: {
+              organisationId, hostname, systemId: system.id,
+              environmentId: environment.id, isCustom: false, verified: true,
+            },
+          });
+        }
       }
     }
   }
@@ -127,9 +178,14 @@ async function rollbackEnvironment({ organisationId, systemId, envName, userId, 
 }
 
 // Promote the preview environment's current release to production (roadmap
-// flow): preview release exists → health gate passes → production release
-// recorded (previous superseded — a no-op on the first-ever promotion) →
-// route publication delegated to the production environment's project.
+// flow): preview healthy → start a PRODUCTION-OWNED container from the promoted
+// image → gate the new container's health → record the production release
+// (previous superseded; a no-op on the first-ever promotion) → switch the route
+// to the new container → tear down the old production container.
+//
+// Production never shares the preview's container: the promoted image is run as
+// a fresh container with its own id and host port, so a later preview redeploy
+// or cleanup cannot pull the container out from under production.
 async function promote({ organisationId, systemId, userId, ip }) {
   const preview = await resolveTarget(organisationId, systemId, 'preview');
   if (preview.error) return { ok: false, code: preview.error.code, error: preview.error.message };
@@ -142,26 +198,53 @@ async function promote({ organisationId, systemId, userId, ip }) {
     : null;
   if (!previewRelease) return { ok: false, code: 400, error: 'No preview release to promote' };
   if (!previewRelease.port) return { ok: false, code: 409, error: 'Preview release has no running port' };
+  if (!previewRelease.imageId) return { ok: false, code: 409, error: 'Preview release has no built image to promote' };
 
   const d = getDeps();
-
-  // Health gate — never promote an unhealthy release.
   const healthPath = preview.environment.healthPath || '/';
+
+  // Pre-gate: never promote a preview that isn't healthy right now.
   try {
     await d.health.waitForHealthy(d.health.targetForPort(previewRelease.port), healthPath);
   } catch (err) {
     return { ok: false, code: 502, error: `Promotion blocked: preview failed its health gate (${err.message})` };
   }
 
+  // Start a production-owned container from the promoted image.
+  const prodSlug = production.project ? production.project.slug : production.system.slug;
+  let started;
+  try {
+    started = await d.startProductionContainer({
+      prodSlug,
+      imageId: previewRelease.imageId,
+      envVars: decryptProjectEnv(production.project),
+      extraLabels: production.project ? await v4sync.labelsForSlug(prodSlug) : {},
+    });
+  } catch (err) {
+    return { ok: false, code: 502, error: `Promotion failed to start the production container: ${err.message}` };
+  }
+
+  // Gate the NEW production container before switching any traffic to it.
+  try {
+    await d.health.waitForHealthy(d.health.targetForPort(started.port), healthPath);
+  } catch (err) {
+    await d.docker.removeContainer(started.containerId, true).catch(() => {});
+    return { ok: false, code: 502, error: `Promotion blocked: production container failed its health gate (${err.message})` };
+  }
+
+  // Record the production release, superseding the previous one. Re-read the
+  // environment's pointer INSIDE the transaction (not the value resolved
+  // earlier) so two concurrent promotes can't both supersede the same release.
+  let previousContainerId = null;
   const release = await prisma.$transaction(async (tx) => {
-    const current = production.environment.currentReleaseId
-      // org-scope-exempt: PK pointer from the org-scoped environment row
-      ? await tx.release.findUnique({ where: { id: production.environment.currentReleaseId } })
+    const envRow = await tx.systemEnvironment.findUnique({ where: { id: production.environment.id } });
+    const current = envRow && envRow.currentReleaseId
+      ? await tx.release.findUnique({ where: { id: envRow.currentReleaseId } })
       : null;
     if (current) {
       // Retain previous: mark superseded, keep the row for rollback. On the
       // first-ever promotion there is no previous release — skip, don't fail.
-      // org-scope-exempt: supersede by PK fetched above
+      previousContainerId = current.containerId;
       await tx.release.update({ where: { id: current.id }, data: { status: 'superseded' } });
     }
     const created = await tx.release.create({
@@ -169,14 +252,13 @@ async function promote({ organisationId, systemId, userId, ip }) {
         organisationId,
         systemId: production.system.id,
         environmentId: production.environment.id,
-        containerId: previewRelease.containerId,
+        containerId: started.containerId,
         imageId: previewRelease.imageId,
-        port: previewRelease.port,
+        port: started.port,
         status: 'active',
         metadata: JSON.stringify({ source: 'promote', fromRelease: previewRelease.id }),
       },
     });
-    // org-scope-exempt: PK from the org-scoped environment row
     await tx.systemEnvironment.update({
       where: { id: production.environment.id },
       data: { currentReleaseId: created.id },
@@ -184,13 +266,15 @@ async function promote({ organisationId, systemId, userId, ip }) {
     return created;
   });
 
-  // Route switch — via the production project when mapped; recorded either way.
+  // Switch the production route to the NEW container's port. Preserve the
+  // access policy verbatim (password stays password) so the switch never
+  // silently drops basic auth.
   if (production.project) {
     try {
       await d.proxy.publishRoute({
         slug: production.project.slug,
-        port: previewRelease.port,
-        visibility: production.environment.accessPolicy === 'private' ? 'private' : 'public',
+        port: started.port,
+        visibility: visibilityForPolicy(production.environment.accessPolicy),
         basicUser: production.environment.basicUser,
         basicHash: production.environment.basicHash,
         apex: !!production.system.isPrimaryRoot,
@@ -198,6 +282,12 @@ async function promote({ organisationId, systemId, userId, ip }) {
     } catch (err) {
       return { ok: true, release, warning: `Release recorded but route switch failed: ${err.message}` };
     }
+  }
+
+  // Traffic has moved — tear down the previous production container.
+  if (previousContainerId && previousContainerId !== started.containerId) {
+    await d.docker.stopContainer(previousContainerId).catch(() => {});
+    await d.docker.removeContainer(previousContainerId, true).catch(() => {});
   }
 
   await auditV4Repo.append({
