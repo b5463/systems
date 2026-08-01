@@ -20,6 +20,24 @@ function configured() {
   return !!(cfg.endpoint && cfg.accessKey && cfg.secretKey);
 }
 
+// Encode an object key for the canonical URI: percent-encode each path segment
+// per RFC3986, but keep the '/' separators. The request URL and the signed
+// canonical URI must be byte-identical.
+function encodeS3Key(key) {
+  return key.split('/').map((seg) => encodeURIComponent(seg)).join('/');
+}
+
+// AWS SigV4 signing key. The HMAC chain is date → region → service →
+// 'aws4_request' (each step keyed by the previous digest). Getting this order
+// wrong yields SignatureDoesNotMatch on every request. Exported for testing
+// against the AWS documented vector.
+function sigV4SigningKey(secretKey, dateShort, region, service) {
+  return [dateShort, region, service, 'aws4_request'].reduce(
+    (key, msg) => crypto.createHmac('sha256', key).update(msg).digest(),
+    Buffer.from(`AWS4${secretKey}`, 'utf8'),
+  );
+}
+
 async function uploadFile(localPath, remoteKey) {
   const cfg = s3Config();
   const stat = await fsp.stat(localPath);
@@ -27,27 +45,30 @@ async function uploadFile(localPath, remoteKey) {
   const dateStr = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
   const dateShort = dateStr.slice(0, 8);
 
-  const url = `${cfg.endpoint.replace(/\/$/, '')}/${cfg.bucket}/${remoteKey}`;
+  const endpoint = cfg.endpoint.replace(/\/$/, '');
+  const canonicalUri = `/${cfg.bucket}/${encodeS3Key(remoteKey)}`;
+  const url = `${endpoint}${canonicalUri}`;
+  // host (with port, if non-default) MUST be a signed header — SigV4 requires
+  // it, and S3/MinIO reject the request otherwise. undici sets the actual Host
+  // header from the URL, so we sign the same value but don't pass it to fetch.
+  const host = new URL(endpoint).host;
 
   const body = fs.createReadStream(localPath);
-  const headers = {
-    'Content-Length': String(contentLength),
-    'Content-Type': 'application/octet-stream',
-    'x-amz-date': dateStr,
-    'x-amz-content-sha256': 'UNSIGNED-PAYLOAD',
-  };
 
-  const canonicalHeaders = Object.entries(headers)
-    .sort(([a], [b]) => a.toLowerCase().localeCompare(b.toLowerCase()))
-    .map(([k, v]) => `${k.toLowerCase()}:${v.trim()}`)
-    .join('\n') + '\n';
-  const signedHeaders = Object.keys(headers)
-    .map((k) => k.toLowerCase())
-    .sort()
-    .join(';');
+  // Canonical + signed headers, lowercased and sorted by name.
+  const signHeaders = {
+    'content-length': String(contentLength),
+    'content-type': 'application/octet-stream',
+    host,
+    'x-amz-content-sha256': 'UNSIGNED-PAYLOAD',
+    'x-amz-date': dateStr,
+  };
+  const sortedKeys = Object.keys(signHeaders).sort();
+  const canonicalHeaders = sortedKeys.map((k) => `${k}:${signHeaders[k].trim()}`).join('\n') + '\n';
+  const signedHeaders = sortedKeys.join(';');
 
   const canonicalRequest = [
-    'PUT', `/${cfg.bucket}/${remoteKey}`, '',
+    'PUT', canonicalUri, '',
     canonicalHeaders, signedHeaders, 'UNSIGNED-PAYLOAD',
   ].join('\n');
 
@@ -57,15 +78,18 @@ async function uploadFile(localPath, remoteKey) {
     crypto.createHash('sha256').update(canonicalRequest).digest('hex'),
   ].join('\n');
 
-  const signingKey = ['aws4_request', 's3', cfg.region, dateShort].reduce(
-    (key, msg) => crypto.createHmac('sha256', key).update(msg).digest(),
-    `AWS4${cfg.secretKey}`
-  );
+  const signingKey = sigV4SigningKey(cfg.secretKey, dateShort, cfg.region, 's3');
   const signature = crypto.createHmac('sha256', signingKey).update(stringToSign).digest('hex');
 
-  headers.Authorization = `AWS4-HMAC-SHA256 Credential=${cfg.accessKey}/${scope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
+  const fetchHeaders = {
+    'Content-Length': String(contentLength),
+    'Content-Type': 'application/octet-stream',
+    'x-amz-content-sha256': 'UNSIGNED-PAYLOAD',
+    'x-amz-date': dateStr,
+    Authorization: `AWS4-HMAC-SHA256 Credential=${cfg.accessKey}/${scope}, SignedHeaders=${signedHeaders}, Signature=${signature}`,
+  };
 
-  const res = await fetch(url, { method: 'PUT', headers, body, duplex: 'half' });
+  const res = await fetch(url, { method: 'PUT', headers: fetchHeaders, body, duplex: 'half' });
   if (!res.ok) {
     const text = await res.text().catch(() => '');
     throw new Error(`S3 upload failed (${res.status}): ${text.slice(0, 200)}`);
@@ -91,4 +115,4 @@ async function uploadDirectory(localDir, remotePrefix) {
   return { totalBytes };
 }
 
-module.exports = { s3Config, configured, uploadFile, uploadDirectory };
+module.exports = { s3Config, configured, uploadFile, uploadDirectory, sigV4SigningKey, encodeS3Key };

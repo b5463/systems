@@ -64,7 +64,7 @@ async function main() {
   }
 
   reconcile.start();
-  backup.start();
+  backup.start().catch((err) => fastify.log.error({ err }, 'backup scheduler failed to start'));
 
   const scheduler = require('./services/scheduler');
   const previewcleanup = require('./services/previewcleanup');

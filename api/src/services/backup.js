@@ -89,7 +89,7 @@ async function runBackup() {
         const st = await fsp.stat(path.join(backupDir(), e.name));
         dirs.push({ name: e.name, mtimeMs: st.mtimeMs });
       }
-      for (const name of backupsToPrune(dirs, getSetting('backupRetention'))) {
+      for (const name of backupsToPrune(dirs, await getSetting('backupRetention'))) {
         await fsp.rm(path.join(backupDir(), name), { recursive: true, force: true });
         pruned++;
       }
@@ -136,12 +136,16 @@ async function runBackup() {
   }
 }
 
-function start() {
+async function start() {
   const { features } = require('../util/flags');
   if (!features().backupScheduler) return; // off by default
-  const hours = getSetting('backupIntervalHours');
-  if (hours <= 0) return;
-  timer = setInterval(() => { runBackup().catch(() => {}); }, hours * 3.6e6);
+  // getSetting is async: without the await, `hours` was a Promise, `hours <= 0`
+  // was always false, and `hours * 3.6e6` was NaN — which setInterval clamps to
+  // ~1ms, firing pg_dump back-to-back forever. Await it and guard the interval.
+  const hours = await getSetting('backupIntervalHours');
+  const ms = Number(hours) * 3.6e6;
+  if (!Number.isFinite(ms) || ms <= 0) return;
+  timer = setInterval(() => { runBackup().catch(() => {}); }, ms);
   if (timer.unref) timer.unref();
 }
 
