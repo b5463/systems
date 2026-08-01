@@ -127,6 +127,7 @@ async function deployToEnvironment({ organisationId, systemId, envName, zipPath,
         // hostname is globally unique. Never repoint a row owned by another
         // organisation — a same-slug system in org B must not hijack org A's
         // subdomain. Only claim the hostname when it's unowned or already ours.
+        // org-scope-exempt: hostname is globally unique; ownership is checked explicitly below
         const existing = await prisma.domain.findUnique({ where: { hostname } });
         if (existing && existing.organisationId !== organisationId) {
           await auditV4Repo.append({
@@ -135,6 +136,7 @@ async function deployToEnvironment({ organisationId, systemId, envName, zipPath,
             detail: `hostname ${hostname} owned by another organisation`, ip,
           });
         } else if (existing) {
+          // org-scope-exempt: only reached when `existing` is this org's row (checked above)
           await prisma.domain.update({
             where: { hostname },
             data: { systemId: system.id, environmentId: environment.id },
@@ -237,14 +239,17 @@ async function promote({ organisationId, systemId, userId, ip }) {
   // earlier) so two concurrent promotes can't both supersede the same release.
   let previousContainerId = null;
   const release = await prisma.$transaction(async (tx) => {
+    // org-scope-exempt: PK from the org-scoped production environment resolved above
     const envRow = await tx.systemEnvironment.findUnique({ where: { id: production.environment.id } });
     const current = envRow && envRow.currentReleaseId
+      // org-scope-exempt: PK pointer from the org-scoped environment row
       ? await tx.release.findUnique({ where: { id: envRow.currentReleaseId } })
       : null;
     if (current) {
       // Retain previous: mark superseded, keep the row for rollback. On the
       // first-ever promotion there is no previous release — skip, don't fail.
       previousContainerId = current.containerId;
+      // org-scope-exempt: supersede by PK fetched above
       await tx.release.update({ where: { id: current.id }, data: { status: 'superseded' } });
     }
     const created = await tx.release.create({
@@ -259,6 +264,7 @@ async function promote({ organisationId, systemId, userId, ip }) {
         metadata: JSON.stringify({ source: 'promote', fromRelease: previewRelease.id }),
       },
     });
+    // org-scope-exempt: PK from the org-scoped production environment
     await tx.systemEnvironment.update({
       where: { id: production.environment.id },
       data: { currentReleaseId: created.id },

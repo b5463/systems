@@ -26,11 +26,20 @@ const SCOPED_TABLES = [
   'legacy_project_map', 'admin_users', 'admin_sessions', 'audit_log_v4',
   'customers', 'orders', 'subscriptions', 'entitlement_grants', 'licences',
   'accounts', 'product_users',
+  // V4 Phase 5 — Portfolio CMS (all org-scoped; form_submissions carries a
+  // direct organisation_id so submissions can't be read cross-tenant).
+  'portfolio_pages', 'product_portfolio_profiles', 'portfolio_blocks',
+  'portfolio_snapshots', 'portfolio_redirects', 'public_forms',
+  'form_submissions', 'media_assets', 'legal_versions',
 ];
 const SCOPED_MODELS = [
   'system', 'product', 'systemEnvironment', 'release', 'domain',
   'environmentSecret', 'infrastructureMetric', 'healthSnapshot',
   'legacyProjectMap', 'adminUser', 'adminSession', 'auditLogV4',
+  // V4 Phase 5 — Portfolio CMS models.
+  'portfolioPage', 'productPortfolioProfile', 'portfolioBlock',
+  'portfolioSnapshot', 'portfolioRedirect', 'publicForm',
+  'formSubmission', 'mediaAsset', 'legalVersion',
 ];
 
 const EXEMPT = /org-scope-exempt:/;

@@ -288,7 +288,7 @@ test('v4 phase 5: portfolio tables are org-scoped (organisationId column)', () =
   const schema = fs.readFileSync(path.join(__dirname, '..', 'prisma', 'schema.prisma'), 'utf8');
   const models = [
     'PortfolioPage', 'ProductPortfolioProfile', 'PortfolioBlock', 'PortfolioSnapshot',
-    'PortfolioRedirect', 'PublicForm', 'MediaAsset', 'LegalVersion',
+    'PortfolioRedirect', 'PublicForm', 'FormSubmission', 'MediaAsset', 'LegalVersion',
   ];
   for (const m of models) {
     const start = schema.indexOf(`model ${m} `);

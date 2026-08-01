@@ -630,16 +630,18 @@ model PublicForm {
 }
 
 model FormSubmission {
-  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  formId     String   @map("form_id") @db.Uuid
-  data       String
-  leadStatus String   @default("new") @map("lead_status")
-  sourceIp   String?  @map("source_ip")
-  createdAt  DateTime @default(now()) @map("created_at")
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organisationId String   @map("organisation_id") @db.Uuid
+  formId         String   @map("form_id") @db.Uuid
+  data           String
+  leadStatus     String   @default("new") @map("lead_status")
+  sourceIp       String?  @map("source_ip")
+  createdAt      DateTime @default(now()) @map("created_at")
 
   form PublicForm @relation(fields: [formId], references: [id], onDelete: Cascade)
 
-  @@index([formId, createdAt])
+  @@index([organisationId, formId, createdAt])
+  @@index([organisationId, leadStatus])
   @@map("form_submissions")
 }
 
