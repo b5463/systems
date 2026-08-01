@@ -38,10 +38,10 @@ function sigV4SigningKey(secretKey, dateShort, region, service) {
   );
 }
 
-async function uploadFile(localPath, remoteKey) {
+// Signed PUT of a body (stream or Buffer) of a known length. Shared by the file
+// and buffer uploaders so the SigV4 signing lives in exactly one place.
+async function signedPut({ remoteKey, contentLength, contentType, body }) {
   const cfg = s3Config();
-  const stat = await fsp.stat(localPath);
-  const contentLength = stat.size;
   const dateStr = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
   const dateShort = dateStr.slice(0, 8);
 
@@ -53,12 +53,10 @@ async function uploadFile(localPath, remoteKey) {
   // header from the URL, so we sign the same value but don't pass it to fetch.
   const host = new URL(endpoint).host;
 
-  const body = fs.createReadStream(localPath);
-
   // Canonical + signed headers, lowercased and sorted by name.
   const signHeaders = {
     'content-length': String(contentLength),
-    'content-type': 'application/octet-stream',
+    'content-type': contentType,
     host,
     'x-amz-content-sha256': 'UNSIGNED-PAYLOAD',
     'x-amz-date': dateStr,
@@ -83,7 +81,7 @@ async function uploadFile(localPath, remoteKey) {
 
   const fetchHeaders = {
     'Content-Length': String(contentLength),
-    'Content-Type': 'application/octet-stream',
+    'Content-Type': contentType,
     'x-amz-content-sha256': 'UNSIGNED-PAYLOAD',
     'x-amz-date': dateStr,
     Authorization: `AWS4-HMAC-SHA256 Credential=${cfg.accessKey}/${scope}, SignedHeaders=${signedHeaders}, Signature=${signature}`,
@@ -94,8 +92,21 @@ async function uploadFile(localPath, remoteKey) {
     const text = await res.text().catch(() => '');
     throw new Error(`S3 upload failed (${res.status}): ${text.slice(0, 200)}`);
   }
-
   return { url, sizeBytes: contentLength };
+}
+
+async function uploadFile(localPath, remoteKey) {
+  const stat = await fsp.stat(localPath);
+  return signedPut({
+    remoteKey, contentLength: stat.size,
+    contentType: 'application/octet-stream', body: fs.createReadStream(localPath),
+  });
+}
+
+// Upload an in-memory buffer (e.g. a serialised catalog snapshot) — no temp file.
+async function uploadBuffer(buffer, remoteKey, contentType = 'application/octet-stream') {
+  const buf = Buffer.isBuffer(buffer) ? buffer : Buffer.from(String(buffer));
+  return signedPut({ remoteKey, contentLength: buf.length, contentType, body: buf });
 }
 
 async function uploadDirectory(localDir, remotePrefix) {
@@ -115,4 +126,4 @@ async function uploadDirectory(localDir, remotePrefix) {
   return { totalBytes };
 }
 
-module.exports = { s3Config, configured, uploadFile, uploadDirectory, sigV4SigningKey, encodeS3Key };
+module.exports = { s3Config, configured, uploadFile, uploadBuffer, uploadDirectory, sigV4SigningKey, encodeS3Key };

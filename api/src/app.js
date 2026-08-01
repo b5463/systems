@@ -267,7 +267,8 @@ async function buildApp(opts = {}) {
   await fastify.register(require('./routes/systems')); // V4 Phase 2 (flag-gated)
   await fastify.register(require('./routes/systemdeploy')); // V4 Phase 3 (flag-gated)
   await fastify.register(require('./routes/portfolio')); // V4 Phase 5 (flag-gated)
-  await fastify.register(require('./routes/domains')); // V4 Phase 4 (flag-gated, partial)
+  await fastify.register(require('./routes/public')); // V4 Phase 5 public catalog (flag-gated)
+  await fastify.register(require('./routes/domains')); // V4 Phase 4 (flag-gated)
 
   return fastify;
 }

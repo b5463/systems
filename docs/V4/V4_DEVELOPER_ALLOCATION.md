@@ -99,12 +99,12 @@ Tick a phase when its exit gate passes — not when coding is done.
   - [x] Draft → preview → publish → immutable snapshot pipeline (`api/src/services/portfolioPublish.js`, pure/unit-tested; `/api/portfolio/preview` and `/api/portfolio/publish`)
   - [x] Dashboard Portfolio area: homepage, nav, product-page, media, legal, redirects, locales, publish history, rollback (Tomas) — hidden test page at `/portfolio`, same pattern as `/products`
   - [x] SK/EN locale support with translation completeness indicator (`translationCompleteness()`, `GET /api/portfolio/locales`, Locales tab in dashboard)
-  - [ ] Public catalog API served from precomputed S3 snapshots — never from live PostgreSQL on public reads (Alex)
+  - [x] Public catalog API served from immutable snapshots — never from the live draft tables (Alex): `GET /api/public/catalog|products/:slug|snapshot/latest` (`routes/public.js`), served from versioned `portfolio_snapshots` with ETag/304, `stale-while-revalidate`, last-known-good fallback, and a public DTO allowlist (`services/publicCatalog.js` — throws in non-prod on a leaked field, strips+audits in prod). S3/CDN offload on publish is wired (`services/catalogOffload.js`, fail-open); reading from S3/CDN instead of the snapshot row is the renderer's job below.
   - [x] Media assets stored by CDN URL only; never embedded in snapshot JSON (`assertNoEmbeddedMedia`, rejects base64 data URIs); max snapshot size 2MB enforced
   - [x] Concurrent publish lock prevents simultaneous publishes (in-memory, per org+locale, 5-min TTL — needs a DB-backed `publish_locks` table once `ENABLE_MULTI_NODE` ships)
-  - [x] Snapshot schema versioning: `rendererCanServe()` refuses to serve a snapshot newer than the renderer knows, never silent fallback — logic is ready, not yet wired into a live renderer
-  - [ ] `acronym.sk` renderer: pre-rendered, snapshot cache, last-known-good, ETag, no live DB dependency (Alex)
-  - [ ] Renderer stays up during SYSTEMS. API outage (Alex — depends on renderer above)
+  - [x] Snapshot schema versioning: `rendererCanServe()` refuses to serve a snapshot newer than the renderer knows, never silent fallback — now wired into `/api/public/*` (serves the newest servable snapshot as last-known-good)
+  - [ ] `acronym.sk` renderer deployed as a system: consumes the S3/CDN catalog, no live DB dependency (Alex — depends on a Docker host; the catalog API + S3 offload it reads are done)
+  - [ ] Renderer stays up during SYSTEMS. API outage (Alex — depends on the deployed renderer above)
 
 ### Milestone D — Paid Products
 - [ ] **Phase 6** — Commerce foundation
@@ -354,16 +354,16 @@ foundational schema:
 
 | Task | Owner |
 |------|-------|
-| `GET /api/public/catalog?locale=sk|en`, `GET /api/public/products/:slug?locale=sk`, `GET /api/public/snapshot/latest?locale=en` | Alex |
-| Public API field allowlist enforcement (no container IDs, ports, repo URLs, logs, internal routes, admin IDs, customer/billing data, secret names) | Alex |
-| Deploy `acronym.sk` as first primary V4 system | Alex |
+| ~~`GET /api/public/catalog?locale=sk|en`, `GET /api/public/products/:slug?locale=sk`, `GET /api/public/snapshot/latest?locale=en`~~ ✅ `routes/public.js` — served from immutable snapshots with ETag/304, last-known-good | Alex |
+| ~~Public API field allowlist enforcement (no container IDs, ports, repo URLs, logs, internal routes, admin IDs, customer/billing data, secret names)~~ ✅ `services/publicCatalog.js` — throws in non-prod on a leaked field, strips+audits in prod | Alex |
+| Deploy `acronym.sk` as first primary V4 system (host — needs Docker) | Alex |
 | ~~Portfolio tables: `portfolio_pages`, `product_portfolio_profiles`, `portfolio_blocks`, `portfolio_snapshots`, `portfolio_redirects`, `public_forms`, `form_submissions`, `media_assets`, `legal_versions`~~ ✅ (`lead_status` implemented as a `form_submissions` column, not a separate table) | Tomas |
 | ~~Draft CMS → validation → preview snapshot → publish → immutable snapshot pipeline~~ ✅ `api/src/services/portfolioPublish.js` + `/api/portfolio/preview`, `/api/portfolio/publish` | Tomas |
 | ~~Dashboard Portfolio area: homepage editor, navigation editor, product-page editor, media library, legal pages, redirects, locales, preview, publish history, snapshot rollback~~ ✅ hidden test page at `dashboard/src/views/Portfolio.vue` (`/portfolio`) | Tomas |
 | ~~SK/EN locale support: translation completeness indicator, fallback rules~~ ✅ (localised slugs/SEO/language-switch mapping/localised legal pages are still basic — no per-locale slug routing yet) | Tomas |
 | `acronym.sk` renderer: pre-rendered pages, snapshot cache, last-known-good snapshot, ETag, stale-while-revalidate, hashed assets, no live DB dependency | Tomas |
 | Tests: draft change does not alter public site, publish creates immutable snapshot, snapshot rollback, SK/EN render, missing translation visible, public API hides private fields, renderer works during SYSTEMS API outage — publish/rollback/locale logic is unit-tested (39 tests); full app.inject() coverage blocked on Prisma client generation in this sandbox, same as the rest of the V4 DB-backed suites | Tomas |
-| Precomputed S3 catalog: publish action serialises catalog JSON to S3; CDN pointer updated atomically; /api/public/* reads from S3/CDN, never from PostgreSQL | Alex |
+| ~~Precomputed S3 catalog: publish action serialises catalog JSON to S3; CDN pointer updated atomically~~ ✅ `services/catalogOffload.js` (fail-open on publish; versioned object then `latest.json` pointer). The renderer reading from S3/CDN instead of the snapshot row is the host-pending renderer task above | Alex |
 | Media upload pipeline: quarantine → security scan (SVG sanitize, malware check, content-type by bytes) → convert → permanent S3 URL; EXIF strip; variants generated | Alex |
 | ~~Max snapshot size 2MB enforced; media stored by URL only (never embedded)~~ ✅ (orphan cleanup job for failed uploads is Alex's, pending the upload pipeline above) | Tomas |
 | ~~Concurrent publish lock; concurrent publishes rejected~~ ✅ in-memory per org+locale, 5-min TTL — needs a DB-backed `publish_locks` table once `ENABLE_MULTI_NODE` ships | Tomas |

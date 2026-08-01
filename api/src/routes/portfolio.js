@@ -268,11 +268,16 @@ async function portfolioRoutes(fastify) {
         detail: `v${snapshot.version} · ${sizeBytes}B · ${hash.slice(0, 12)}`, ip: request.ip,
       });
 
-      // Phase 5 (Alex): publish should also serialise this snapshot to S3 and
-      // flip the CDN pointer atomically. Not wired here — /api/public/* reads
-      // live from PostgreSQL until the S3 publish pipeline exists.
+      // Phase 5 (Alex): serialise the public catalog to S3 and flip the CDN
+      // pointer. Best-effort and fail-open — the DB snapshot is the
+      // authoritative last-known-good that /api/public/* serves regardless.
+      const offload = await require('../services/catalogOffload').offloadSnapshot({
+        locale, version: snapshot.version, content, publishedAt: snapshot.publishedAt,
+      });
+
       return reply.code(201).send({
         snapshot: { id: snapshot.id, version: snapshot.version, locale: snapshot.locale, publishedAt: snapshot.publishedAt, sizeBytes },
+        offload,
       });
     } catch (err) {
       return reply.code(422).send({ error: err.message });
