@@ -457,17 +457,28 @@ async function beginDeploy({ name, slug, visibility = 'public', zipPath, userId,
     const project = result.project;
 
     // env vars
-    if (Object.keys(envVars).length > 0 && process.env.ENV_SECRET) {
-      try {
-        const { encryptEnvVars } = require('./env');
-        const encrypted = encryptEnvVars(envVars);
-        await projectRepo.updateEnvVars(slug, encrypted);
-      } catch (e) {
-        console.error('[deploy] Failed to save env vars:', e);
+    let envWarning = null;
+    if (Object.keys(envVars).length > 0) {
+      if (process.env.ENV_SECRET) {
+        try {
+          const { encryptEnvVars } = require('./env');
+          const encrypted = encryptEnvVars(envVars);
+          await projectRepo.updateEnvVars(slug, encrypted);
+        } catch (e) {
+          console.error('[deploy] Failed to save env vars:', e);
+          envWarning = 'Environment variables could not be saved; they apply to this deploy only.';
+        }
+      } else {
+        // Without ENV_SECRET the vars still reach THIS container run (they're
+        // passed to the pipeline below) but can't be stored encrypted, so a
+        // later redeploy would start without them. Don't let that be silent.
+        envWarning = 'ENV_SECRET is not set: environment variables were applied to this deploy but NOT persisted, so a future redeploy will start without them. Set ENV_SECRET to save them.';
+        console.warn('[deploy] ' + envWarning);
       }
     }
 
     buildLogs.set(slug, []);
+    if (envWarning) appendBuildLog(slug, `[deploy] WARNING: ${envWarning}\n`);
     buildStatus.set(slug, 'building');
     const extractDir = tmpDir();
     setImmediate(() => {
@@ -476,7 +487,7 @@ async function beginDeploy({ name, slug, visibility = 'public', zipPath, userId,
       });
     });
     handedOff = true;
-    return { ok: true, project: pub(project) };
+    return { ok: true, project: pub(project), warning: envWarning || undefined };
   } catch (err) {
     if (dockerService.isDockerUnavailableError(err)) {
       return { ok: false, code: 503, error: 'Docker is not reachable. Start Docker and try again.' };
@@ -604,7 +615,7 @@ async function deployRoutes(fastify, options) {
         if (zipPath) await fsp.rm(zipPath, { force: true }).catch(() => {});
         return reply.code(result.code).send({ error: result.error });
       }
-      return reply.code(202).send({ project: result.project });
+      return reply.code(202).send({ project: result.project, warning: result.warning });
     } catch (err) {
       if (zipPath) await fsp.rm(zipPath, { force: true }).catch(() => {});
       throw err;

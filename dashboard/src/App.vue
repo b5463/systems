@@ -42,7 +42,10 @@ onBeforeUnmount(() => {
 
   <template v-if="auth.ready">
     <AppShell v-if="showShell">
-      <RouterView :key="route.fullPath" />
+      <!-- Key on path, not fullPath: a query-string change (tab switch, Events
+           filter) must not tear down and refetch the whole view. Different
+           routes/systems still have different paths, so they remount. -->
+      <RouterView :key="route.path" />
     </AppShell>
     <RouterView v-else />
   </template>

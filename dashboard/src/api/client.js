@@ -23,13 +23,20 @@ function jsonRequest(method, body) {
   }
 }
 
+// Send the user to login on a 401, preserving where they were so re-login
+// returns them there (the router guard reads the same `redirect` query).
+function redirectToLogin() {
+  const current = router.currentRoute.value
+  if (current.name === 'login') return
+  const redirect = current.fullPath && current.fullPath !== '/' ? current.fullPath : undefined
+  router.replace({ name: 'login', query: redirect ? { redirect } : undefined })
+}
+
 async function handle(res) {
   if (res.status === 401) {
     const auth = useAuthStore()
     auth.clear()
-    if (router.currentRoute.value.name !== 'login') {
-      router.replace({ name: 'login' })
-    }
+    redirectToLogin()
     throw new ApiError('Unauthorized', 401, null)
   }
 
@@ -120,7 +127,7 @@ export const api = {
         }
         if (xhr.status === 401) {
           auth.clear()
-          if (router.currentRoute.value.name !== 'login') router.replace({ name: 'login' })
+          redirectToLogin()
           reject(new ApiError('Unauthorized', 401, body))
           return
         }
@@ -145,6 +152,9 @@ export const api = {
     const totalChunks = Math.max(1, Math.ceil(file.size / chunkSize))
     const init = await this.post('/upload/init', {
       name: fields.name, slug: fields.slug, visibility: fields.visibility,
+      // Forward env vars too — the multipart path sends these, and without them
+      // a large chunked deploy starts its container with no environment.
+      ...(fields.envVars ? { envVars: fields.envVars } : {}),
       totalSize: file.size, totalChunks
     })
     const id = init.uploadId

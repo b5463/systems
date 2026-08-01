@@ -131,7 +131,7 @@ async function retryPublish() {
   try {
     const data = await api.post(`/projects/${props.slug}/publish-route`)
     if (data && data.project) system.value = data.project
-    showToast('Public route published.', 'ok')
+    showToast('Public route published.', 'success')
   } catch (e) {
     publishMsg.value = e.message || 'Could not publish the route.'
   } finally {

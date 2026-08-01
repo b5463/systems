@@ -45,10 +45,11 @@ const ACTION_LABELS = {
 }
 
 const ACTION_CATEGORIES = {
-  deploy: ['deploy', 'redeploy', 'redeploy_fail', 'rollback', 'start', 'stop', 'restart', 'github_push'],
+  deploy: ['deploy', 'deploy_fail', 'redeploy', 'redeploy_fail', 'rollback', 'rollback_fail',
+    'start', 'stop', 'restart', 'github_push'],
   auth: ['login', 'login_fail', 'login_locked', 'logout', 'sessions_revoked', 'session_revoked',
     'password_change', '2fa_enabled', '2fa_disabled'],
-  admin: ['user_create', 'user_delete', 'env_update', 'delete'],
+  admin: ['user_create', 'user_delete', 'env_update', 'delete', 'purge'],
   system: ['backup_succeeded', 'backup_failed', 'restore_started', 'restore_completed',
     'update_started', 'update_failed', 'update_completed', 'caddy_validate_failed',
     'docker_unavailable', 'postgres_unavailable', 'disk_warning', 'backup_overdue', 'resource_warning'],
@@ -269,12 +270,21 @@ function syncQuery() {
   router.replace({ query })
 }
 
+// Neutralize CSV/spreadsheet formula injection: a cell starting with = + - @
+// (or a control char that Excel may skip to reach one) is executed as a formula
+// when the file is opened. Audit rows carry attacker-influenced text (e.g. a
+// login_fail username), so prefix any such cell with a single quote.
+function csvSafe(value) {
+  const s = String(value ?? '')
+  return /^[=+\-@\t\r]/.test(s) ? `'${s}` : s
+}
+
 function exportCSV() {
   const rows = [['Date/Time', 'Action', 'Target type', 'Target', 'Actor', 'IP', 'Detail']]
   for (const e of entries.value) {
     rows.push([e.created_at, humanize(e.action), targetKind(e), e.target || '', actorLabel(e), e.ip || '', e.detail || ''])
   }
-  const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n')
+  const csv = rows.map(r => r.map(v => `"${csvSafe(v).replace(/"/g, '""')}"`).join(',')).join('\n')
   const blob = new Blob([csv], { type: 'text/csv' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')

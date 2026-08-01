@@ -78,6 +78,9 @@ async function uploadRoutes(fastify, options) {
           visibility: { type: 'string', enum: ['public', 'private'] },
           totalSize: { type: 'integer' },
           totalChunks: { type: 'integer' },
+          // Env vars are sent as a JSON string, same as the multipart deploy
+          // form field — parsed below.
+          envVars: { type: 'string', maxLength: 65536 },
         },
       },
     },
@@ -85,6 +88,16 @@ async function uploadRoutes(fastify, options) {
     if (!(await guard(request, reply))) return;
     const { name, slug, totalSize, totalChunks } = request.body;
     const visibility = request.body.visibility || 'public';
+
+    // Parse env vars up front (same handling as POST /api/deploy) so a large
+    // chunked deploy doesn't silently start its container without them.
+    let envVars = {};
+    if (request.body.envVars) {
+      try {
+        const parsed = JSON.parse(request.body.envVars);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) envVars = parsed;
+      } catch { /* ignore malformed */ }
+    }
 
     const sErr = slugError(slug);
     if (sErr) return reply.code(400).send({ error: sErr });
@@ -110,7 +123,7 @@ async function uploadRoutes(fastify, options) {
     await fsp.writeFile(part, Buffer.alloc(0)); // create empty
 
     sessions.set(uploadId, {
-      name, slug, visibility, totalSize, totalChunks,
+      name, slug, visibility, totalSize, totalChunks, envVars,
       received: 0, bytes: 0, part,
       userId: request.user.id, ip: request.ip,
       createdAt: Date.now(),
@@ -169,13 +182,13 @@ async function uploadRoutes(fastify, options) {
 
     const result = await deploy.beginDeploy({
       name: s.name, slug: s.slug, visibility: s.visibility,
-      zipPath, userId: s.userId, ip: s.ip,
+      zipPath, userId: s.userId, ip: s.ip, envVars: s.envVars || {},
     });
     if (!result.ok) {
       await fsp.rm(zipPath, { force: true }).catch(() => {});
       return reply.code(result.code).send({ error: result.error });
     }
-    return reply.code(202).send({ project: result.project });
+    return reply.code(202).send({ project: result.project, warning: result.warning });
   });
 
   // Cancel + clean up.

@@ -95,7 +95,7 @@ async function bulkRun(action) {
   const results = await Promise.allSettled(targets.map((s) => api.post(`/projects/${s.slug}/${action}`)))
   const ok = results.filter((r) => r.status === 'fulfilled').length
   const failed = results.length - ok
-  showToast(`${action === 'stop' ? 'Stopped' : 'Restarted'} ${ok}${failed ? ` · ${failed} failed` : ''}`, failed ? 'error' : 'ok')
+  showToast(`${action === 'stop' ? 'Stopped' : 'Restarted'} ${ok}${failed ? ` · ${failed} failed` : ''}`, failed ? 'error' : 'success')
   bulkBusy.value = ''
   exitSelect()
   load()
@@ -108,7 +108,7 @@ async function bulkDelete() {
   const results = await Promise.allSettled(targets.map((s) => api.del(`/projects/${s.slug}`)))
   const ok = results.filter((r) => r.status === 'fulfilled').length
   const failed = results.length - ok
-  showToast(`Deleted ${ok}${failed ? ` · ${failed} failed` : ''}`, failed ? 'error' : 'ok')
+  showToast(`Deleted ${ok}${failed ? ` · ${failed} failed` : ''}`, failed ? 'error' : 'success')
   bulkBusy.value = ''
   exitSelect()
   load()

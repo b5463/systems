@@ -22,62 +22,90 @@ async function extractZip(zipPath, destDir) {
 
   const extractedFiles = [];
   let entryCount = 0;
+  // Each entry is written asynchronously. The parser's 'close' fires once the
+  // input is consumed, but the last entry's write may still be in flight — so
+  // track every per-entry promise and wait for them ALL before resolving, or
+  // the returned file list is incomplete and the build context is truncated.
+  const pending = [];
 
   await new Promise((resolve, reject) => {
-    fs.createReadStream(zipPath)
-      .pipe(unzipper.Parse())
-      .on('entry', async (entry) => {
-        entryCount++;
-        if (entryCount > MAX_ENTRIES) {
-          entry.autodrain();
-          reject(new Error(`ZIP contains more than ${MAX_ENTRIES} entries`));
-          return;
-        }
+    const readStream = fs.createReadStream(zipPath);
+    const parser = unzipper.Parse();
+    let failed = false;
+    const fail = (err) => {
+      if (failed) return;
+      failed = true;
+      // Stop reading so a hostile/huge archive doesn't keep extracting after a
+      // limit is breached.
+      readStream.destroy();
+      reject(err);
+    };
 
-        const entryPath = entry.path;
-        const type = entry.type;
+    readStream.on('error', fail);
+    parser.on('error', fail);
 
-        // Zip slip prevention (shared, unit-tested guard)
-        const fullOutputPath = safeResolve(destDir, entryPath);
-        if (!fullOutputPath) {
-          entry.autodrain();
-          reject(new Error(`Zip slip attempt detected: entry "${entryPath}" resolves outside destination`));
-          return;
-        }
+    parser.on('entry', (entry) => {
+      if (failed) { entry.autodrain(); return; }
 
-        if (type === 'Directory') {
-          try {
-            await fsp.mkdir(fullOutputPath, { recursive: true });
-          } catch (err) {
-            // Ignore already-exists
-          }
-          entry.autodrain();
-        } else {
-          try {
-            await fsp.mkdir(path.dirname(fullOutputPath), { recursive: true });
-            await new Promise((res, rej) => {
-              let written = 0;
-              const ws = fs.createWriteStream(fullOutputPath);
-              ws.on('finish', res);
-              ws.on('error', rej);
-              entry.on('data', (chunk) => {
-                written += chunk.length;
-                if (written > MAX_FILE_BYTES) {
-                  ws.destroy();
-                  entry.destroy();
-                  rej(new Error(`File "${entryPath}" exceeds the 100MB per-file limit`));
-                }
-              });
-              entry.pipe(ws);
+      entryCount++;
+      if (entryCount > MAX_ENTRIES) {
+        entry.autodrain();
+        fail(new Error(`ZIP contains more than ${MAX_ENTRIES} entries`));
+        return;
+      }
+
+      const entryPath = entry.path;
+      const type = entry.type;
+
+      // Zip slip prevention (shared, unit-tested guard)
+      const fullOutputPath = safeResolve(destDir, entryPath);
+      if (!fullOutputPath) {
+        entry.autodrain();
+        fail(new Error(`Zip slip attempt detected: entry "${entryPath}" resolves outside destination`));
+        return;
+      }
+
+      if (type === 'Directory') {
+        entry.autodrain();
+        pending.push(fsp.mkdir(fullOutputPath, { recursive: true }).catch(() => {}));
+      } else {
+        const task = (async () => {
+          await fsp.mkdir(path.dirname(fullOutputPath), { recursive: true });
+          await new Promise((res, rej) => {
+            let written = 0;
+            const ws = fs.createWriteStream(fullOutputPath);
+            ws.on('finish', res);
+            ws.on('error', rej);
+            entry.on('data', (chunk) => {
+              written += chunk.length;
+              if (written > MAX_FILE_BYTES) {
+                ws.destroy();
+                entry.destroy();
+                rej(new Error(`File "${entryPath}" exceeds the 100MB per-file limit`));
+              }
             });
-            extractedFiles.push(path.relative(destDir, fullOutputPath));
-          } catch (err) {
-            reject(err);
-          }
-        }
-      })
-      .on('finish', resolve)
-      .on('error', reject);
+            entry.pipe(ws);
+          });
+          extractedFiles.push(path.relative(destDir, fullOutputPath));
+        })();
+        task.catch(fail);
+        pending.push(task);
+      }
+    });
+
+    // Wait for the input to be fully consumed AND every write to finish. Guard
+    // so we settle once regardless of whether unzipper emits 'finish', 'close',
+    // or both.
+    let settling = false;
+    const onDone = () => {
+      if (settling) return;
+      settling = true;
+      Promise.allSettled(pending).then(() => { if (!failed) resolve(); });
+    };
+    parser.on('finish', onDone);
+    parser.on('close', onDone);
+
+    readStream.pipe(parser);
   });
 
   return extractedFiles;

@@ -26,6 +26,17 @@ const {
 const publishLocks = new Map();
 const PUBLISH_LOCK_TTL_MS = 5 * 60 * 1000;
 
+// A block's `data` is stored as a JSON string. Parse defensively so one
+// malformed row can't turn a whole list response into a 500 — fall back to the
+// raw string and flag it rather than throwing.
+function parseBlockData(raw) {
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return { _unparsed: raw };
+  }
+}
+
 async function portfolioRoutes(fastify) {
   const currentOrg = () => orgRepo.ensureDefault();
 
@@ -100,7 +111,7 @@ async function portfolioRoutes(fastify) {
     const { ownerType, ownerId, locale } = request.query;
     if (!ownerType || !ownerId) return reply.code(400).send({ error: 'ownerType and ownerId are required' });
     const blocks = await portfolioRepo.listBlocks(org.id, ownerType, ownerId, locale);
-    return { blocks: blocks.map((b) => ({ ...b, data: JSON.parse(b.data) })) };
+    return { blocks: blocks.map((b) => ({ ...b, data: parseBlockData(b.data) })) };
   });
 
   fastify.put('/api/portfolio/blocks', {
@@ -113,7 +124,7 @@ async function portfolioRoutes(fastify) {
     }
     const block = await portfolioRepo.upsertBlock(org.id, body);
     if (!block) return reply.code(404).send({ error: 'Block not found' });
-    return { block: { ...block, data: JSON.parse(block.data) } };
+    return { block: { ...block, data: parseBlockData(block.data) } };
   });
 
   fastify.delete('/api/portfolio/blocks/:id', {
